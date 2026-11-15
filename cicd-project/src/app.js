@@ -38,4 +38,9 @@ app.use((error, req, res, next) => {
   res.status(status).json({ error: error.message });
 });
 
+
+// Customer Order Routes
+
+app.use('/orders', ordersRouter);
+
 module.exports = app;

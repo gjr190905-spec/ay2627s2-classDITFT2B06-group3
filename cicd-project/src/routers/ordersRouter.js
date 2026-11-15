@@ -4,7 +4,7 @@ const {
   createOrder,
   getCustomerOrders,
   getOrderById
-} = require('../models/Order.model');
+} = require('../models/ordersModel');
 
 const router = express.Router();
 
