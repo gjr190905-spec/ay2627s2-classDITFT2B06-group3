@@ -44,15 +44,28 @@ async function seed() {
   console.log(`Inserted ${persons.length} persons.`);
 
   // Insert somethings (batch)
-  if (somethings.length > 0) {
-    const somethingPlaceholders = somethings.map((_, i) => `($${i + 1})`);
-    const somethingValues = somethings.map((s) => s.name);
-    await pool.query(
-      `INSERT INTO "Something" ("name") VALUES ${somethingPlaceholders.join(', ')}`,
-      somethingValues,
-    );
-  }
-  console.log(`Inserted ${somethings.length} somethings.`);
+  await pool.query(`
+    INSERT INTO "Stall" ("name", "pickupLocation", "isActive") VALUES
+      ('Chicken Rice Uncle', 'Stall A', true),
+      ('Mala Station', 'Stall B', true),
+      ('Western Grill', 'Stall C', true),
+      ('Yong Tau Foo', 'Stall D', false)
+    ON CONFLICT DO NOTHING;
+  `);
+  console.log('Inserted stalls.');
+
+  await pool.query(`
+    INSERT INTO "MenuItem" ("stallId", "name", "priceCents", "isAvailable") VALUES
+      (1, 'Chicken Rice', 350, true),
+      (1, 'Roast Pork Rice', 400, true),
+      (1, 'Soup', 150, true),
+      (2, 'Mala Xiang Guo', 800, true),
+      (2, 'Mala Noodles', 600, true),
+      (3, 'Chicken Chop', 700, true),
+      (3, 'Fish and Chips', 650, false)
+    ON CONFLICT DO NOTHING;
+  `);
+  console.log('Inserted menu items.');
 
   console.log('Seed data inserted successfully.');
 }
