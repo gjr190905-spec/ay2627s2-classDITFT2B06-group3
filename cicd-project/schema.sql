@@ -27,5 +27,92 @@ CREATE TABLE "Person" (
   CONSTRAINT "Person_pkey" PRIMARY KEY ("id")
 );
 
+-- Create Users Table
+CREATE TABLE users (
+    user_id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    role VARCHAR(20) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create Stalls Table
+CREATE TABLE stalls (
+    stall_id SERIAL PRIMARY KEY,
+    vendor_id INTEGER NOT NULL,
+    stall_name VARCHAR(150) NOT NULL,
+    description TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+
+    FOREIGN KEY (vendor_id) REFERENCES users(user_id)
+);
+
+-- Create Menu Items Table
+CREATE TABLE menu_items (
+    menu_item_id SERIAL PRIMARY KEY,
+    stall_id INTEGER NOT NULL,
+    item_name VARCHAR(150) NOT NULL,
+    description TEXT,
+    price NUMERIC(10,2) NOT NULL,
+    is_available BOOLEAN DEFAULT TRUE,
+
+    FOREIGN KEY (stall_id) REFERENCES stalls(stall_id)
+);
+
+-- Create Orders Table
+CREATE TABLE orders (
+    order_id SERIAL PRIMARY KEY,
+    customer_id INTEGER NOT NULL,
+    stall_id INTEGER NOT NULL,
+    total_amount NUMERIC(10,2) NOT NULL,
+    order_status VARCHAR(30) DEFAULT 'CONFIRMED',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (customer_id) REFERENCES users(user_id),
+    FOREIGN KEY (stall_id) REFERENCES stalls(stall_id)
+);
+
+-- Create Order Items Table
+CREATE TABLE order_items (
+    order_item_id SERIAL PRIMARY KEY,
+    order_id INTEGER NOT NULL,
+    menu_item_id INTEGER,
+    item_name VARCHAR(150) NOT NULL,
+    unit_price NUMERIC(10,2) NOT NULL,
+    quantity INTEGER NOT NULL,
+    subtotal NUMERIC(10,2) NOT NULL,
+
+    FOREIGN KEY (order_id) REFERENCES orders(order_id),
+    FOREIGN KEY (menu_item_id) REFERENCES menu_items(menu_item_id)
+);
+
+-- Create Payments Table
+CREATE TABLE payments (
+    payment_id SERIAL PRIMARY KEY,
+    order_id INTEGER NOT NULL UNIQUE,
+    amount NUMERIC(10,2) NOT NULL,
+    payment_status VARCHAR(20) DEFAULT 'PENDING',
+    payment_method VARCHAR(50),
+    transaction_reference VARCHAR(255),
+    paid_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (order_id) REFERENCES orders(order_id)
+);
+
+-- Create Collections Table
+CREATE TABLE collections (
+    collection_id SERIAL PRIMARY KEY,
+    order_id INTEGER NOT NULL UNIQUE,
+    collected_by INTEGER NOT NULL,
+    collected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (order_id) REFERENCES orders(order_id),
+    FOREIGN KEY (collected_by) REFERENCES users(user_id)
+);
+
 -- Indexes
 CREATE UNIQUE INDEX "Person_email_key" ON "Person"("email");
+
+
