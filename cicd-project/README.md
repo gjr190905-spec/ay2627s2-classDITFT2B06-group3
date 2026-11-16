@@ -68,16 +68,26 @@ This project demonstrates a CRUD web application with a complete CI/CD workflow.
 ├── src/
 │   ├── app.js                  # Express app (middleware, routes, error handling)
 │   ├── server.js               # Server startup + graceful shutdown
+│   ├── controllers/
+│   │   └── Vendor.controller.js # Vendor request validation + responses
 │   ├── models/
 │   │   ├── db.js               # PostgreSQL connection pool
+│   │   ├── Vendor.model.js     # Vendor lookup + open/close (transaction)
 │   │   ├── Person.model.js     # Person model
 │   │   └── Something.model.js  # Something model (full CRUD)
 │   ├── routers/
+│   │   ├── Vendor.router.js    # /vendors
 │   │   ├── Person.router.js    # GET /persons
 │   │   └── Something.router.js # CRUD /somethings
 │   └── public/
 │       ├── index.html          # Frontend UI
-│       └── index.js            # Frontend JavaScript
+│       ├── index.js            # Frontend JavaScript
+│       ├── vendor/home.html    # Vendor home page
+│       ├── css/theme.css       # Shared Makan Liao? theme (fonts, colours, buttons)
+│       ├── css/vendor-home.css # Vendor home page styles
+│       ├── js/vendor-home.js   # Vendor home page logic
+│       ├── fonts/              # Patrick Hand + Montserrat (OFL licences included)
+│       └── images/vendors/     # Sample vendor logos used by the seed data
 ├── e2e-tests/                  # Playwright E2E test specs
 ├── schema.sql                  # Database schema (single source of truth)
 ├── package.json
@@ -132,7 +142,7 @@ PORT=3001
 npm run migration:reset
 ```
 
-This reads `schema.sql` and creates the `Person` and `Something` tables.
+This reads `schema.sql` and creates the `Person`, `Something`, `Vendor` and `StoreClosure` tables.
 
 ### 5. Seed sample data (optional)
 
@@ -140,7 +150,7 @@ This reads `schema.sql` and creates the `Person` and `Something` tables.
 npm run seed
 ```
 
-Inserts 20 sample persons and 2 sample somethings.
+Inserts 20 sample persons, 2 sample somethings and 3 sample vendors.
 
 ### 6. Start the server
 
@@ -183,6 +193,27 @@ The app runs at `http://localhost:3000` by default.
 | `GET`    | `/somethings`     | Get all somethings | 200          |
 | `PUT`    | `/somethings/:id` | Update a something | 200, 404     |
 | `DELETE` | `/somethings/:id` | Delete a something | 200, 404     |
+
+### Vendors (vendor home page)
+
+| Method  | Endpoint                   | Description                                        | Status Codes       |
+| ------- | -------------------------- | -------------------------------------------------- | ------------------ |
+| `GET`   | `/vendors/closure-reasons` | Reasons offered when a vendor closes their stall   | 200                |
+| `GET`   | `/vendors/:id`             | Stall name, logo, and open/closed status           | 200, 400, 404      |
+| `PATCH` | `/vendors/:id/status`      | Open or close the stall (closing needs a `reason`) | 200, 400, 404, 409 |
+
+`PATCH /vendors/:id/status` body:
+
+```jsonc
+{ "isOpen": true }                                              // open – no reason asked
+{ "isOpen": false, "reason": "SOLD_OUT" }                       // close with a listed reason
+{ "isOpen": false, "reason": "OTHER", "otherReason": "Gas ran out" } // close with typed reason (1–255 chars)
+```
+
+Each close is recorded in the `StoreClosure` table. `409` means the stall is already in the requested state.
+
+The page itself is at `/vendor/home.html`. Until the login page exists, open it as
+`/vendor/home.html?vendorId=1` (the id is then kept in `sessionStorage`).
 
 ### Persons (read-only)
 
@@ -301,10 +332,10 @@ Push / PR to main
 
 Set these in **Settings → Secrets and variables → Actions**:
 
-| Secret         | Example Value                                                          |
-| -------------- | ---------------------------------------------------------------------- |
+| Secret         | Example Value                                            |
+| -------------- | -------------------------------------------------------- |
 | `DATABASE_URL` | `postgresql://user:password@host/dbname?sslmode=require` |
-| `APP_PORT`     | `3001`                                                                 |
+| `APP_PORT`     | `3001`                                                   |
 
 ### GitHub Pages Setup
 

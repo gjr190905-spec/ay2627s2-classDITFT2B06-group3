@@ -1,0 +1,466 @@
+/* ─────────────────────────────────────────────────────────
+   Vendor home page
+   Depends on theme.css for colours, fonts and buttons.
+   ───────────────────────────────────────────────────────── */
+
+/* ── Header ─────────────────────────────────────────────── */
+.vh-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background:#CC0202;
+  backdrop-filter: saturate(1.4) blur(10px);
+  border-bottom: 1px solid var(--ml-line);
+}
+
+.vh-header__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0.75rem 1.5rem;
+}
+
+.vh-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-width: 0;
+}
+
+.vh-logo {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--ml-surface);
+  box-shadow: inset 0 0 0 1px var(--ml-line);
+}
+
+.vh-logo__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vh-logo__fallback {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font: 1.35rem/1 var(--ml-font-hand);
+  color: var(--ml-paper);
+  background: var(--ml-red);
+}
+
+.vh-logo__fallback:empty {
+  background: transparent;
+}
+
+.vh-brand__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.vh-brand__stall {
+  font-weight: 600;
+  font-size: 1rem;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: white;
+}
+
+.vh-logout {
+  flex: none;
+  min-height: 40px;
+  padding-inline: 1.1rem;
+}
+
+/* ── Layout ─────────────────────────────────────────────── */
+.vh-main {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+
+/* ── Status panel ───────────────────────────────────────── */
+/* The panel takes on the stall's state: blue when open, red when closed. */
+.vh-status {
+  --state: var(--ml-ink-soft);
+  --state-tint: var(--ml-surface);
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 1rem 2rem;
+  padding: 2.25rem 2.5rem;
+  overflow: hidden;
+  background: var(--state-tint);
+  border-radius: var(--ml-radius-lg);
+  transition: background-color 300ms ease;
+}
+
+.vh-status[data-state='open'] {
+  --state: var(--ml-blue);
+  --state-tint: var(--ml-blue-tint);
+}
+
+.vh-status[data-state='closed'] {
+  --state: var(--ml-red);
+  --state-tint: var(--ml-red-tint);
+}
+
+.vh-status__heading {
+  font-size: clamp(2.1rem, 4.5vw, 2.9rem);
+  overflow-wrap: anywhere;
+}
+
+.vh-status__line {
+  max-width: 42ch;
+  margin: 0.5rem 0 0;
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+
+.vh-status__since {
+  margin: 0.2rem 0 0;
+  font-size: 0.88rem;
+  color: var(--ml-ink-soft);
+}
+
+.vh-status__since:empty {
+  display: none;
+}
+
+.vh-status__toggle {
+  margin-top: 1.5rem;
+  min-width: 10rem;
+}
+
+/* The state word is the page's one big typographic moment */
+.vh-status__word {
+  margin: 0;
+  font-family: var(--ml-font-hand);
+  font-size: clamp(4.5rem, 13vw, 8.5rem);
+  line-height: 1;
+  align-self: center;
+  color: var(--state);
+  user-select: none;
+}
+
+.vh-status__word:empty {
+  display: none;
+}
+
+.vh-status__word.is-changing {
+  animation: vh-word-in 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes vh-word-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+/* ── Services ───────────────────────────────────────────── */
+.vh-services {
+  margin-top: 3rem;
+}
+
+.vh-services__heading {
+  font-size: 1.9rem;
+  margin-bottom: 1rem;
+}
+
+.vh-services__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vh-tile {
+  display: flex;
+}
+
+.vh-tile--dashboard {
+  grid-column: span 2;
+}
+
+.vh-tile__link {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 0.3rem;
+  width: 100%;
+  min-height: 8.5rem;
+  padding: 1.4rem 1.5rem;
+  text-decoration: none;
+  background: var(--ml-paper);
+  border: 1px solid var(--ml-line);
+  border-radius: var(--ml-radius);
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+
+.vh-tile__link:hover {
+  border-color: var(--ml-ink);
+}
+
+.vh-tile__name {
+  font: 1.55rem/1.1 var(--ml-font-hand);
+}
+
+.vh-tile__desc {
+  font-size: 0.9rem;
+  color: var(--ml-ink-soft);
+}
+
+/* Dashboard is the most-used service, so it leads in the accent blue */
+.vh-tile--dashboard .vh-tile__link {
+  color: var(--ml-paper);
+  background: var(--ml-blue);
+  border-color: var(--ml-blue);
+}
+
+.vh-tile--dashboard .vh-tile__link:hover {
+  background: var(--ml-blue-dark);
+  border-color: var(--ml-blue-dark);
+}
+
+.vh-tile--dashboard .vh-tile__name {
+  font-size: 2.2rem;
+}
+
+.vh-tile--dashboard .vh-tile__desc {
+  color: rgb(255 255 255 / 0.88);
+}
+
+/* ── Signed-out state ───────────────────────────────────── */
+.vh-signed-out {
+  max-width: 30rem;
+  margin: 3rem auto 0;
+  padding: 2.5rem 2rem;
+  text-align: center;
+  background: var(--ml-surface);
+  border-radius: var(--ml-radius-lg);
+}
+
+.vh-signed-out h1 {
+  font-size: 2.4rem;
+}
+
+.vh-signed-out p {
+  margin: 0.5rem 0 1.5rem;
+  color: var(--ml-ink-soft);
+}
+
+/* ── Close-stall dialog ─────────────────────────────────── */
+.vh-dialog {
+  width: min(30rem, calc(100vw - 2rem));
+  padding: 1.75rem;
+  color: var(--ml-ink);
+  border: 0;
+  border-radius: var(--ml-radius-lg);
+  box-shadow: var(--ml-shadow-pop);
+}
+
+.vh-dialog::backdrop {
+  background: rgb(33 33 33 / 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.vh-dialog[open] {
+  animation: vh-pop 180ms ease-out;
+}
+
+@keyframes vh-pop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+}
+
+.vh-dialog__heading {
+  font-size: 2rem;
+}
+
+.vh-dialog__hint {
+  margin: 0.35rem 0 1.25rem;
+  font-size: 0.92rem;
+  color: var(--ml-ink-soft);
+}
+
+.vh-reasons {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.vh-reasons__list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.vh-reason {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  font-weight: 500;
+  border: 1px solid var(--ml-line);
+  border-radius: var(--ml-radius-sm);
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+
+.vh-reason:hover {
+  border-color: var(--ml-ink-soft);
+}
+
+.vh-reason:has(.vh-reason__input:checked) {
+  border-color: var(--ml-red);
+  box-shadow: inset 0 0 0 1px var(--ml-red);
+  background: var(--ml-red-tint);
+  color: var(--ml-red-dark);
+  font-weight: 600;
+}
+
+.vh-reason__input {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin: 0;
+  accent-color: var(--ml-red);
+}
+
+.vh-other {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 1rem;
+}
+
+.vh-other__label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.vh-other textarea {
+  width: 100%;
+  padding: 0.65rem 0.8rem;
+  font: inherit;
+  color: inherit;
+  resize: vertical;
+  border: 1px solid var(--ml-line);
+  border-radius: var(--ml-radius-sm);
+}
+
+.vh-other textarea:focus-visible {
+  outline-offset: 0;
+  border-color: var(--ml-blue);
+}
+
+.vh-other__count {
+  justify-self: end;
+  font-size: 0.78rem;
+  color: var(--ml-ink-soft);
+}
+
+.vh-dialog__error {
+  min-height: 1.4em;
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ml-red);
+}
+
+.vh-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+/* ── Toast ──────────────────────────────────────────────── */
+.vh-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 1.5rem;
+  z-index: 20;
+  padding: 0.7rem 1.3rem;
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--ml-paper);
+  background: var(--ml-ink);
+  border-radius: 999px;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.18);
+  transform: translate(-50%, 200%);
+  visibility: hidden;
+  transition:
+    transform 220ms ease,
+    visibility 0s linear 220ms;
+}
+
+.vh-toast.is-visible {
+  transform: translate(-50%, 0);
+  visibility: visible;
+  transition: transform 220ms ease;
+}
+
+.vh-toast.is-error {
+  background: var(--ml-red);
+}
+
+/* ── Responsive ─────────────────────────────────────────── */
+@media (max-width: 800px) {
+  .vh-services__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .vh-header__inner {
+    padding: 0.6rem 1rem;
+  }
+
+  .vh-main {
+    padding: 1.25rem 1rem 3rem;
+  }
+
+  .vh-status {
+    grid-template-columns: 1fr;
+    padding: 1.75rem 1.5rem;
+  }
+
+  .vh-status__word {
+    order: -1;
+    font-size: 4.5rem;
+  }
+
+  .vh-status__toggle {
+    width: 100%;
+  }
+
+  .vh-services__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .vh-tile--dashboard {
+    grid-column: auto;
+  }
+
+  .vh-tile__link {
+    min-height: 0;
+  }
+}

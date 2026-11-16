@@ -29,6 +29,24 @@ const persons = [
 
 const somethings = [{ name: 'Seed 1' }, { name: 'Seed 2' }];
 
+// Stall vendors. Vendor 1 is the one the vendor home page E2E tests use.
+const vendors = [
+  {
+    email: 'ahseng@makanliao.sg',
+    stallName: 'Ah Seng Chicken Rice',
+    logoUrl: '/images/vendors/ah-seng-chicken-rice.svg',
+    isOpen: true,
+  },
+  {
+    email: 'mdmlim@makanliao.sg',
+    stallName: 'Mdm Lim Laksa',
+    logoUrl: '/images/vendors/mdm-lim-laksa.svg',
+    isOpen: false,
+  },
+  // No logo configured – exercises the header's fallback badge
+  { email: 'kopi@makanliao.sg', stallName: 'Kopi Corner', logoUrl: null, isOpen: true },
+];
+
 async function seed() {
   console.log('Seeding data...');
 
@@ -53,6 +71,19 @@ async function seed() {
     );
   }
   console.log(`Inserted ${somethings.length} somethings.`);
+
+  // Insert vendors (batch)
+  if (vendors.length > 0) {
+    const vendorPlaceholders = vendors.map(
+      (_, i) => `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`,
+    );
+    const vendorValues = vendors.flatMap((v) => [v.email, v.stallName, v.logoUrl, v.isOpen]);
+    await pool.query(
+      `INSERT INTO "Vendor" ("email", "stallName", "logoUrl", "isOpen") VALUES ${vendorPlaceholders.join(', ')}`,
+      vendorValues,
+    );
+  }
+  console.log(`Inserted ${vendors.length} vendors.`);
 
   console.log('Seed data inserted successfully.');
 }
