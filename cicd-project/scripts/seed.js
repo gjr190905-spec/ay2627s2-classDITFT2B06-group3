@@ -26,7 +26,7 @@ const persons = [
   { email: 'zara@example.com', name: 'Zara' },
   { email: 'leo@example.com', name: 'Leo' },
 ];
-
+// eslint-disable-next-line no-unused-vars
 const somethings = [{ name: 'Seed 1' }, { name: 'Seed 2' }];
 
 async function seed() {
