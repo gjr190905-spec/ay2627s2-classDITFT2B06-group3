@@ -1,11 +1,13 @@
 const express = require('express');
 const createError = require('http-errors');
 const path = require('path');
+const { toHttpError } = require('./utils/errors');
 
 // Import route handlers
 const somethingRouter = require('./routers/Something.router');
 const personRouter = require('./routers/Person.router');
 const stallRouter = require('./routers/Stall.router');
+
 
 const app = express();
 
@@ -25,6 +27,16 @@ app.use('/stalls', stallRouter);
 
 // 404 handler — if no route above matched the request,
 // create a 404 error and pass it to the error handler below.
+// eslint-disable-next-line no-unused-vars
+app.use((error, req, res, next) => {
+  const httpError = toHttpError(error);
+  if (httpError.status >= 500) {
+    console.error(error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+  return res.status(httpError.status).json({ error: httpError.message });
+});
+
 app.use((req, res, next) => {
   next(createError(404, `Unknown resource ${req.method} ${req.originalUrl}`));
 });
