@@ -3,6 +3,8 @@ const {
   getClosureReasons,
   getVendor,
   updateVendorStatus,
+  updateVendorProfile,
+  updateVendorLogoImage,
 } = require('../controllers/Vendor.controller');
 
 const router = express.Router();
@@ -16,5 +18,11 @@ router.get('/:id', getVendor);
 
 // Open or close the stall. Closing requires a reason.
 router.patch('/:id/status', updateVendorStatus);
+
+// Change the shop name (must be unique across all vendors)
+router.patch('/:id/profile', updateVendorProfile);
+
+// Replace the profile picture (a vendor only ever has one)
+router.put('/:id/logo', updateVendorLogoImage);
 
 module.exports = router;

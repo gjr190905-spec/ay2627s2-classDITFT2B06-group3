@@ -15,6 +15,9 @@ const VENDOR_COLUMNS = '"id", "stallName", "logoUrl", "isOpen", "statusUpdatedAt
 
 module.exports.CLOSURE_REASONS = CLOSURE_REASONS;
 
+// Postgres error code for "unique_violation"
+const UNIQUE_VIOLATION = '23505';
+
 module.exports.getVendorById = async function getVendorById(id) {
   const { rows } = await pool.query(`SELECT ${VENDOR_COLUMNS} FROM "Vendor" WHERE "id" = $1`, [id]);
   return rows[0];
@@ -67,6 +70,60 @@ module.exports.setVendorOpenStatus = async function setVendorOpenStatus(id, isOp
 
     await client.query('COMMIT');
     return { vendor: updated.rows[0], changed: true };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+/**
+ * Change a vendor's shop name.
+ * Uniqueness is enforced by the database (case-insensitive unique index on "stallName"),
+ * so two vendors saving the same name at the same moment can't both succeed.
+ *
+ * @returns {Promise<object|undefined|null>}
+ *          the updated vendor, undefined if the vendor does not exist,
+ *          or null if another vendor already uses that name
+ */
+module.exports.updateVendorStallName = async function updateVendorStallName(id, stallName) {
+  try {
+    const { rows } = await pool.query(
+      `UPDATE "Vendor" SET "stallName" = $1 WHERE "id" = $2 RETURNING ${VENDOR_COLUMNS}`,
+      [stallName, id],
+    );
+    return rows[0];
+  } catch (error) {
+    if (error.code === UNIQUE_VIOLATION) return null;
+    throw error;
+  }
+};
+
+/**
+ * Replace a vendor's profile picture. There is only one "logoUrl" column,
+ * so a vendor can never have more than one picture.
+ *
+ * @returns {Promise<{vendor: object, previousLogoUrl: string|null}|undefined>}
+ *          undefined if the vendor does not exist
+ */
+module.exports.updateVendorLogo = async function updateVendorLogo(id, logoUrl) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const current = await client.query('SELECT "logoUrl" FROM "Vendor" WHERE "id" = $1 FOR UPDATE', [
+      id,
+    ]);
+    if (current.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return undefined;
+    }
+    const updated = await client.query(
+      `UPDATE "Vendor" SET "logoUrl" = $1 WHERE "id" = $2 RETURNING ${VENDOR_COLUMNS}`,
+      [logoUrl, id],
+    );
+    await client.query('COMMIT');
+    return { vendor: updated.rows[0], previousLogoUrl: current.rows[0].logoUrl };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

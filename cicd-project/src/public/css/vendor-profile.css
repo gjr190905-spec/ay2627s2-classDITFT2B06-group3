@@ -1,0 +1,147 @@
+/* ─────────────────────────────────────────────────────────
+   Vendor profile page
+   Depends on theme.css (colours, fonts, buttons) and
+   vendor-home.css (header, toast, signed-out panel).
+   ───────────────────────────────────────────────────────── */
+
+.vp-main {
+  max-width: 720px;
+}
+
+.vp-title {
+  font-size: clamp(2.1rem, 4.5vw, 2.9rem);
+}
+
+.vp-intro {
+  margin: 0.4rem 0 1.75rem;
+  color: var(--ml-ink-soft);
+}
+
+.vp-card {
+  margin-bottom: 1.5rem;
+  padding: 1.75rem 2rem;
+  background: var(--ml-surface);
+  border-radius: var(--ml-radius-lg);
+}
+
+.vp-card__heading {
+  font-size: 1.7rem;
+}
+
+.vp-card__hint {
+  margin: 0.25rem 0 1.25rem;
+  font-size: 0.92rem;
+  color: var(--ml-ink-soft);
+}
+
+/* ── Picture ────────────────────────────────────────────── */
+.vp-picture {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.vp-picture__frame {
+  flex: none;
+  width: 128px;
+  height: 128px;
+  overflow: hidden;
+  border-radius: var(--ml-radius);
+  background: var(--ml-paper);
+  box-shadow: inset 0 0 0 1px var(--ml-line);
+}
+
+.vp-picture__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vp-picture__fallback {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font: 3rem/1 var(--ml-font-hand);
+  color: var(--ml-paper);
+  background: var(--ml-red);
+}
+
+.vp-picture__controls {
+  min-width: 0;
+}
+
+.vp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.vp-note {
+  margin: 0.7rem 0 0;
+  font-size: 0.85rem;
+  color: var(--ml-ink-soft);
+}
+
+/* ── Name form ──────────────────────────────────────────── */
+.vp-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.vp-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0.6rem 1rem;
+  font: 500 1rem/1.3 var(--ml-font-ui);
+  color: var(--ml-ink);
+  background: var(--ml-paper);
+  border: 1px solid var(--ml-line);
+  border-radius: var(--ml-radius-sm);
+}
+
+.vp-input:hover {
+  border-color: var(--ml-ink-soft);
+}
+
+.vp-input[aria-invalid='true'] {
+  border-color: var(--ml-red);
+  background: var(--ml-red-tint);
+}
+
+.vp-input-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 1.6rem;
+  margin: 0.35rem 0 1rem;
+}
+
+.vp-error {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--ml-red);
+}
+
+.vp-error:empty {
+  display: none;
+}
+
+.vp-count {
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: var(--ml-ink-soft);
+}
+
+@media (max-width: 520px) {
+  .vp-card {
+    padding: 1.4rem 1.2rem;
+  }
+  .vp-picture {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
