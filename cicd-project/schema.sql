@@ -16,6 +16,7 @@ DROP TABLE IF EXISTS "Order" CASCADE;
 DROP TABLE IF EXISTS "PickupWindow" CASCADE;
 DROP TABLE IF EXISTS "MenuItem" CASCADE;
 DROP TABLE IF EXISTS "Stall" CASCADE;
+DROP TABLE IF EXISTS "FoodCourt" CASCADE;
 
 -- Create tables
 CREATE TABLE "Something" (
@@ -36,13 +37,29 @@ CREATE TABLE "Person" (
 CREATE UNIQUE INDEX "Person_email_key" ON "Person"("email");
 
 --customer features tables--
+CREATE TABLE "FoodCourt" (
+  "id" SERIAL NOT NULL,
+  "name" TEXT NOT NULL,
+  "location" TEXT NOT NULL,
+  "isActive" BOOLEAN NOT NULL DEFAULT true,
+  CONSTRAINT "FoodCourt_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "FoodCourt_name_check"
+    CHECK ("name" = btrim("name") AND char_length("name") BETWEEN 1 AND 100),
+  CONSTRAINT "FoodCourt_location_check"
+    CHECK ("location" = btrim("location") AND char_length("location") BETWEEN 1 AND 200)
+);
 CREATE TABLE "Stall" (
   "id" SERIAL NOT NULL,
+  "foodCourtId" INTEGER NOT NULL,
   "name" TEXT NOT NULL,
   "pickupLocation" TEXT NOT NULL,
   "isActive" BOOLEAN NOT NULL DEFAULT true,
-  CONSTRAINT "Stall_pkey" PRIMARY KEY ("id")
+  CONSTRAINT "Stall_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "Stall_foodCourtId_fkey" FOREIGN KEY ("foodCourtId")
+    REFERENCES "FoodCourt"("id") ON DELETE RESTRICT,
+  CONSTRAINT "Stall_foodCourt_name_key" UNIQUE ("foodCourtId", "name")
 );
+CREATE UNIQUE INDEX "FoodCourt_name_lower_key" ON "FoodCourt" (lower("name"));
 
 CREATE TABLE "MenuItem" (
   "id" SERIAL NOT NULL,
