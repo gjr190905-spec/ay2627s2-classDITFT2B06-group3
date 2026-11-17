@@ -3,26 +3,87 @@ const pool = require('./db');
 
 // Create an order
 module.exports.createOrder = async function createOrder(order) {
+
+  // Validate item IDs and quantities
+  const menuItemIds = [];
+
+  for (const item of order.items) {
+    if (
+      !Number.isInteger(item.menuItemId) ||
+      item.menuItemId <= 0 ||
+      !Number.isInteger(item.quantity) ||
+      item.quantity <= 0
+    ) {
+      const error = new Error('Invalid menu item ID or quantity');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // Prevent duplicate menu items in the same order
+    if (menuItemIds.includes(item.menuItemId)) {
+      const error = new Error('Duplicate menu items are not allowed');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    menuItemIds.push(item.menuItemId);
+  }
+
   const client = await pool.connect();
 
   try {
     await client.query('BEGIN');
 
-    // Calculate total amount from the order items
-    let totalAmount = 0;
+    // Check whether the stall exists and is active
+    const { rows: stallRows } = await client.query(
+      'SELECT stall_id FROM stalls WHERE stall_id = $1 AND is_active = TRUE',
+      [order.stallId]
+    );
+
+    if (stallRows.length === 0) {
+      const error = new Error('Stall not found or inactive');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // Check menu items and calculate the order total
+    let totalAmountInCents = 0;
+    const validatedItems = [];
 
     for (const item of order.items) {
       const { rows } = await client.query(
-        'SELECT price FROM menu_items WHERE menu_item_id = $1 AND stall_id = $2 AND is_available = TRUE',
+        `SELECT menu_item_id, item_name, price
+         FROM menu_items
+         WHERE menu_item_id = $1
+         AND stall_id = $2
+         AND is_available = TRUE`,
         [item.menuItemId, order.stallId]
       );
 
       if (rows.length === 0) {
-        throw new Error('Menu item not found or unavailable');
+        const error = new Error(
+          'Menu item not found or unavailable'
+        );
+        error.statusCode = 400;
+        throw error;
       }
 
-      totalAmount += Number(rows[0].price) * item.quantity;
+      const menuItem = rows[0];
+      const unitPriceInCents = Math.round(Number(menuItem.price) * 100);
+      const subtotalInCents = unitPriceInCents * item.quantity;
+
+      totalAmountInCents += subtotalInCents;
+
+      validatedItems.push({
+        menuItemId: menuItem.menu_item_id,
+        itemName: menuItem.item_name,
+        unitPrice: (unitPriceInCents / 100).toFixed(2),
+        quantity: item.quantity,
+        subtotal: (subtotalInCents / 100).toFixed(2)
+      });
     }
+
+    const totalAmount = (totalAmountInCents / 100).toFixed(2);
 
     // Create the order
     const { rows: orderRows } = await client.query(
@@ -30,26 +91,13 @@ module.exports.createOrder = async function createOrder(order) {
         (customer_id, stall_id, total_amount, order_status)
        VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [
-        order.customerId,
-        order.stallId,
-        totalAmount,
-        'CONFIRMED'
-      ]
+      [order.customerId, order.stallId, totalAmount, 'CONFIRMED']
     );
 
     const newOrder = orderRows[0];
 
-    // Insert individual order items
-    for (const item of order.items) {
-      const { rows } = await client.query(
-        'SELECT item_name, price FROM menu_items WHERE menu_item_id = $1',
-        [item.menuItemId]
-      );
-
-      const unitPrice = Number(rows[0].price);
-      const subtotal = unitPrice * item.quantity;
-
+    // Insert order items
+    for (const item of validatedItems) {
       await client.query(
         `INSERT INTO order_items
           (order_id, menu_item_id, item_name, unit_price, quantity, subtotal)
@@ -57,10 +105,10 @@ module.exports.createOrder = async function createOrder(order) {
         [
           newOrder.order_id,
           item.menuItemId,
-          rows[0].item_name,
-          unitPrice,
+          item.itemName,
+          item.unitPrice,
           item.quantity,
-          subtotal
+          item.subtotal
         ]
       );
     }
@@ -76,9 +124,11 @@ module.exports.createOrder = async function createOrder(order) {
     await client.query('COMMIT');
 
     return newOrder;
+
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
+
   } finally {
     client.release();
   }
