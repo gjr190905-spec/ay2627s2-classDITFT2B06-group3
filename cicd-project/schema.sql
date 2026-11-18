@@ -9,6 +9,7 @@
 -- ─────────────────────────────────────────────────────────
 
 -- Drop existing tables
+DROP TABLE IF EXISTS "VendorLogo" CASCADE;
 DROP TABLE IF EXISTS "StoreClosure" CASCADE;
 DROP TABLE IF EXISTS "Vendor" CASCADE;
 DROP TABLE IF EXISTS "Something" CASCADE;
@@ -42,6 +43,24 @@ CREATE TABLE "Vendor" (
   CONSTRAINT "Vendor_pkey" PRIMARY KEY ("id")
 );
 
+-- ── VendorLogo (the vendor's profile picture, stored in the database) ──
+--  One row per vendor ("vendorId" is the primary key), so a vendor can only
+--  ever have one picture. Deleting a vendor deletes their picture.
+--  The app serves it at GET /vendors/:id/logo and points "Vendor"."logoUrl" there.
+CREATE TABLE "VendorLogo" (
+  "vendorId" INTEGER NOT NULL,
+  "data" BYTEA NOT NULL,
+  "mimeType" TEXT NOT NULL,
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT "VendorLogo_pkey" PRIMARY KEY ("vendorId"),
+  CONSTRAINT "VendorLogo_vendorId_fkey" FOREIGN KEY ("vendorId")
+    REFERENCES "Vendor"("id") ON DELETE CASCADE,
+  CONSTRAINT "VendorLogo_data_check" CHECK (octet_length("data") BETWEEN 1 AND 1048576),
+  CONSTRAINT "VendorLogo_mimeType_check" CHECK (
+    "mimeType" IN ('image/png', 'image/jpeg', 'image/webp')
+  )
+);
+
 -- ── StoreClosure (one row each time a vendor closes) ────
 --  "reason"      : one of the fixed codes the UI offers
 --  "otherReason" : free text, required only when reason = 'OTHER'
@@ -65,4 +84,7 @@ CREATE TABLE "StoreClosure" (
 -- Indexes
 CREATE UNIQUE INDEX "Person_email_key" ON "Person"("email");
 CREATE UNIQUE INDEX "Vendor_email_key" ON "Vendor"("email");
+-- Shop names are unique, ignoring upper/lower case and outer spaces.
+-- Vendor.model.js relies on this to reject a name that is already taken.
+CREATE UNIQUE INDEX "Vendor_stallName_unique" ON "Vendor"(lower(btrim("stallName")));
 CREATE INDEX "StoreClosure_vendorId_idx" ON "StoreClosure"("vendorId");

@@ -1,6 +1,8 @@
 /* ─────────────────────────────────────────────────────────
    Vendor home page
    Depends on theme.css for colours, fonts and buttons.
+   Layout is unchanged from the previous design; only colours and type follow
+   the Makan Liao? brand.
    ───────────────────────────────────────────────────────── */
 
 /* ── Header ─────────────────────────────────────────────── */
@@ -8,9 +10,9 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  background:#CC0202;
+  background: var(--ml-red-gradient);
   backdrop-filter: saturate(1.4) blur(10px);
-  border-bottom: 1px solid var(--ml-line);
+  border-bottom: 1px solid #9e070c;
 }
 
 .vh-header__inner {
@@ -36,8 +38,8 @@
   height: 44px;
   border-radius: 12px;
   overflow: hidden;
-  background: var(--ml-surface);
-  box-shadow: inset 0 0 0 1px var(--ml-line);
+  background: #fff;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.55);
 }
 
 .vh-logo__img {
@@ -51,9 +53,10 @@
   place-items: center;
   width: 100%;
   height: 100%;
-  font: 1.35rem/1 var(--ml-font-hand);
-  color: var(--ml-paper);
-  background: var(--ml-red);
+  font: 900 1.05rem/1 var(--ml-font-ui);
+  letter-spacing: -0.03em;
+  color: var(--ml-red);
+  background: #fff;
 }
 
 .vh-logo__fallback:empty {
@@ -67,19 +70,29 @@
 }
 
 .vh-brand__stall {
-  font-weight: 600;
+  font-weight: 800;
   font-size: 1rem;
+  letter-spacing: -0.02em;
   line-height: 1.25;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: white;
+  color: #fff;
 }
 
 .vh-logout {
   flex: none;
   min-height: 40px;
   padding-inline: 1.1rem;
+  color: var(--ml-red);
+  background: #fff;
+  border-color: #fff;
+}
+
+.vh-logout:hover {
+  color: var(--ml-red-dark);
+  background: var(--ml-red-soft);
+  border-color: var(--ml-red-soft);
 }
 
 /* ── Layout ─────────────────────────────────────────────── */
@@ -94,6 +107,7 @@
 .vh-status {
   --state: var(--ml-ink-soft);
   --state-tint: var(--ml-surface);
+  --state-line: var(--ml-line);
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -103,20 +117,29 @@
   overflow: hidden;
   background: var(--state-tint);
   border-radius: var(--ml-radius-lg);
+  box-shadow:
+    inset 0 0 0 1px var(--state-line),
+    var(--ml-shadow-card);
   transition: background-color 300ms ease;
 }
 
 .vh-status[data-state='open'] {
-  --state: var(--ml-blue);
-  --state-tint: var(--ml-blue-tint);
+  --state: var(--ml-green);
+  --state-tint: var(--ml-green-tint);
+  --state-line: #d4e8dc;
 }
 
 .vh-status[data-state='closed'] {
   --state: var(--ml-red);
   --state-tint: var(--ml-red-tint);
+  --state-line: #efd8d4;
 }
 
 .vh-status__heading {
+  font-family: var(--ml-font-display);
+  font-weight: 400;
+  font-style: normal;
+  letter-spacing: 0;
   font-size: clamp(2.1rem, 4.5vw, 2.9rem);
   overflow-wrap: anywhere;
 }
@@ -125,7 +148,7 @@
   max-width: 42ch;
   margin: 0.5rem 0 0;
   font-size: 1.05rem;
-  font-weight: 500;
+  font-weight: 700;
 }
 
 .vh-status__since {
@@ -146,7 +169,11 @@
 /* The state word is the page's one big typographic moment */
 .vh-status__word {
   margin: 0;
-  font-family: var(--ml-font-hand);
+  font-family: var(--ml-font-display);
+  font-weight: 400;
+  font-style: normal;
+  letter-spacing: 0;
+  text-transform: uppercase;
   font-size: clamp(4.5rem, 13vw, 8.5rem);
   line-height: 1;
   align-self: center;
@@ -175,6 +202,7 @@
 }
 
 .vh-services__heading {
+  letter-spacing: -0.05em;
   font-size: 1.9rem;
   margin-bottom: 1rem;
 }
@@ -199,7 +227,8 @@
 .vh-tile__link {
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  /* Top-aligned so tile names in the same row line up, whatever the description length */
+  justify-content: flex-start;
   gap: 0.3rem;
   width: 100%;
   min-height: 8.5rem;
@@ -208,17 +237,27 @@
   background: var(--ml-paper);
   border: 1px solid var(--ml-line);
   border-radius: var(--ml-radius);
+  box-shadow: var(--ml-shadow-card);
   transition:
     border-color 150ms ease,
-    background-color 150ms ease;
+    background-color 150ms ease,
+    box-shadow 150ms ease;
 }
 
 .vh-tile__link:hover {
-  border-color: var(--ml-ink);
+  border-color: #f1c4b6;
+  box-shadow: var(--ml-shadow-soft);
+}
+
+.vh-tile__link:hover .vh-tile__name {
+  color: var(--ml-red);
 }
 
 .vh-tile__name {
-  font: 1.55rem/1.1 var(--ml-font-hand);
+  font: 900 1.3rem/1.1 var(--ml-font-ui);
+  font-family: var(--ml-font-display);
+  letter-spacing: -0.045em;
+  transition: color 150ms ease;
 }
 
 .vh-tile__desc {
@@ -226,24 +265,30 @@
   color: var(--ml-ink-soft);
 }
 
-/* Dashboard is the most-used service, so it leads in the accent blue */
+/* Dashboard is the most-used service, so it leads in the dark feature style */
 .vh-tile--dashboard .vh-tile__link {
-  color: var(--ml-paper);
-  background: var(--ml-blue);
-  border-color: var(--ml-blue);
+  color: #fff;
+  background: var(--ml-charcoal);
+  border-color: var(--ml-charcoal);
 }
 
 .vh-tile--dashboard .vh-tile__link:hover {
-  background: var(--ml-blue-dark);
-  border-color: var(--ml-blue-dark);
+  background: #3b3236;
+  border-color: #3b3236;
 }
 
-.vh-tile--dashboard .vh-tile__name {
-  font-size: 2.2rem;
+.vh-tile--dashboard .vh-tile__name,
+.vh-tile--dashboard .vh-tile__link:hover .vh-tile__name {
+  font-family: var(--ml-font-display);
+  font-weight: 400;
+  font-style: normal;
+  letter-spacing: 0;
+  font-size: 2.6rem;
+  color: #fff;
 }
 
 .vh-tile--dashboard .vh-tile__desc {
-  color: rgb(255 255 255 / 0.88);
+  color: #d9d3d4;
 }
 
 /* ── Signed-out state ───────────────────────────────────── */
@@ -252,12 +297,26 @@
   margin: 3rem auto 0;
   padding: 2.5rem 2rem;
   text-align: center;
-  background: var(--ml-surface);
+  background: var(--ml-paper);
   border-radius: var(--ml-radius-lg);
+  box-shadow:
+    inset 0 0 0 1px var(--ml-line),
+    var(--ml-shadow-soft);
+}
+
+.vh-signed-out__logo {
+  mix-blend-mode: multiply;
+  width: 186px;
+  height: auto;
+  margin: 0 auto 1.25rem;
 }
 
 .vh-signed-out h1 {
-  font-size: 2.4rem;
+  font-family: var(--ml-font-display);
+  font-weight: 400;
+  font-style: normal;
+  letter-spacing: 0;
+  font-size: 2.6rem;
 }
 
 .vh-signed-out p {
@@ -270,13 +329,14 @@
   width: min(30rem, calc(100vw - 2rem));
   padding: 1.75rem;
   color: var(--ml-ink);
+  background: var(--ml-paper);
   border: 0;
   border-radius: var(--ml-radius-lg);
   box-shadow: var(--ml-shadow-pop);
 }
 
 .vh-dialog::backdrop {
-  background: rgb(33 33 33 / 0.45);
+  background: rgb(38 32 33 / 0.5);
   backdrop-filter: blur(2px);
 }
 
@@ -292,7 +352,7 @@
 }
 
 .vh-dialog__heading {
-  font-size: 2rem;
+  font-size: 1.75rem;
 }
 
 .vh-dialog__hint {
@@ -317,7 +377,8 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.7rem 0.9rem;
-  font-weight: 500;
+  font-weight: 700;
+  background: #fff;
   border: 1px solid var(--ml-line);
   border-radius: var(--ml-radius-sm);
   cursor: pointer;
@@ -327,15 +388,16 @@
 }
 
 .vh-reason:hover {
-  border-color: var(--ml-ink-soft);
+  border-color: #e8aaa0;
+  background: var(--ml-surface);
 }
 
 .vh-reason:has(.vh-reason__input:checked) {
   border-color: var(--ml-red);
   box-shadow: inset 0 0 0 1px var(--ml-red);
-  background: var(--ml-red-tint);
+  background: var(--ml-red-soft);
   color: var(--ml-red-dark);
-  font-weight: 600;
+  font-weight: 800;
 }
 
 .vh-reason__input {
@@ -352,7 +414,7 @@
 }
 
 .vh-other__label {
-  font-weight: 600;
+  font-weight: 800;
   font-size: 0.9rem;
 }
 
@@ -362,13 +424,15 @@
   font: inherit;
   color: inherit;
   resize: vertical;
-  border: 1px solid var(--ml-line);
+  background: #fff;
+  border: 1px solid #e7e1dd;
   border-radius: var(--ml-radius-sm);
 }
 
 .vh-other textarea:focus-visible {
-  outline-offset: 0;
-  border-color: var(--ml-blue);
+  outline: none;
+  border-color: var(--ml-red);
+  box-shadow: 0 0 0 3px rgb(204 2 2 / 0.09);
 }
 
 .vh-other__count {
@@ -381,7 +445,7 @@
   min-height: 1.4em;
   margin: 0.75rem 0 0;
   font-size: 0.9rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--ml-red);
 }
 
@@ -399,9 +463,9 @@
   bottom: 1.5rem;
   z-index: 20;
   padding: 0.7rem 1.3rem;
-  font-weight: 600;
+  font-weight: 800;
   font-size: 0.92rem;
-  color: var(--ml-paper);
+  color: #fff;
   background: var(--ml-ink);
   border-radius: 999px;
   box-shadow: 0 10px 30px rgb(0 0 0 / 0.18);
@@ -419,7 +483,7 @@
 }
 
 .vh-toast.is-error {
-  background: var(--ml-red);
+  background: #a4282e;
 }
 
 /* ── Responsive ─────────────────────────────────────────── */

@@ -5,6 +5,7 @@ const {
   updateVendorStatus,
   updateVendorProfile,
   updateVendorLogoImage,
+  getVendorLogoImage,
 } = require('../controllers/Vendor.controller');
 
 const router = express.Router();
@@ -22,7 +23,10 @@ router.patch('/:id/status', updateVendorStatus);
 // Change the shop name (must be unique across all vendors)
 router.patch('/:id/profile', updateVendorProfile);
 
-// Replace the profile picture (a vendor only ever has one)
+// The profile picture itself, read from the database (used as the <img> src)
+router.get('/:id/logo', getVendorLogoImage);
+
+// Replace the profile picture (a vendor only ever has one; it is stored in the database)
 router.put('/:id/logo', updateVendorLogoImage);
 
 module.exports = router;

@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const request = require('supertest');
 const app = require('../../src/app');
 const pool = require('../../src/models/db');
@@ -234,5 +236,124 @@ describe('GET /vendor/home.html', () => {
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toMatch(/html/);
     expect(res.text).toContain('Where to next?');
+  });
+});
+
+// ─────────────────────────────────────────────────────────
+// Profile picture: PUT /vendors/:id/logo and GET /vendors/:id/logo
+// Pictures are stored in the "VendorLogo" table, never as files in the project.
+// ─────────────────────────────────────────────────────────
+// A real 1x1 PNG and a tiny JPEG header
+const PNG_1PX = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'base64',
+);
+const JPEG_BYTES = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
+const UPLOAD_DIR = path.join(__dirname, '..', '..', 'src', 'public', 'uploads');
+
+function putLogo(id, buffer, type = 'image/png') {
+  return request(app)
+    .put(`/vendors/${id}/logo`)
+    .send({ image: `data:${type};base64,${buffer.toString('base64')}` });
+}
+
+async function storedLogos() {
+  const { rows } = await pool.query(
+    'SELECT "vendorId", "mimeType", "data" FROM "VendorLogo" ORDER BY "vendorId"',
+  );
+  return rows;
+}
+
+describe('PUT /vendors/:id/logo', () => {
+  // Valid partition: picture is saved in the database and logoUrl points at it
+  test('should store the picture in the database', async () => {
+    const res = await putLogo(vendorId, PNG_1PX);
+
+    expect(res.status).toBe(200);
+    expect(res.body.logoUrl).toMatch(new RegExp(`^/vendors/${vendorId}/logo\\?v=\\d+$`));
+    const logos = await storedLogos();
+    expect(logos).toHaveLength(1);
+    expect(logos[0].vendorId).toBe(vendorId);
+    expect(logos[0].mimeType).toBe('image/png');
+    expect(logos[0].data.equals(PNG_1PX)).toBe(true);
+  });
+
+  // Valid partition: nothing is written into the project folder
+  test('should not write any file into the project', async () => {
+    await putLogo(vendorId, PNG_1PX);
+
+    expect(fs.existsSync(UPLOAD_DIR)).toBe(false);
+  });
+
+  // Boundary: a second upload replaces the first (one picture per vendor)
+  test('should replace the previous picture instead of adding another', async () => {
+    const first = await putLogo(vendorId, PNG_1PX);
+    const second = await putLogo(vendorId, JPEG_BYTES, 'image/jpeg');
+
+    expect(second.status).toBe(200);
+    expect(second.body.logoUrl).not.toBe(first.body.logoUrl);
+    const logos = await storedLogos();
+    expect(logos).toHaveLength(1);
+    expect(logos[0].mimeType).toBe('image/jpeg');
+  });
+
+  // Invalid partition: text pretending to be an image is refused and nothing is saved
+  test('should return 400 for a file that is not an image', async () => {
+    const res = await putLogo(vendorId, Buffer.from('definitely not an image'));
+
+    expect(res.status).toBe(400);
+    expect(await storedLogos()).toHaveLength(0);
+  });
+
+  // Boundary: non-existent vendor
+  test('should return 404 for a non-existing vendor (boundary)', async () => {
+    const res = await putLogo(999999, PNG_1PX);
+
+    expect(res.status).toBe(404);
+    expect(await storedLogos()).toHaveLength(0);
+  });
+
+  // Invalid partition: non-numeric id
+  test('should return 400 for a non-numeric id', async () => {
+    const res = await putLogo('abc', PNG_1PX);
+
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('GET /vendors/:id/logo', () => {
+  // Valid partition: the stored bytes come back with the right type
+  test('should return the stored picture', async () => {
+    const saved = await putLogo(vendorId, PNG_1PX);
+
+    const res = await request(app).get(saved.body.logoUrl);
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toBe('image/png');
+    expect(res.headers['x-content-type-options']).toBe('nosniff');
+    expect(Buffer.from(res.body).equals(PNG_1PX)).toBe(true);
+  });
+
+  // Boundary: vendor exists but has no picture
+  test('should return 404 when the vendor has no picture', async () => {
+    const res = await request(app).get(`/vendors/${vendorId}/logo`);
+
+    expect(res.status).toBe(404);
+  });
+
+  // Invalid partition: non-numeric id
+  test('should return 400 for a non-numeric id', async () => {
+    const res = await request(app).get('/vendors/abc/logo');
+
+    expect(res.status).toBe(400);
+  });
+
+  // Valid partition: deleting a vendor deletes their picture
+  test('should delete the picture when the vendor is deleted', async () => {
+    await putLogo(vendorId, PNG_1PX);
+
+    await pool.query('DELETE FROM "Vendor" WHERE "id" = $1', [vendorId]);
+
+    expect(await storedLogos()).toHaveLength(0);
   });
 });

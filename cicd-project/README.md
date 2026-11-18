@@ -142,7 +142,7 @@ PORT=3001
 npm run migration:reset
 ```
 
-This reads `schema.sql` and creates the `Person`, `Something`, `Vendor` and `StoreClosure` tables.
+This reads `schema.sql` and creates the `Person`, `Something`, `Vendor`, `VendorLogo` and `StoreClosure` tables.
 
 ### 5. Seed sample data (optional)
 
@@ -194,13 +194,16 @@ The app runs at `http://localhost:3000` by default.
 | `PUT`    | `/somethings/:id` | Update a something | 200, 404     |
 | `DELETE` | `/somethings/:id` | Delete a something | 200, 404     |
 
-### Vendors (vendor home page)
+### Vendors (vendor home and profile pages)
 
 | Method  | Endpoint                   | Description                                        | Status Codes       |
 | ------- | -------------------------- | -------------------------------------------------- | ------------------ |
 | `GET`   | `/vendors/closure-reasons` | Reasons offered when a vendor closes their stall   | 200                |
 | `GET`   | `/vendors/:id`             | Stall name, logo, and open/closed status           | 200, 400, 404      |
 | `PATCH` | `/vendors/:id/status`      | Open or close the stall (closing needs a `reason`) | 200, 400, 404, 409 |
+| `PATCH` | `/vendors/:id/profile`     | Change the shop name (must be unique)              | 200, 400, 404, 409 |
+| `PUT`   | `/vendors/:id/logo`        | Replace the profile picture (PNG, JPEG or WebP)    | 200, 400, 404      |
+| `GET`   | `/vendors/:id/logo`        | The stored profile picture itself                  | 200, 400, 404      |
 
 `PATCH /vendors/:id/status` body:
 
@@ -211,6 +214,10 @@ The app runs at `http://localhost:3000` by default.
 ```
 
 Each close is recorded in the `StoreClosure` table. `409` means the stall is already in the requested state.
+
+`PUT /vendors/:id/logo` body is `{ "image": "data:image/jpeg;base64,..." }` (max 1 MB). The picture is
+stored in the database (`VendorLogo` table, one row per vendor), not as a file in the project.
+`logoUrl` then points at `GET /vendors/:id/logo?v=<upload time>`.
 
 The page itself is at `/vendor/home.html`. Until the login page exists, open it as
 `/vendor/home.html?vendorId=1` (the id is then kept in `sessionStorage`).

@@ -312,7 +312,7 @@ function showSignedOut() {
   el.services.hidden = true;
   el.logout.hidden = true;
   el.logoWrap.hidden = true;
-  el.brandSubline.hidden = true;
+  if (el.brandSubline) el.brandSubline.hidden = true; // element was removed from the header
   el.stallName.textContent = 'Makan Liao?';
   el.signedOut.hidden = false;
 }

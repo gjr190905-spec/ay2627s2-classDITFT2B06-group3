@@ -100,34 +100,70 @@ module.exports.updateVendorStallName = async function updateVendorStallName(id, 
   }
 };
 
+// Address the page uses to show a stored picture. The ?v= part changes with every upload,
+// so browsers never show a cached old picture.
+function logoUrlFor(id, version) {
+  return `/vendors/${id}/logo?v=${version}`;
+}
+
+module.exports.logoUrlFor = logoUrlFor;
+
 /**
- * Replace a vendor's profile picture. There is only one "logoUrl" column,
- * so a vendor can never have more than one picture.
+ * Replace a vendor's profile picture. The image itself is stored in the database
+ * ("VendorLogo"), one row per vendor, so a vendor can never have more than one picture.
+ * "Vendor"."logoUrl" is pointed at GET /vendors/:id/logo in the same transaction.
  *
- * @returns {Promise<{vendor: object, previousLogoUrl: string|null}|undefined>}
- *          undefined if the vendor does not exist
+ * @param {number} id         Vendor id
+ * @param {Buffer} data       Image bytes (already checked to be PNG, JPEG or WebP)
+ * @param {string} mimeType   'image/png', 'image/jpeg' or 'image/webp'
+ * @returns {Promise<object|undefined>} the updated vendor, or undefined if it does not exist
  */
-module.exports.updateVendorLogo = async function updateVendorLogo(id, logoUrl) {
+module.exports.updateVendorLogo = async function updateVendorLogo(id, data, mimeType) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const current = await client.query('SELECT "logoUrl" FROM "Vendor" WHERE "id" = $1 FOR UPDATE', [
+    const current = await client.query('SELECT "id" FROM "Vendor" WHERE "id" = $1 FOR UPDATE', [
       id,
     ]);
     if (current.rows.length === 0) {
       await client.query('ROLLBACK');
       return undefined;
     }
+
+    const saved = await client.query(
+      `INSERT INTO "VendorLogo" ("vendorId", "data", "mimeType", "updatedAt")
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT ("vendorId")
+       DO UPDATE SET "data" = EXCLUDED."data", "mimeType" = EXCLUDED."mimeType", "updatedAt" = NOW()
+       RETURNING "updatedAt"`,
+      [id, data, mimeType],
+    );
+    const version = saved.rows[0].updatedAt.getTime();
+
     const updated = await client.query(
       `UPDATE "Vendor" SET "logoUrl" = $1 WHERE "id" = $2 RETURNING ${VENDOR_COLUMNS}`,
-      [logoUrl, id],
+      [logoUrlFor(id, version), id],
     );
     await client.query('COMMIT');
-    return { vendor: updated.rows[0], previousLogoUrl: current.rows[0].logoUrl };
+    return updated.rows[0];
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
   } finally {
     client.release();
   }
+};
+
+/**
+ * Read a vendor's stored profile picture.
+ *
+ * @returns {Promise<{data: Buffer, mimeType: string, updatedAt: Date}|undefined>}
+ *          undefined if the vendor has no stored picture
+ */
+module.exports.getVendorLogo = async function getVendorLogo(id) {
+  const { rows } = await pool.query(
+    'SELECT "data", "mimeType", "updatedAt" FROM "VendorLogo" WHERE "vendorId" = $1',
+    [id],
+  );
+  return rows[0];
 };

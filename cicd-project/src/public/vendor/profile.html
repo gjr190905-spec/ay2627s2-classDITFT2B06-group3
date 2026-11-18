@@ -28,7 +28,10 @@
     <main class="vh-main vp-main" id="main">
       <div id="profilePanel">
         <h1 class="vp-title">Your profile</h1>
-        <p class="vp-intro">This is how students see your stall in Makan Liao?</p>
+        <svg class="vp-underline" viewBox="0 0 180 12" aria-hidden="true" focusable="false">
+          <path d="M3 8.5C38 4.2 92 2.6 177 4.8" />
+        </svg>
+        <p class="vp-intro">This is how students see your stall.</p>
 
         <!-- ── Profile picture ──────────────────────────────── -->
         <section class="vp-card" aria-labelledby="pictureHeading">
@@ -66,7 +69,7 @@
         <!-- ── Shop name ────────────────────────────────────── -->
         <section class="vp-card" aria-labelledby="nameHeading">
           <h2 class="vp-card__heading" id="nameHeading">Shop name</h2>
-          <p class="vp-card__hint">Every shop name is unique. Once a name is taken, nobody else can use it.</p>
+          <p class="vp-card__hint">Don't anyhow change your shop name ah!</p>
 
           <form id="nameForm" novalidate>
             <label for="stallNameInput" class="vp-label">Shop name</label>
@@ -91,6 +94,13 @@
       </div>
 
       <section class="vh-signed-out" id="signedOutPanel" hidden>
+        <img
+          class="vh-signed-out__logo"
+          src="../images/brand/makan-liao-logo.png"
+          alt="Makan Liao?"
+          width="186"
+          height="70"
+        />
         <h1>You're signed out</h1>
         <p>Log in with your stall account to edit your profile.</p>
         <a class="ml-btn ml-btn--primary" href="/">Go to log in</a>

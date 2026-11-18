@@ -1,5 +1,3 @@
-const fs = require('fs/promises');
-const path = require('path');
 const createError = require('http-errors');
 const {
   CLOSURE_REASONS,
@@ -7,6 +5,7 @@ const {
   setVendorOpenStatus,
   updateVendorStallName,
   updateVendorLogo,
+  getVendorLogo,
 } = require('../models/Vendor.model');
 
 const OTHER_REASON_MAX_LENGTH = 255;
@@ -15,8 +14,6 @@ const VALID_REASON_CODES = CLOSURE_REASONS.map((r) => r.code);
 const STALL_NAME_MIN_LENGTH = 2;
 const STALL_NAME_MAX_LENGTH = 40;
 const LOGO_MAX_BYTES = 1024 * 1024; // 1 MB after decoding (the page shrinks images first)
-const UPLOAD_URL_PREFIX = '/uploads/vendors/';
-const UPLOAD_DIR = path.join(__dirname, '..', 'public', 'uploads', 'vendors');
 
 /**
  * Parse a route id. Returns a positive integer, or null if the value is not one.
@@ -91,21 +88,21 @@ function validateProfilePayload(body) {
 
 /**
  * Work out the real image type from the first bytes of the file (the browser-supplied
- * type can be faked). Returns the file extension, or null if it is not PNG/JPEG/WebP.
+ * type can be faked). Returns the MIME type, or null if it is not PNG/JPEG/WebP.
  */
-function detectImageExtension(buffer) {
+function detectImageType(buffer) {
   if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex'))) {
-    return 'png';
+    return 'image/png';
   }
   if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
-    return 'jpg';
+    return 'image/jpeg';
   }
   if (
     buffer.length >= 12 &&
     buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
     buffer.subarray(8, 12).toString('ascii') === 'WEBP'
   ) {
-    return 'webp';
+    return 'image/webp';
   }
   return null;
 }
@@ -113,11 +110,14 @@ function detectImageExtension(buffer) {
 /**
  * Validate the body of PUT /vendors/:id/logo. Expects { image: "data:image/...;base64,...." }.
  *
- * @returns {{error: string} | {buffer: Buffer, extension: string}}
+ * @returns {{error: string} | {buffer: Buffer, mimeType: string}}
  */
 function validateLogoPayload(body) {
   const image = body && body.image;
-  const match = typeof image === 'string' ? /^data:image\/[a-z+.-]+;base64,([A-Za-z0-9+/=]+)$/.exec(image) : null;
+  const match =
+    typeof image === 'string'
+      ? /^data:image\/[a-z+.-]+;base64,([A-Za-z0-9+/=]+)$/.exec(image)
+      : null;
   if (!match) {
     return { error: 'image must be a base64 image data URL' };
   }
@@ -130,22 +130,11 @@ function validateLogoPayload(body) {
     return { error: 'Image is too large (max 1 MB)' };
   }
 
-  const extension = detectImageExtension(buffer);
-  if (!extension) {
+  const mimeType = detectImageType(buffer);
+  if (!mimeType) {
     return { error: 'Image must be a PNG, JPEG or WebP file' };
   }
-  return { buffer, extension };
-}
-
-// Delete an old picture file we saved earlier. Never touches anything outside the upload folder.
-async function removeStoredLogo(logoUrl) {
-  if (typeof logoUrl !== 'string' || !logoUrl.startsWith(UPLOAD_URL_PREFIX)) return;
-  const fileName = path.basename(logoUrl);
-  try {
-    await fs.unlink(path.join(UPLOAD_DIR, fileName));
-  } catch (error) {
-    if (error.code !== 'ENOENT') console.error('Could not remove old logo:', error.message);
-  }
+  return { buffer, mimeType };
 }
 
 // GET /vendors/closure-reasons
@@ -222,7 +211,8 @@ function updateVendorProfile(req, res, next) {
 }
 
 // PUT /vendors/:id/logo
-async function updateVendorLogoImage(req, res, next) {
+// The picture is saved in the database ("VendorLogo"), not as a file in the project.
+function updateVendorLogoImage(req, res, next) {
   const id = parseVendorId(req.params.id);
   if (id === null) {
     return next(createError(400, 'Vendor id must be a positive integer'));
@@ -233,37 +223,41 @@ async function updateVendorLogoImage(req, res, next) {
     return next(createError(400, payload.error));
   }
 
-  // A new file name each time means browsers never show a cached old picture
-  const fileName = `vendor-${id}-${Date.now()}.${payload.extension}`;
-  const logoUrl = `${UPLOAD_URL_PREFIX}${fileName}`;
+  return updateVendorLogo(id, payload.buffer, payload.mimeType)
+    .then((vendor) => {
+      if (!vendor) {
+        return next(createError(404, 'Vendor not found'));
+      }
+      return res.status(200).json(vendor);
+    })
+    .catch(next);
+}
 
-  try {
-    const existing = await getVendorById(id);
-    if (!existing) {
-      return next(createError(404, 'Vendor not found'));
-    }
-
-    await fs.mkdir(UPLOAD_DIR, { recursive: true });
-    await fs.writeFile(path.join(UPLOAD_DIR, fileName), payload.buffer);
-
-    let result;
-    try {
-      result = await updateVendorLogo(id, logoUrl);
-    } catch (dbError) {
-      await removeStoredLogo(logoUrl); // don't leave an orphan file behind
-      throw dbError;
-    }
-    if (!result) {
-      await removeStoredLogo(logoUrl);
-      return next(createError(404, 'Vendor not found'));
-    }
-
-    // Only one picture may exist: remove the previous one now the new one is saved
-    await removeStoredLogo(result.previousLogoUrl);
-    return res.status(200).json(result.vendor);
-  } catch (error) {
-    return next(error);
+// GET /vendors/:id/logo
+// Sends the stored picture itself, so it can be used directly as an <img> src.
+function getVendorLogoImage(req, res, next) {
+  const id = parseVendorId(req.params.id);
+  if (id === null) {
+    return next(createError(400, 'Vendor id must be a positive integer'));
   }
+
+  return getVendorLogo(id)
+    .then((logo) => {
+      if (!logo) {
+        return next(createError(404, 'This vendor has no profile picture'));
+      }
+      res.set({
+        'Content-Type': logo.mimeType,
+        'Content-Length': logo.data.length,
+        'Last-Modified': logo.updatedAt.toUTCString(),
+        'X-Content-Type-Options': 'nosniff',
+        // The page links to /logo?v=<upload time>, which changes on every upload, so a
+        // versioned address can be cached for good. Without ?v=, always check for a newer one.
+        'Cache-Control': req.query.v ? 'public, max-age=31536000, immutable' : 'no-cache',
+      });
+      return res.status(200).send(logo.data);
+    })
+    .catch(next);
 }
 
 module.exports = {
@@ -275,9 +269,11 @@ module.exports = {
   validateStatusPayload,
   validateProfilePayload,
   validateLogoPayload,
+  detectImageType,
   getClosureReasons,
   getVendor,
   updateVendorStatus,
   updateVendorProfile,
   updateVendorLogoImage,
+  getVendorLogoImage,
 };

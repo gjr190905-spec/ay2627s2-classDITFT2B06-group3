@@ -1,36 +1,70 @@
 /* ─────────────────────────────────────────────────────────
    Vendor profile page
-   Depends on theme.css (colours, fonts, buttons) and
+   Depends on theme.css (colours, fonts, buttons, eyebrow) and
    vendor-home.css (header, toast, signed-out panel).
+   Cards, fields and the picture frame follow the Makan Liao?
+   reference design's panels and forms.
    ───────────────────────────────────────────────────────── */
 
 .vp-main {
   max-width: 720px;
 }
 
+/* ── Page heading ───────────────────────────────────────── */
 .vp-title {
-  font-size: clamp(2.1rem, 4.5vw, 2.9rem);
+  font-family: var(--ml-font-display);
+  font-weight: 400;
+  font-style: normal;
+  letter-spacing: 0;
+  line-height: 0.95;
+  font-size: clamp(2.8rem, 6vw, 3.9rem);
+}
+
+/* Hand-drawn stroke under the title, like the one on the Makan Liao? homepage */
+.vp-underline {
+  display: block;
+  width: 230px;
+  max-width: 70%;
+  height: 12px;
+  margin: 0.85rem 0 0 0.15rem;
+  overflow: visible;
+}
+
+.vp-underline path {
+  fill: none;
+  stroke: #e08a7a;
+  stroke-width: 5;
+  stroke-linecap: round;
 }
 
 .vp-intro {
-  margin: 0.4rem 0 1.75rem;
+  margin: 0.8rem 0 1.75rem;
   color: var(--ml-ink-soft);
 }
 
+/* ── Cards ──────────────────────────────────────────────── */
 .vp-card {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
   padding: 1.75rem 2rem;
-  background: var(--ml-surface);
-  border-radius: var(--ml-radius-lg);
+  background: var(--ml-paper);
+  border: 1px solid #eaddd4;
+  border-radius: var(--ml-radius);
+  box-shadow: var(--ml-shadow-card);
 }
 
 .vp-card__heading {
-  font-size: 1.7rem;
+  font-family: var(--ml-font-display);
+  font-weight: 400;
+  font-style: normal;
+  letter-spacing: 0;
+  line-height: 0.95;
+  font-size: 1.35rem;
+  letter-spacing: -0.045em;
 }
 
 .vp-card__hint {
-  margin: 0.25rem 0 1.25rem;
-  font-size: 0.92rem;
+  margin: 0.3rem 0 1.35rem;
+  font-size: 0.9rem;
   color: var(--ml-ink-soft);
 }
 
@@ -46,9 +80,11 @@
   width: 128px;
   height: 128px;
   overflow: hidden;
-  border-radius: var(--ml-radius);
-  background: var(--ml-paper);
-  box-shadow: inset 0 0 0 1px var(--ml-line);
+  border-radius: 20px;
+  background: #fff0e7;
+  box-shadow:
+    inset 0 0 0 1px var(--ml-line),
+    0 6px 18px rgb(88 54 34 / 0.08);
 }
 
 .vp-picture__img {
@@ -62,9 +98,10 @@
   place-items: center;
   width: 100%;
   height: 100%;
-  font: 3rem/1 var(--ml-font-hand);
-  color: var(--ml-paper);
-  background: var(--ml-red);
+  font: 900 2.6rem/1 var(--ml-font-ui);
+  letter-spacing: -0.05em;
+  color: var(--ml-red);
+  background: #fff0e7;
 }
 
 .vp-picture__controls {
@@ -79,31 +116,41 @@
 
 .vp-note {
   margin: 0.7rem 0 0;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   color: var(--ml-ink-soft);
 }
 
 /* ── Name form ──────────────────────────────────────────── */
 .vp-label {
   display: block;
-  margin-bottom: 0.35rem;
-  font-weight: 600;
-  font-size: 0.92rem;
+  margin-bottom: 0.4rem;
+  font-weight: 800;
+  font-size: 0.85rem;
+  color: #443e42;
 }
 
 .vp-input {
   width: 100%;
   min-height: 48px;
-  padding: 0.6rem 1rem;
+  padding: 0.6rem 0.95rem;
   font: 500 1rem/1.3 var(--ml-font-ui);
   color: var(--ml-ink);
-  background: var(--ml-paper);
-  border: 1px solid var(--ml-line);
+  background: #fff;
+  border: 1px solid #e7e1dd;
   border-radius: var(--ml-radius-sm);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
 }
 
 .vp-input:hover {
-  border-color: var(--ml-ink-soft);
+  border-color: #d9c7ba;
+}
+
+.vp-input:focus-visible {
+  outline: none;
+  border-color: var(--ml-red);
+  box-shadow: 0 0 0 3px rgb(204 2 2 / 0.09);
 }
 
 .vp-input[aria-invalid='true'] {
@@ -116,13 +163,13 @@
   justify-content: space-between;
   gap: 1rem;
   min-height: 1.6rem;
-  margin: 0.35rem 0 1rem;
+  margin: 0.4rem 0 1rem;
 }
 
 .vp-error {
   margin: 0;
-  font-size: 0.88rem;
-  font-weight: 500;
+  font-size: 0.86rem;
+  font-weight: 700;
   color: var(--ml-red);
 }
 
@@ -132,7 +179,8 @@
 
 .vp-count {
   margin-left: auto;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 700;
   color: var(--ml-ink-soft);
 }
 

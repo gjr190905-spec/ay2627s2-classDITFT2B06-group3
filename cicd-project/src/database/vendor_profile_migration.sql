@@ -15,3 +15,16 @@ ALTER TABLE "Vendor" ADD COLUMN IF NOT EXISTS "logoUrl" TEXT;
 
 CREATE UNIQUE INDEX IF NOT EXISTS "Vendor_stallName_unique"
     ON "Vendor" (lower(btrim("stallName")));
+
+-- ---------------------------------------------------------------------
+--  Profile pictures are stored IN the database, not as files in the project.
+--  One row per vendor ("vendorId" is the primary key), so a vendor can only
+--  ever have one picture. Deleting a vendor deletes their picture.
+--  The app shows it through GET /vendors/:id/logo and points "logoUrl" there.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS "VendorLogo" (
+    "vendorId"  INTEGER PRIMARY KEY REFERENCES "Vendor"("id") ON DELETE CASCADE,
+    "data"      BYTEA       NOT NULL CHECK (octet_length("data") BETWEEN 1 AND 1048576),
+    "mimeType"  TEXT        NOT NULL CHECK ("mimeType" IN ('image/png', 'image/jpeg', 'image/webp')),
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
