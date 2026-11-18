@@ -5,6 +5,8 @@ const path = require('path');
 // Import route handlers
 const somethingRouter = require('./routers/Something.router');
 const personRouter = require('./routers/Person.router');
+const ordersRouter = require('./routers/ordersRouter');
+const paymentRouter = require('./routers/paymentRouter');
 
 const app = express();
 
@@ -40,7 +42,9 @@ app.use((error, req, res, next) => {
 
 
 // Customer Order Routes
-
 app.use('/orders', ordersRouter);
+
+// Payment Routes
+app.use('/payments', paymentRouter);
 
 module.exports = app;
