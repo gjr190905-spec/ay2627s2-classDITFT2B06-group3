@@ -7,6 +7,7 @@ const somethingRouter = require('./routers/Something.router');
 const personRouter = require('./routers/Person.router');
 const ordersRouter = require('./routers/ordersRouter');
 const paymentRouter = require('./routers/paymentRouter');
+const pickupWindowRouter = require('./routers/pickupWindowRouter');
 
 const app = express();
 
@@ -46,5 +47,8 @@ app.use('/orders', ordersRouter);
 
 // Payment Routes
 app.use('/payments', paymentRouter);
+
+// Pickup Window Routes
+app.use('/pickup-windows', pickupWindowRouter);
 
 module.exports = app;

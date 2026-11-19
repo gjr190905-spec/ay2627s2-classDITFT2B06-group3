@@ -19,7 +19,6 @@ module.exports.createOrder = async function createOrder(order) {
       throw error;
     }
 
-    // Prevent duplicate menu items in the same order
     if (menuItemIds.includes(item.menuItemId)) {
       const error = new Error('Duplicate menu items are not allowed');
       error.statusCode = 400;
@@ -29,6 +28,16 @@ module.exports.createOrder = async function createOrder(order) {
     menuItemIds.push(item.menuItemId);
   }
 
+  // Validate pickup window ID
+  if (
+    !Number.isInteger(order.pickupWindowId) ||
+    order.pickupWindowId <= 0
+  ) {
+    const error = new Error('Invalid pickup window ID');
+    error.statusCode = 400;
+    throw error;
+  }
+
   const client = await pool.connect();
 
   try {
@@ -36,12 +45,51 @@ module.exports.createOrder = async function createOrder(order) {
 
     // Check whether the stall exists and is active
     const { rows: stallRows } = await client.query(
-      'SELECT stall_id FROM stalls WHERE stall_id = $1 AND is_active = TRUE',
+      `SELECT stall_id
+       FROM stalls
+       WHERE stall_id = $1
+       AND is_active = TRUE`,
       [order.stallId]
     );
 
     if (stallRows.length === 0) {
       const error = new Error('Stall not found or inactive');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // Check whether the pickup window belongs to the selected stall
+    const { rows: windowRows } = await client.query(
+      `SELECT window_id
+       FROM pickup_windows
+       WHERE window_id = $1
+       AND stall_id = $2
+       AND is_active = TRUE
+       AND start_time > CURRENT_TIMESTAMP`,
+      [order.pickupWindowId, order.stallId]
+    );
+
+    if (windowRows.length === 0) {
+      const error = new Error('Pickup window not found or unavailable');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // Reserve one pickup slot
+    const { rows: reservedRows } = await client.query(
+      `UPDATE pickup_windows
+       SET booked_count = booked_count + 1
+       WHERE window_id = $1
+       AND stall_id = $2
+       AND is_active = TRUE
+       AND start_time > CURRENT_TIMESTAMP
+       AND booked_count < capacity
+       RETURNING window_id`,
+      [order.pickupWindowId, order.stallId]
+    );
+
+    if (reservedRows.length === 0) {
+      const error = new Error('Pickup window is fully booked');
       error.statusCode = 400;
       throw error;
     }
@@ -61,14 +109,13 @@ module.exports.createOrder = async function createOrder(order) {
       );
 
       if (rows.length === 0) {
-        const error = new Error(
-          'Menu item not found or unavailable'
-        );
+        const error = new Error('Menu item not found or unavailable');
         error.statusCode = 400;
         throw error;
       }
 
       const menuItem = rows[0];
+
       const unitPriceInCents = Math.round(Number(menuItem.price) * 100);
       const subtotalInCents = unitPriceInCents * item.quantity;
 
@@ -85,13 +132,19 @@ module.exports.createOrder = async function createOrder(order) {
 
     const totalAmount = (totalAmountInCents / 100).toFixed(2);
 
-    // Create the order
+    // Create the order with the selected pickup window
     const { rows: orderRows } = await client.query(
       `INSERT INTO orders
-        (customer_id, stall_id, total_amount, order_status)
-       VALUES ($1, $2, $3, $4)
+        (customer_id, stall_id, pickup_window_id, total_amount, order_status)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [order.customerId, order.stallId, totalAmount, 'CONFIRMED']
+      [
+        order.customerId,
+        order.stallId,
+        order.pickupWindowId,
+        totalAmount,
+        'CONFIRMED'
+      ]
     );
 
     const newOrder = orderRows[0];

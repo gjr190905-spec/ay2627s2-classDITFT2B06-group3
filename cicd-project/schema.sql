@@ -60,17 +60,37 @@ CREATE TABLE menu_items (
     FOREIGN KEY (stall_id) REFERENCES stalls(stall_id)
 );
 
+-- Create Pickup Windows Table
+CREATE TABLE pickup_windows (
+    window_id SERIAL PRIMARY KEY,
+    stall_id INTEGER NOT NULL,
+    start_time TIMESTAMP NOT NULL,
+    end_time TIMESTAMP NOT NULL,
+    capacity INTEGER NOT NULL,
+    booked_count INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+
+    FOREIGN KEY (stall_id) REFERENCES stalls(stall_id),
+
+    CHECK (end_time > start_time),
+    CHECK (capacity > 0),
+    CHECK (booked_count >= 0),
+    CHECK (booked_count <= capacity)
+);
+
 -- Create Orders Table
 CREATE TABLE orders (
     order_id SERIAL PRIMARY KEY,
     customer_id INTEGER NOT NULL,
     stall_id INTEGER NOT NULL,
+    pickup_window_id INTEGER NOT NULL,
     total_amount NUMERIC(10,2) NOT NULL,
     order_status VARCHAR(30) DEFAULT 'CONFIRMED',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (customer_id) REFERENCES users(user_id),
-    FOREIGN KEY (stall_id) REFERENCES stalls(stall_id)
+    FOREIGN KEY (stall_id) REFERENCES stalls(stall_id),
+    FOREIGN KEY (pickup_window_id) REFERENCES pickup_windows(window_id)
 );
 
 -- Create Order Items Table
@@ -114,5 +134,8 @@ CREATE TABLE collections (
 
 -- Indexes
 CREATE UNIQUE INDEX "Person_email_key" ON "Person"("email");
+
+CREATE INDEX idx_pickup_windows_stall_time
+ON pickup_windows(stall_id, start_time);
 
 
