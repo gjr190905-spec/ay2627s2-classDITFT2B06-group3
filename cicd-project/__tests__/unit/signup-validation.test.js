@@ -211,4 +211,39 @@ describe('SCRUM-12 customer sign-up input validation', () => {
     validateSignupInput(input);
     expect(input.displayName).toBe('  Alex   Tan  ');
   });
+
+  test('accepts a password of exactly 72 UTF-8 bytes', () => {
+    const password = 'a'.repeat(72);
+    const result = validateSignupInput({
+      ...validSignup,
+      password,
+      confirmPassword: password,
+    });
+
+    expect(result.valid).toBe(true);
+  });
+
+  test('rejects passwords exceeding 72 UTF-8 bytes', () => {
+    const password = 'a'.repeat(73);
+    const result = validateSignupInput({
+      ...validSignup,
+      password,
+      confirmPassword: password,
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors.password).toBe('Password must not exceed 72 UTF-8 bytes.');
+  });
+
+  test('rejects Unicode passwords exceeding 72 UTF-8 bytes', () => {
+    const password = '😊'.repeat(19);
+    const result = validateSignupInput({
+      ...validSignup,
+      password,
+      confirmPassword: password,
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors.password).toBe('Password must not exceed 72 UTF-8 bytes.');
+  });
 });
