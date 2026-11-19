@@ -69,23 +69,30 @@ This project demonstrates a CRUD web application with a complete CI/CD workflow.
 │   ├── app.js                  # Express app (middleware, routes, error handling)
 │   ├── server.js               # Server startup + graceful shutdown
 │   ├── controllers/
-│   │   └── Vendor.controller.js # Vendor request validation + responses
+│   │   ├── Vendor.controller.js # Vendor request validation + responses
+│   │   └── Menu.controller.js  # Menu request validation + responses
 │   ├── models/
 │   │   ├── db.js               # PostgreSQL connection pool
 │   │   ├── Vendor.model.js     # Vendor lookup + open/close (transaction)
+│   │   ├── Menu.model.js       # Menu items, photos, banner, checkout validation
 │   │   ├── Person.model.js     # Person model
 │   │   └── Something.model.js  # Something model (full CRUD)
 │   ├── routers/
 │   │   ├── Vendor.router.js    # /vendors
+│   │   ├── Menu.router.js      # /vendors/:vendorId/menu
 │   │   ├── Person.router.js    # GET /persons
 │   │   └── Something.router.js # CRUD /somethings
 │   └── public/
 │       ├── index.html          # Frontend UI
 │       ├── index.js            # Frontend JavaScript
 │       ├── vendor/home.html    # Vendor home page
+│       ├── vendor/menu.html    # Vendor menu management page
+│       ├── stall.html          # Customer view of a stall's menu (live availability)
 │       ├── css/theme.css       # Shared Makan Liao? theme (fonts, colours, buttons)
 │       ├── css/vendor-home.css # Vendor home page styles
 │       ├── js/vendor-home.js   # Vendor home page logic
+│       ├── css/vendor-menu.css, js/vendor-menu.js   # Vendor menu page
+│       ├── css/stall-menu.css, js/stall-menu.js     # Customer stall page
 │       ├── fonts/              # Patrick Hand + Montserrat (OFL licences included)
 │       └── images/vendors/     # Sample vendor logos used by the seed data
 ├── e2e-tests/                  # Playwright E2E test specs
@@ -142,7 +149,8 @@ PORT=3001
 npm run migration:reset
 ```
 
-This reads `schema.sql` and creates the `Person`, `Something`, `Vendor`, `VendorLogo` and `StoreClosure` tables.
+This reads `schema.sql` and creates the `Person`, `Something`, `Vendor`, `VendorLogo`, `StoreClosure`,
+`MenuItem`, `MenuItemImage` and `MenuBanner` tables.
 
 ### 5. Seed sample data (optional)
 
@@ -150,7 +158,7 @@ This reads `schema.sql` and creates the `Person`, `Something`, `Vendor`, `Vendor
 npm run seed
 ```
 
-Inserts 20 sample persons, 2 sample somethings and 3 sample vendors.
+Inserts 20 sample persons, 2 sample somethings and 3 sample vendors, each with a 3-item starter menu.
 
 ### 6. Start the server
 
@@ -221,6 +229,58 @@ stored in the database (`VendorLogo` table, one row per vendor), not as a file i
 
 The page itself is at `/vendor/home.html`. Until the login page exists, open it as
 `/vendor/home.html?vendorId=1` (the id is then kept in `sessionStorage`).
+
+### Menu (vendor menu page, customer stall page, checkout validation)
+
+All routes are under `/vendors/:vendorId/menu`. An item always belongs to the vendor in the address:
+another vendor's item id gives `404`.
+
+| Method   | Endpoint                      | Description                                          | Status Codes       |
+| -------- | ----------------------------- | ---------------------------------------------------- | ------------------ |
+| `GET`    | `/`                           | Stall, banner and every item with its availability   | 200, 400, 404      |
+| `POST`   | `/items`                      | Add an item                                          | 201, 400, 404, 409 |
+| `GET`    | `/items/:itemId`              | One item                                             | 200, 400, 404      |
+| `PATCH`  | `/items/:itemId`              | Change name, description, price and/or quantity left | 200, 400, 404, 409 |
+| `DELETE` | `/items/:itemId`              | Delete an item (hidden, kept for order history)      | 204, 400, 404      |
+| `PATCH`  | `/items/:itemId/availability` | Switch between Available and Sold out                | 200, 400, 404, 409 |
+| `PUT`    | `/items/:itemId/image`        | Replace the item's photo (one per item)              | 200, 400, 404      |
+| `DELETE` | `/items/:itemId/image`        | Remove the item's photo                              | 200, 400, 404      |
+| `GET`    | `/items/:itemId/image`        | The stored photo itself                              | 200, 400, 404      |
+| `PUT`    | `/banner`                     | Replace the menu banner (one per vendor)             | 200, 400, 404      |
+| `DELETE` | `/banner`                     | Remove the menu banner                               | 200, 400, 404      |
+| `GET`    | `/banner`                     | The stored banner itself                             | 200, 400, 404      |
+| `POST`   | `/checkout-check`             | Check a basket before checkout                       | 200, 400, 404, 409 |
+
+```jsonc
+// POST /items  (name and price required; price in dollars, up to 2 decimal places)
+{ "name": "Mee Siam", "description": "Tangy", "price": "4.50", "quantityLeft": 12 }
+// quantityLeft: whole number 0–9999, or null = not counting
+
+// PATCH /items/:itemId/availability
+{ "isAvailable": false }
+
+// POST /checkout-check
+{ "items": [{ "itemId": 5, "quantity": 2 }] }
+// 200 { "ok": true, "items": [...], "totalCents": 1100 }
+// 409 { "error": "...", "problems": [{ "itemId": 5, "code": "SOLD_OUT", "message": "..." }] }
+//     codes: SOLD_OUT, NOT_ENOUGH, NOT_FOUND (deleted or another stall's), STALL_CLOSED
+```
+
+Availability rules:
+
+- Items carry an `isAvailable` flag. The customer page and `/checkout-check` both read it, so a
+  vendor's switch takes effect on both straight away.
+- Setting `quantityLeft` to `0` marks the item Sold out; setting it above `0` marks it Available
+  (restocked). Setting it to `null` (stop counting) leaves the switch as it was.
+- An item with `0` left can't be switched to Available (`409`); set how many are left first.
+  The database enforces this too (`MenuItem_zero_left_check`).
+- Item names are unique per vendor, ignoring case and spaces (`409`). Deleted items don't count.
+- Photos and banners use the same rules as the profile picture: base64 data URL, PNG/JPEG/WebP
+  checked from the bytes, max 1 MB, stored in the database (`MenuItemImage`, `MenuBanner`).
+
+Pages: the vendor manages the menu at `/vendor/menu.html` (opened from the Menu tile on the
+home page). Customers see it at `/stall.html?vendorId=1`; that page rechecks availability every
+15 seconds.
 
 ### Persons (read-only)
 

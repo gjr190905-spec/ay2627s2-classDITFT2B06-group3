@@ -47,6 +47,74 @@ const vendors = [
   { email: 'kopi@makanliao.sg', stallName: 'Kopi Corner', logoUrl: null, isOpen: true },
 ];
 
+// Starter menus, keyed by stall name. quantityLeft: null = not counting.
+// Vendor 2 (Mdm Lim Laksa) is the one the menu E2E tests use.
+const menuItems = {
+  'Ah Seng Chicken Rice': [
+    {
+      name: 'Steamed Chicken Rice',
+      description: 'Poached chicken, fragrant rice, chilli and ginger.',
+      priceCents: 450,
+      quantityLeft: null,
+      isSoldOut: false,
+    },
+    {
+      name: 'Roasted Chicken Rice',
+      description: 'Crispy-skin roast chicken with dark soy.',
+      priceCents: 480,
+      quantityLeft: 20,
+      isSoldOut: false,
+    },
+    { name: 'Braised Egg', description: null, priceCents: 80, quantityLeft: 0, isSoldOut: true },
+  ],
+  'Mdm Lim Laksa': [
+    {
+      name: 'Curry Laksa',
+      description: 'Rich coconut curry broth with prawns, tau pok and cockles.',
+      priceCents: 550,
+      quantityLeft: null,
+      isSoldOut: false,
+    },
+    {
+      name: 'Mee Siam',
+      description: 'Tangy, slightly spicy rice vermicelli.',
+      priceCents: 450,
+      quantityLeft: 5,
+      isSoldOut: false,
+    },
+    {
+      name: 'Otah',
+      description: 'Grilled spiced fish cake.',
+      priceCents: 150,
+      quantityLeft: null,
+      isSoldOut: true,
+    },
+  ],
+  'Kopi Corner': [
+    {
+      name: 'Kopi',
+      description: 'Coffee with condensed milk.',
+      priceCents: 150,
+      quantityLeft: null,
+      isSoldOut: false,
+    },
+    {
+      name: 'Teh Tarik',
+      description: 'Pulled milk tea.',
+      priceCents: 170,
+      quantityLeft: null,
+      isSoldOut: false,
+    },
+    {
+      name: 'Kaya Toast Set',
+      description: 'Two slices of kaya toast with soft-boiled eggs.',
+      priceCents: 380,
+      quantityLeft: 15,
+      isSoldOut: false,
+    },
+  ],
+};
+
 async function seed() {
   console.log('Seeding data...');
 
@@ -78,10 +146,34 @@ async function seed() {
       (_, i) => `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`,
     );
     const vendorValues = vendors.flatMap((v) => [v.email, v.stallName, v.logoUrl, v.isOpen]);
-    await pool.query(
-      `INSERT INTO "Vendor" ("email", "stallName", "logoUrl", "isOpen") VALUES ${vendorPlaceholders.join(', ')}`,
+    const { rows: insertedVendors } = await pool.query(
+      `INSERT INTO "Vendor" ("email", "stallName", "logoUrl", "isOpen") VALUES ${vendorPlaceholders.join(', ')} RETURNING "id", "stallName"`,
       vendorValues,
     );
+
+    // Insert each vendor's starter menu (batch)
+    const items = insertedVendors.flatMap((v) =>
+      (menuItems[v.stallName] || []).map((item) => ({ vendorId: v.id, ...item })),
+    );
+    if (items.length > 0) {
+      const itemPlaceholders = items.map(
+        (_, i) =>
+          `($${i * 6 + 1}, $${i * 6 + 2}, $${i * 6 + 3}, $${i * 6 + 4}, $${i * 6 + 5}, $${i * 6 + 6})`,
+      );
+      const itemValues = items.flatMap((m) => [
+        m.vendorId,
+        m.name,
+        m.description,
+        m.priceCents,
+        m.quantityLeft,
+        m.isSoldOut,
+      ]);
+      await pool.query(
+        `INSERT INTO "MenuItem" ("vendorId", "name", "description", "priceCents", "quantityLeft", "isSoldOut") VALUES ${itemPlaceholders.join(', ')}`,
+        itemValues,
+      );
+    }
+    console.log(`Inserted ${items.length} menu items.`);
   }
   console.log(`Inserted ${vendors.length} vendors.`);
 

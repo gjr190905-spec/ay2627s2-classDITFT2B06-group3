@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Ah Seng Chicken Rice">
+  <!-- Placeholder logo for seed data: a bowl of rice on brand red -->
+  <rect width="96" height="96" rx="20" fill="#ba080d"/>
+  <path d="M30 50a18 12 0 0 1 36 0" fill="#fffdf9"/>
+  <path d="M22 50h52a26 26 0 0 1-52 0z" fill="#fff"/>
+  <rect x="38" y="74" width="20" height="6" rx="3" fill="#fff"/>
+</svg>

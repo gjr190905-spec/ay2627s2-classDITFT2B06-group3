@@ -6,6 +6,7 @@ const path = require('path');
 const somethingRouter = require('./routers/Something.router');
 const personRouter = require('./routers/Person.router');
 const vendorRouter = require('./routers/Vendor.router');
+const menuRouter = require('./routers/Menu.router');
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 app.use('/somethings', somethingRouter);
 app.use('/persons', personRouter);
+app.use('/vendors/:vendorId/menu', menuRouter);
 app.use('/vendors', vendorRouter);
 
 // 404 handler — if no route above matched the request,

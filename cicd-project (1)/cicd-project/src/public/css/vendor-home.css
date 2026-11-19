@@ -1,0 +1,530 @@
+/* ─────────────────────────────────────────────────────────
+   Vendor home page
+   Depends on theme.css for colours, fonts and buttons.
+   Layout is unchanged from the previous design; only colours and type follow
+   the Makan Liao? brand.
+   ───────────────────────────────────────────────────────── */
+
+/* ── Header ─────────────────────────────────────────────── */
+.vh-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--ml-red-gradient);
+  backdrop-filter: saturate(1.4) blur(10px);
+  border-bottom: 1px solid #9e070c;
+}
+
+.vh-header__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0.75rem 1.5rem;
+}
+
+.vh-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-width: 0;
+}
+
+.vh-logo {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.55);
+}
+
+.vh-logo__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vh-logo__fallback {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font: 900 1.05rem/1 var(--ml-font-ui);
+  letter-spacing: -0.03em;
+  color: var(--ml-red);
+  background: #fff;
+}
+
+.vh-logo__fallback:empty {
+  background: transparent;
+}
+
+.vh-brand__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.vh-brand__stall {
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #fff;
+}
+
+.vh-logout {
+  flex: none;
+  min-height: 40px;
+  padding-inline: 1.1rem;
+  color: var(--ml-red);
+  background: #fff;
+  border-color: #fff;
+}
+
+.vh-logout:hover {
+  color: var(--ml-red-dark);
+  background: var(--ml-red-soft);
+  border-color: var(--ml-red-soft);
+}
+
+/* ── Layout ─────────────────────────────────────────────── */
+.vh-main {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+
+/* ── Status panel ───────────────────────────────────────── */
+/* The panel takes on the stall's state: blue when open, red when closed. */
+.vh-status {
+  --state: var(--ml-ink-soft);
+  --state-tint: var(--ml-surface);
+  --state-line: var(--ml-line);
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 1rem 2rem;
+  padding: 2.25rem 2.5rem;
+  overflow: hidden;
+  background: var(--state-tint);
+  border-radius: var(--ml-radius-lg);
+  box-shadow:
+    inset 0 0 0 1px var(--state-line),
+    var(--ml-shadow-card);
+  transition: background-color 300ms ease;
+}
+
+.vh-status[data-state='open'] {
+  --state: var(--ml-green);
+  --state-tint: var(--ml-green-tint);
+  --state-line: #d4e8dc;
+}
+
+.vh-status[data-state='closed'] {
+  --state: var(--ml-red);
+  --state-tint: var(--ml-red-tint);
+  --state-line: #efd8d4;
+}
+
+.vh-status__heading {
+  font-family: var(--ml-font-display);
+  font-weight: 400;
+  font-style: normal;
+  letter-spacing: 0;
+  font-size: clamp(2.1rem, 4.5vw, 2.9rem);
+  overflow-wrap: anywhere;
+}
+
+.vh-status__line {
+  max-width: 42ch;
+  margin: 0.5rem 0 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.vh-status__since {
+  margin: 0.2rem 0 0;
+  font-size: 0.88rem;
+  color: var(--ml-ink-soft);
+}
+
+.vh-status__since:empty {
+  display: none;
+}
+
+.vh-status__toggle {
+  margin-top: 1.5rem;
+  min-width: 10rem;
+}
+
+/* The state word is the page's one big typographic moment */
+.vh-status__word {
+  margin: 0;
+  font-family: var(--ml-font-display);
+  font-weight: 400;
+  font-style: normal;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  font-size: clamp(4.5rem, 13vw, 8.5rem);
+  line-height: 1;
+  align-self: center;
+  color: var(--state);
+  user-select: none;
+}
+
+.vh-status__word:empty {
+  display: none;
+}
+
+.vh-status__word.is-changing {
+  animation: vh-word-in 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes vh-word-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+/* ── Services ───────────────────────────────────────────── */
+.vh-services {
+  margin-top: 3rem;
+}
+
+.vh-services__heading {
+  letter-spacing: -0.05em;
+  font-size: 1.9rem;
+  margin-bottom: 1rem;
+}
+
+.vh-services__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vh-tile {
+  display: flex;
+}
+
+.vh-tile--dashboard {
+  grid-column: span 2;
+}
+
+.vh-tile__link {
+  display: flex;
+  flex-direction: column;
+  /* Top-aligned so tile names in the same row line up, whatever the description length */
+  justify-content: flex-start;
+  gap: 0.3rem;
+  width: 100%;
+  min-height: 8.5rem;
+  padding: 1.4rem 1.5rem;
+  text-decoration: none;
+  background: var(--ml-paper);
+  border: 1px solid var(--ml-line);
+  border-radius: var(--ml-radius);
+  box-shadow: var(--ml-shadow-card);
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.vh-tile__link:hover {
+  border-color: #f1c4b6;
+  box-shadow: var(--ml-shadow-soft);
+}
+
+.vh-tile__link:hover .vh-tile__name {
+  color: var(--ml-red);
+}
+
+.vh-tile__name {
+  font: 900 1.3rem/1.1 var(--ml-font-ui);
+  font-family: var(--ml-font-display);
+  letter-spacing: -0.045em;
+  transition: color 150ms ease;
+}
+
+.vh-tile__desc {
+  font-size: 0.9rem;
+  color: var(--ml-ink-soft);
+}
+
+/* Dashboard is the most-used service, so it leads in the dark feature style */
+.vh-tile--dashboard .vh-tile__link {
+  color: #fff;
+  background: var(--ml-charcoal);
+  border-color: var(--ml-charcoal);
+}
+
+.vh-tile--dashboard .vh-tile__link:hover {
+  background: #3b3236;
+  border-color: #3b3236;
+}
+
+.vh-tile--dashboard .vh-tile__name,
+.vh-tile--dashboard .vh-tile__link:hover .vh-tile__name {
+  font-family: var(--ml-font-display);
+  font-weight: 400;
+  font-style: normal;
+  letter-spacing: 0;
+  font-size: 2.6rem;
+  color: #fff;
+}
+
+.vh-tile--dashboard .vh-tile__desc {
+  color: #d9d3d4;
+}
+
+/* ── Signed-out state ───────────────────────────────────── */
+.vh-signed-out {
+  max-width: 30rem;
+  margin: 3rem auto 0;
+  padding: 2.5rem 2rem;
+  text-align: center;
+  background: var(--ml-paper);
+  border-radius: var(--ml-radius-lg);
+  box-shadow:
+    inset 0 0 0 1px var(--ml-line),
+    var(--ml-shadow-soft);
+}
+
+.vh-signed-out__logo {
+  mix-blend-mode: multiply;
+  width: 186px;
+  height: auto;
+  margin: 0 auto 1.25rem;
+}
+
+.vh-signed-out h1 {
+  font-family: var(--ml-font-display);
+  font-weight: 400;
+  font-style: normal;
+  letter-spacing: 0;
+  font-size: 2.6rem;
+}
+
+.vh-signed-out p {
+  margin: 0.5rem 0 1.5rem;
+  color: var(--ml-ink-soft);
+}
+
+/* ── Close-stall dialog ─────────────────────────────────── */
+.vh-dialog {
+  width: min(30rem, calc(100vw - 2rem));
+  padding: 1.75rem;
+  color: var(--ml-ink);
+  background: var(--ml-paper);
+  border: 0;
+  border-radius: var(--ml-radius-lg);
+  box-shadow: var(--ml-shadow-pop);
+}
+
+.vh-dialog::backdrop {
+  background: rgb(38 32 33 / 0.5);
+  backdrop-filter: blur(2px);
+}
+
+.vh-dialog[open] {
+  animation: vh-pop 180ms ease-out;
+}
+
+@keyframes vh-pop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+}
+
+.vh-dialog__heading {
+  font-size: 1.75rem;
+}
+
+.vh-dialog__hint {
+  margin: 0.35rem 0 1.25rem;
+  font-size: 0.92rem;
+  color: var(--ml-ink-soft);
+}
+
+.vh-reasons {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.vh-reasons__list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.vh-reason {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  font-weight: 700;
+  background: #fff;
+  border: 1px solid var(--ml-line);
+  border-radius: var(--ml-radius-sm);
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+
+.vh-reason:hover {
+  border-color: #e8aaa0;
+  background: var(--ml-surface);
+}
+
+.vh-reason:has(.vh-reason__input:checked) {
+  border-color: var(--ml-red);
+  box-shadow: inset 0 0 0 1px var(--ml-red);
+  background: var(--ml-red-soft);
+  color: var(--ml-red-dark);
+  font-weight: 800;
+}
+
+.vh-reason__input {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin: 0;
+  accent-color: var(--ml-red);
+}
+
+.vh-other {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 1rem;
+}
+
+.vh-other__label {
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+
+.vh-other textarea {
+  width: 100%;
+  padding: 0.65rem 0.8rem;
+  font: inherit;
+  color: inherit;
+  resize: vertical;
+  background: #fff;
+  border: 1px solid #e7e1dd;
+  border-radius: var(--ml-radius-sm);
+}
+
+.vh-other textarea:focus-visible {
+  outline: none;
+  border-color: var(--ml-red);
+  box-shadow: 0 0 0 3px rgb(204 2 2 / 0.09);
+}
+
+.vh-other__count {
+  justify-self: end;
+  font-size: 0.78rem;
+  color: var(--ml-ink-soft);
+}
+
+.vh-dialog__error {
+  min-height: 1.4em;
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--ml-red);
+}
+
+.vh-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+/* ── Toast ──────────────────────────────────────────────── */
+.vh-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 1.5rem;
+  z-index: 20;
+  padding: 0.7rem 1.3rem;
+  font-weight: 800;
+  font-size: 0.92rem;
+  color: #fff;
+  background: var(--ml-ink);
+  border-radius: 999px;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.18);
+  transform: translate(-50%, 200%);
+  visibility: hidden;
+  transition:
+    transform 220ms ease,
+    visibility 0s linear 220ms;
+}
+
+.vh-toast.is-visible {
+  transform: translate(-50%, 0);
+  visibility: visible;
+  transition: transform 220ms ease;
+}
+
+.vh-toast.is-error {
+  background: #a4282e;
+}
+
+/* ── Responsive ─────────────────────────────────────────── */
+@media (max-width: 800px) {
+  .vh-services__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .vh-header__inner {
+    padding: 0.6rem 1rem;
+  }
+
+  .vh-main {
+    padding: 1.25rem 1rem 3rem;
+  }
+
+  .vh-status {
+    grid-template-columns: 1fr;
+    padding: 1.75rem 1.5rem;
+  }
+
+  .vh-status__word {
+    order: -1;
+    font-size: 4.5rem;
+  }
+
+  .vh-status__toggle {
+    width: 100%;
+  }
+
+  .vh-services__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .vh-tile--dashboard {
+    grid-column: auto;
+  }
+
+  .vh-tile__link {
+    min-height: 0;
+  }
+}
