@@ -1,6 +1,5 @@
 {
   "dependencies": {
-    "@prisma/client": "6.19.3",
     "dotenv": "^17.3.1",
     "dotenv-cli": "^11.0.0",
     "express": "^5.2.1",
@@ -17,7 +16,6 @@
     "globals": "^17.4.0",
     "jest": "^30.3.0",
     "prettier": "^3.8.1",
-    "prisma": "6.19.3",
     "supertest": "^7.2.2"
   },
   "scripts": {
@@ -34,13 +32,7 @@
     "lint:report": "eslint -c configs/eslint.config.mjs . --format html --output-file reports/eslint-report.html || true",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "report": "node scripts/qa-report.js",
-    "db:format": "prisma format",
-    "db:validate": "prisma validate",
-    "db:migrate:create": "prisma migrate dev --create-only",
-    "db:migrate:deploy": "prisma migrate deploy",
-    "db:migrate:status": "prisma migrate status",
-    "db:generate": "prisma generate"
+    "report": "node scripts/qa-report.js"
   },
   "jest": {
     "testMatch": [

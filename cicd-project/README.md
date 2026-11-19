@@ -1,9 +1,5 @@
 # ST0526 CI/CD Project
 
-For the current PostgreSQL/Prisma setup, migration workflow, and pgAdmin checks,
-see [DATABASE.md](DATABASE.md). The reset workflow below is legacy starter
-tooling and must not be run against the Prisma-managed development database.
-
 A Node.js + Express web application with a full CI/CD pipeline, automated testing, and report publishing to GitHub Pages.
 
 ---
