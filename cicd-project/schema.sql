@@ -84,6 +84,7 @@ CREATE TABLE orders (
     customer_id INTEGER NOT NULL,
     stall_id INTEGER NOT NULL,
     pickup_window_id INTEGER NOT NULL,
+    collection_reference VARCHAR(100) UNIQUE,
     total_amount NUMERIC(10,2) NOT NULL,
     order_status VARCHAR(30) DEFAULT 'CONFIRMED',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

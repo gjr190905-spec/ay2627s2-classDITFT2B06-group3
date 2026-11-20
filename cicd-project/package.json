@@ -4,7 +4,8 @@
     "dotenv-cli": "^11.0.0",
     "express": "^5.2.1",
     "http-errors": "^2.0.1",
-    "pg": "^8.20.0"
+    "pg": "^8.20.0",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
