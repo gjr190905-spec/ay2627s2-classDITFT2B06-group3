@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Food stalls | Makan Liao</title>
+    <meta name="description" content="Browse campus food courts and order ahead for pickup." />
+    <link rel="stylesheet" href="menu.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+
+    <p class="promo-bar">Order before your break. Pay at the stall when you collect.</p>
+
+    <header class="site-header">
+      <a class="brand" href="menu.html">
+        <img class="brand__logo" src="images/logo.webp" alt="Makan Liao" width="120" height="48" />
+      </a>
+
+      <nav class="site-nav" aria-label="Main">
+        <ul class="site-nav__list">
+          <li><a href="menu.html" aria-current="page">Food stalls</a></li>
+          <li><a href="orders.html">My orders</a></li>
+          <li>
+            <a href="cart.html">
+              Cart
+              <span class="cart-badge" id="cart-count" aria-live="polite">0</span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+
+      <div class="site-user">
+        <span class="site-user__name" id="user-name"></span>
+        <button type="button" class="button button--outline" id="sign-out">Sign out</button>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="page-intro" aria-labelledby="page-title">
+        <h1 id="page-title">Explore food stalls</h1>
+        <p>Browse the campus food courts, pick a stall and order for pickup.</p>
+      </section>
+
+      <!-- Food court filter. One button per court; JS marks one as pressed. -->
+      <section class="courts" aria-labelledby="courts-title">
+        <h2 id="courts-title">Food courts</h2>
+        <p class="section-hint">Choose a court to see its stalls.</p>
+
+        <ul class="court-list" id="court-list">
+          <li>
+            <button type="button" class="court-card" data-court="1" aria-pressed="false">
+              <span class="court-card__name">Food Court 1</span>
+              <span class="court-card__count">0 stalls</span>
+            </button>
+          </li>
+          <li>
+            <button type="button" class="court-card" data-court="2" aria-pressed="false">
+              <span class="court-card__name">Food Court 2</span>
+              <span class="court-card__count">0 stalls</span>
+            </button>
+          </li>
+          <li>
+            <button type="button" class="court-card" data-court="3" aria-pressed="false">
+              <span class="court-card__name">Food Court 3</span>
+              <span class="court-card__count">0 stalls</span>
+            </button>
+          </li>
+          <li>
+            <button type="button" class="court-card" data-court="4" aria-pressed="false">
+              <span class="court-card__name">Food Court 4</span>
+              <span class="court-card__count">0 stalls</span>
+            </button>
+          </li>
+          <li>
+            <button type="button" class="court-card" data-court="5" aria-pressed="false">
+              <span class="court-card__name">Food Court 5</span>
+              <span class="court-card__count">0 stalls</span>
+            </button>
+          </li>
+          <li>
+            <button type="button" class="court-card" data-court="6" aria-pressed="true">
+              <span class="court-card__name">Food Court 6</span>
+              <span class="court-card__count">6 stalls</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+
+      <section class="stalls" aria-labelledby="stalls-title">
+        <div class="stalls__head">
+          <h2 id="stalls-title">All food stalls</h2>
+          <p class="stalls__count" id="stall-count" role="status">6 stalls found</p>
+        </div>
+
+        <form class="search" id="search-form" role="search">
+          <label class="search__label" for="stall-search">Search for a stall or cuisine</label>
+          <input
+            class="search__input"
+            id="stall-search"
+            name="q"
+            type="search"
+            placeholder="Search for a stall or cuisine"
+            autocomplete="off"
+            maxlength="100"
+          />
+          <button type="submit" class="button button--primary">Search</button>
+        </form>
+
+        <ul class="chip-list" id="cuisine-list" aria-label="Filter by cuisine">
+          <li><button type="button" class="chip" data-cuisine="all" aria-pressed="true">All</button></li>
+          <li><button type="button" class="chip" data-cuisine="breakfast" aria-pressed="false">Breakfast</button></li>
+          <li><button type="button" class="chip" data-cuisine="healthy-bowls" aria-pressed="false">Healthy bowls</button></li>
+          <li><button type="button" class="chip" data-cuisine="dessert" aria-pressed="false">Dessert</button></li>
+          <li><button type="button" class="chip" data-cuisine="japanese" aria-pressed="false">Japanese</button></li>
+          <li><button type="button" class="chip" data-cuisine="western" aria-pressed="false">Western</button></li>
+          <li><button type="button" class="chip" data-cuisine="noodles" aria-pressed="false">Noodles</button></li>
+        </ul>
+
+        <!-- Messages for loading, empty and failed states. JS toggles the hidden attribute. -->
+        <p class="message" id="stall-loading" role="status">Loading stalls...</p>
+        <p class="message message--error" id="stall-error" role="alert" hidden>
+          We could not load the stalls. Refresh the page to try again.
+        </p>
+        <p class="message" id="stall-empty" hidden>No stalls match your search. Try another word or clear the filters.</p>
+
+        <ul class="stall-grid" id="stall-grid">
+          <!-- Two static examples so the layout is visible before the JS exists. JS replaces these. -->
+          <li>
+            <article class="stall-card">
+              <img
+                class="stall-card__image"
+                src="images/stalls/placeholder.webp"
+                alt=""
+                width="400"
+                height="240"
+                loading="lazy"
+              />
+              <div class="stall-card__body">
+                <div class="stall-card__tags">
+                  <span class="tag">Japanese</span>
+                  <span class="status status--open">Accepting orders</span>
+                </div>
+                <h3 class="stall-card__name">Japanese Food</h3>
+                <p class="stall-card__blurb">Rice bowls, curry and udon.</p>
+                <div class="stall-card__foot">
+                  <p class="stall-card__meta">Food Court 6, 16 items</p>
+                  <a class="stall-card__link" href="stall-menu.html?id=4">View menu</a>
+                </div>
+              </div>
+            </article>
+          </li>
+          <li>
+            <article class="stall-card">
+              <img
+                class="stall-card__image"
+                src="images/stalls/placeholder.webp"
+                alt=""
+                width="400"
+                height="240"
+                loading="lazy"
+              />
+              <div class="stall-card__body">
+                <div class="stall-card__tags">
+                  <span class="tag">Western</span>
+                  <span class="status status--closed">Closed</span>
+                </div>
+                <h3 class="stall-card__name">Western Food</h3>
+                <p class="stall-card__blurb">Chops, pasta and burgers.</p>
+                <div class="stall-card__foot">
+                  <p class="stall-card__meta">Food Court 6, 39 items</p>
+                  <span class="stall-card__link stall-card__link--disabled" aria-disabled="true">Not taking orders</span>
+                </div>
+              </div>
+            </article>
+          </li>
+        </ul>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <img class="brand__logo" src="images/logo.webp" alt="Makan Liao" width="96" height="38" />
+      <p>A campus food ordering platform for students and staff.</p>
+      <p class="site-footer__note">
+        Independent class project prototype. Locations, menus and accounts are fictional. Pay at pickup only. There is no
+        online payment.
+      </p>
+    </footer>
+
+    <!-- Used by menu.js to build each stall card from API data. -->
+    <template id="stall-card-template">
+      <li>
+        <article class="stall-card">
+          <img class="stall-card__image" src="" alt="" width="400" height="240" loading="lazy" />
+          <div class="stall-card__body">
+            <div class="stall-card__tags">
+              <span class="tag"></span>
+              <span class="status"></span>
+            </div>
+            <h3 class="stall-card__name"></h3>
+            <p class="stall-card__blurb"></p>
+            <div class="stall-card__foot">
+              <p class="stall-card__meta"></p>
+              <a class="stall-card__link" href="">View menu</a>
+            </div>
+          </div>
+        </article>
+      </li>
+    </template>
+
+    <script src="menu.js" defer></script>
+  </body>
+</html>
