@@ -70,7 +70,7 @@ test.describe('Vendor menu – page load', () => {
       'false',
     );
     await expect(row(page, 'Mee Siam')).toContainText('2 left');
-    await expect(row(page, 'Curry Laksa')).toContainText('Not counting');
+    await expect(row(page, 'Curry Laksa')).toContainText('No limit');
   });
 
   // Valid partition: the home page's Menu tile opens this page for the signed-in vendor
@@ -107,6 +107,7 @@ test.describe('Vendor menu – add item', () => {
     await dialog.getByLabel('Name').fill('Lontong');
     await dialog.getByLabel('Description').fill('Rice cakes in vegetable curry');
     await dialog.getByLabel('Price').fill('4.80');
+    await dialog.getByLabel('Stock').selectOption({ label: 'Set quantity left' });
     await dialog.getByLabel('Quantity left').fill('10');
     await page.locator('#photoInput').setInputFiles(pngFile('lontong.png'));
     await expect(dialog.getByRole('img', { name: 'Item photo' })).toBeVisible();
@@ -127,6 +128,7 @@ test.describe('Vendor menu – add item', () => {
     await page.getByRole('button', { name: 'Add item' }).click();
     await page.getByLabel('Name').fill('Tahu Goreng');
     await page.getByLabel('Price').fill('3');
+    await page.getByLabel('Stock').selectOption('limited');
     await page.getByLabel('Quantity left').fill('0');
     await page.locator('#saveItem').click();
 
@@ -178,6 +180,88 @@ test.describe('Vendor menu – add item', () => {
     await page.getByLabel('Name').fill('Never saved');
     await page.getByRole('button', { name: 'Cancel' }).click();
 
+    await expect(page.locator('.vm-item')).toHaveCount(STARTER_MENU.length);
+  });
+});
+
+// ── Stock: No limit or a set quantity ────────────────────
+test.describe('Vendor menu – No limit option', () => {
+  // Valid partition: new items default to No limit, and the quantity box is hidden
+  test('should default a new item to No limit', async ({ page }) => {
+    await openMenu(page);
+    await page.getByRole('button', { name: 'Add item' }).click();
+
+    await expect(page.getByLabel('Stock')).toHaveValue('unlimited');
+    await expect(page.getByLabel('Quantity left')).toBeHidden();
+
+    await page.getByLabel('Name').fill('Chendol');
+    await page.getByLabel('Price').fill('2.50');
+    await page.locator('#saveItem').click();
+
+    await expect(row(page, 'Chendol')).toContainText('No limit');
+  });
+
+  // Valid partition: switch a No limit item to a set quantity in the edit popup
+  test('should switch an item from No limit to a quantity', async ({ page, request }) => {
+    await openMenu(page);
+    await page.getByRole('button', { name: 'Edit Curry Laksa' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Edit item' });
+    await expect(dialog.getByLabel('Stock')).toHaveValue('unlimited');
+
+    await dialog.getByLabel('Stock').selectOption({ label: 'Set quantity left' });
+    await expect(dialog.getByLabel('Quantity left')).toBeFocused();
+    await dialog.getByLabel('Quantity left').fill('8');
+    await dialog.getByRole('button', { name: 'Save changes' }).click();
+
+    await expect(row(page, 'Curry Laksa')).toContainText('8 left');
+    const menu = await (await request.get(API)).json();
+    expect(menu.items.find((i) => i.name === 'Curry Laksa').quantityLeft).toBe(8);
+  });
+
+  // Valid partition: switch a counted item back to No limit
+  test('should switch an item from a quantity back to No limit', async ({ page, request }) => {
+    await openMenu(page);
+    await page.getByRole('button', { name: 'Edit Mee Siam' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Edit item' });
+    await expect(dialog.getByLabel('Stock')).toHaveValue('limited');
+    await expect(dialog.getByLabel('Quantity left')).toHaveValue('2');
+
+    await dialog.getByLabel('Stock').selectOption({ label: 'No limit' });
+    await expect(dialog.getByLabel('Quantity left')).toBeHidden();
+    await dialog.getByRole('button', { name: 'Save changes' }).click();
+
+    await expect(row(page, 'Mee Siam')).toContainText('No limit');
+    const menu = await (await request.get(API)).json();
+    expect(menu.items.find((i) => i.name === 'Mee Siam').quantityLeft).toBeNull();
+  });
+
+  // Valid partition: it can be switched back and forth as often as the vendor likes
+  test('should switch back and forth repeatedly', async ({ page }) => {
+    await openMenu(page);
+    for (const [option, expected] of [
+      ['limited', '5 left'],
+      ['unlimited', 'No limit'],
+      ['limited', '5 left'],
+    ]) {
+      await page.getByRole('button', { name: 'Edit Curry Laksa' }).click();
+      await page.getByLabel('Stock').selectOption(option);
+      if (option === 'limited') await page.getByLabel('Quantity left').fill('5');
+      await page.locator('#saveItem').click();
+      await expect(row(page, 'Curry Laksa')).toContainText(expected);
+    }
+  });
+
+  // Invalid partition: "Set quantity left" with the box left empty
+  test('should ask for a number when Set quantity left is chosen', async ({ page }) => {
+    await openMenu(page);
+    await page.getByRole('button', { name: 'Add item' }).click();
+    await page.getByLabel('Name').fill('Rojak');
+    await page.getByLabel('Price').fill('4');
+    await page.getByLabel('Stock').selectOption('limited');
+    await page.locator('#saveItem').click();
+
+    await expect(page.locator('#itemError')).toContainText('Enter how many are left');
+    await expect(page.getByLabel('Quantity left')).toHaveAttribute('aria-invalid', 'true');
     await expect(page.locator('.vm-item')).toHaveCount(STARTER_MENU.length);
   });
 });

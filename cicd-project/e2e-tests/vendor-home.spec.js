@@ -72,6 +72,16 @@ test.describe('Vendor home – page load', () => {
   });
 });
 
+/**
+ * Check the Open / Closed sign: the right picture, its alt text, and that it loaded.
+ */
+async function expectSign(page, word) {
+  const sign = page.getByRole('img', { name: word, exact: true });
+  await expect(sign).toBeVisible();
+  await expect(sign).toHaveAttribute('src', `../images/status/${word.toLowerCase()}-sign.png`);
+  await expect.poll(() => sign.evaluate((img) => img.complete && img.naturalWidth > 0)).toBe(true);
+}
+
 // ── Closing the stall ────────────────────────────────────
 test.describe('Vendor home – close stall', () => {
   test.beforeEach(async ({ request, page }) => {
@@ -81,7 +91,7 @@ test.describe('Vendor home – close stall', () => {
 
   // Valid partition: open stall shows OPEN and a Close stall button
   test('should show the open status', async ({ page }) => {
-    await expect(page.locator('#statusWord')).toHaveText('Open');
+    await expectSign(page, 'Open');
     await expect(page.getByRole('button', { name: 'Close stall' })).toBeVisible();
   });
 
@@ -101,7 +111,7 @@ test.describe('Vendor home – close stall', () => {
     await page.getByRole('button', { name: 'Cancel' }).click();
 
     await expect(page.getByRole('dialog')).toBeHidden();
-    await expect(page.locator('#statusWord')).toHaveText('Open');
+    await expectSign(page, 'Open');
   });
 
   // Valid partition: pick a listed reason and confirm
@@ -112,7 +122,7 @@ test.describe('Vendor home – close stall', () => {
     await dialog.getByRole('button', { name: 'Close stall' }).click();
 
     await expect(dialog).toBeHidden();
-    await expect(page.locator('#statusWord')).toHaveText('Closed');
+    await expectSign(page, 'Closed');
     await expect(page.getByRole('button', { name: 'Open stall' })).toBeVisible();
     await expect(page.getByRole('status')).toHaveText('Stall closed');
   });
@@ -122,11 +132,11 @@ test.describe('Vendor home – close stall', () => {
     await page.getByRole('button', { name: 'Close stall' }).click();
     await page.getByRole('radio', { name: 'Taking a short break' }).check();
     await page.getByRole('dialog').getByRole('button', { name: 'Close stall' }).click();
-    await expect(page.locator('#statusWord')).toHaveText('Closed');
+    await expectSign(page, 'Closed');
 
     await page.reload();
 
-    await expect(page.locator('#statusWord')).toHaveText('Closed');
+    await expectSign(page, 'Closed');
   });
 
   // Valid partition: Other reveals a text box; typed reason is accepted
@@ -140,7 +150,7 @@ test.describe('Vendor home – close stall', () => {
     await dialog.getByLabel('Tell us what happened').fill('Gas tank ran out');
     await dialog.getByRole('button', { name: 'Close stall' }).click();
 
-    await expect(page.locator('#statusWord')).toHaveText('Closed');
+    await expectSign(page, 'Closed');
   });
 
   // Boundary: confirming with no reason selected is blocked
@@ -162,7 +172,7 @@ test.describe('Vendor home – close stall', () => {
     await dialog.getByRole('button', { name: 'Close stall' }).click();
 
     await expect(dialog.getByRole('alert')).toHaveText('Type a reason, or pick one from the list.');
-    await expect(page.locator('#statusWord')).toHaveText('Open');
+    await expectSign(page, 'Open');
   });
 
   // Boundary / XSS: typed reason with HTML is accepted as plain text
@@ -172,7 +182,7 @@ test.describe('Vendor home – close stall', () => {
     await page.getByLabel('Tell us what happened').fill('<b>bold</b> & "quotes"');
     await page.getByRole('dialog').getByRole('button', { name: 'Close stall' }).click();
 
-    await expect(page.locator('#statusWord')).toHaveText('Closed');
+    await expectSign(page, 'Closed');
   });
 });
 
@@ -183,12 +193,12 @@ test.describe('Vendor home – open stall', () => {
   // Valid partition: opening asks no questions
   test('should open the stall straight away without a prompt', async ({ page }) => {
     await openHome(page);
-    await expect(page.locator('#statusWord')).toHaveText('Closed');
+    await expectSign(page, 'Closed');
 
     await page.getByRole('button', { name: 'Open stall' }).click();
 
     await expect(page.getByRole('dialog')).toBeHidden();
-    await expect(page.locator('#statusWord')).toHaveText('Open');
+    await expectSign(page, 'Open');
     await expect(page.getByRole('status')).toHaveText('Stall opened');
   });
 });

@@ -351,6 +351,30 @@
   gap: 0 1rem;
 }
 
+/* Stock: "No limit" or "Set quantity left" */
+.vm-select {
+  appearance: none;
+  padding-right: 2.5rem;
+  cursor: pointer;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ml-ink-soft) 50%),
+    linear-gradient(135deg, var(--ml-ink-soft) 50%, transparent 50%);
+  background-position:
+    calc(100% - 1.15rem) 50%,
+    calc(100% - 0.8rem) 50%;
+  background-size: 0.35rem 0.35rem;
+  background-repeat: no-repeat;
+}
+
+/* The quantity box sits under the Stock select */
+.vm-quantity-field {
+  grid-column: 2;
+}
+
+.vm-quantity-field[hidden] {
+  display: none;
+}
+
 .vm-money {
   position: relative;
 }
@@ -403,5 +427,9 @@
 
   .vm-row {
     grid-template-columns: 1fr;
+  }
+
+  .vm-quantity-field {
+    grid-column: auto;
   }
 }

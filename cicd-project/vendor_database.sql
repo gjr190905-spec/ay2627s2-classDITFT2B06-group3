@@ -6,7 +6,7 @@
 --    -> Query Tool -> open or paste this file -> Execute (F5).
 --
 --  WARNING: this REBUILDS the app's tables. Every vendor, closure record,
---  profile picture, menu item, item photo, menu banner, person and something
+--  profile picture, menu item, item photo, menu banner, order, person and something
 --  in them is deleted and replaced
 --  with the sample data at the bottom. It does the same as
 --  `npm run migration:reset`, so the two always give the same database.
@@ -26,6 +26,9 @@ BEGIN;   -- all or nothing: if any step fails, nothing is changed
 -- ---------------------------------------------------------------------
 -- 1. Remove the old tables (pictures and closures first, they depend on Vendor)
 -- ---------------------------------------------------------------------
+DROP TABLE IF EXISTS "OrderItem" CASCADE;
+DROP TABLE IF EXISTS "Order" CASCADE;
+DROP FUNCTION IF EXISTS "Order_collected_is_final"() CASCADE;
 DROP TABLE IF EXISTS "MenuBanner" CASCADE;
 DROP TABLE IF EXISTS "MenuItemImage" CASCADE;
 DROP TABLE IF EXISTS "MenuItem" CASCADE;
@@ -181,6 +184,87 @@ CREATE TABLE "MenuBanner" (
 );
 
 -- ---------------------------------------------------------------------
+-- 5c. Orders: pickup orders, their items, and the "collected is final" rule
+-- ---------------------------------------------------------------------
+-- ── Order (a student's pickup order at one stall) ──
+--  "orderNumber"  : the number the student shows at the stall, unique per stall (1001, 1002…)
+--  "status"       : CONFIRMED → PREPARING → READY → COLLECTED, one step at a time
+--  "pickupWindow*": the window the student booked; the dashboard groups orders by it
+--  "totalCents"   : the amount to collect at the stall (students pay on pickup)
+--  "readyAt"      : when the vendor marked it Ready, so on-time readiness
+--                   ("readyAt" <= "pickupWindowEnd") can be checked
+--  "collectedAt"  : when it was handed over. Once COLLECTED the row can't change
+--                   (trigger "Order_collected_is_final").
+CREATE TABLE "Order" (
+  "id" SERIAL NOT NULL,
+  "vendorId" INTEGER NOT NULL,
+  "orderNumber" INTEGER NOT NULL,
+  "customerName" TEXT,
+  "status" TEXT NOT NULL DEFAULT 'CONFIRMED',
+  "pickupWindowStart" TIMESTAMPTZ NOT NULL,
+  "pickupWindowEnd" TIMESTAMPTZ NOT NULL,
+  "totalCents" INTEGER NOT NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "preparingAt" TIMESTAMPTZ,
+  "readyAt" TIMESTAMPTZ,
+  "collectedAt" TIMESTAMPTZ,
+  CONSTRAINT "Order_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "Order_vendorId_fkey" FOREIGN KEY ("vendorId")
+    REFERENCES "Vendor"("id") ON DELETE CASCADE,
+  CONSTRAINT "Order_status_check" CHECK (
+    "status" IN ('CONFIRMED', 'PREPARING', 'READY', 'COLLECTED')
+  ),
+  CONSTRAINT "Order_window_check" CHECK ("pickupWindowEnd" > "pickupWindowStart"),
+  CONSTRAINT "Order_totalCents_check" CHECK ("totalCents" >= 0),
+  CONSTRAINT "Order_customerName_check" CHECK (
+    "customerName" IS NULL OR char_length("customerName") <= 60
+  ),
+  -- Each status has the timestamps of every step before it
+  CONSTRAINT "Order_timestamps_check" CHECK (
+    ("status" = 'CONFIRMED' AND "readyAt" IS NULL AND "collectedAt" IS NULL)
+    OR ("status" = 'PREPARING' AND "preparingAt" IS NOT NULL AND "readyAt" IS NULL
+        AND "collectedAt" IS NULL)
+    OR ("status" = 'READY' AND "preparingAt" IS NOT NULL AND "readyAt" IS NOT NULL
+        AND "collectedAt" IS NULL)
+    OR ("status" = 'COLLECTED' AND "preparingAt" IS NOT NULL AND "readyAt" IS NOT NULL
+        AND "collectedAt" IS NOT NULL)
+  )
+);
+
+-- ── OrderItem (the lines of an order) ──
+--  Name and price are copied at order time, so later menu edits don't change past orders.
+CREATE TABLE "OrderItem" (
+  "id" SERIAL NOT NULL,
+  "orderId" INTEGER NOT NULL,
+  "menuItemId" INTEGER,
+  "name" TEXT NOT NULL,
+  "unitPriceCents" INTEGER NOT NULL,
+  "quantity" INTEGER NOT NULL,
+  CONSTRAINT "OrderItem_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "OrderItem_orderId_fkey" FOREIGN KEY ("orderId")
+    REFERENCES "Order"("id") ON DELETE CASCADE,
+  CONSTRAINT "OrderItem_menuItemId_fkey" FOREIGN KEY ("menuItemId")
+    REFERENCES "MenuItem"("id") ON DELETE SET NULL,
+  CONSTRAINT "OrderItem_unitPriceCents_check" CHECK ("unitPriceCents" >= 0),
+  CONSTRAINT "OrderItem_quantity_check" CHECK ("quantity" BETWEEN 1 AND 99)
+);
+
+-- A collected order is final: no second collection (or any other change) can alter it
+CREATE FUNCTION "Order_collected_is_final"() RETURNS trigger AS $$
+BEGIN
+  IF OLD."status" = 'COLLECTED' THEN
+    RAISE EXCEPTION 'Order % has already been collected', OLD."orderNumber"
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER "Order_collected_is_final"
+  BEFORE UPDATE ON "Order"
+  FOR EACH ROW EXECUTE FUNCTION "Order_collected_is_final"();
+
+-- ---------------------------------------------------------------------
 -- 6. Indexes
 -- ---------------------------------------------------------------------
 CREATE UNIQUE INDEX "Person_email_key" ON "Person"("email");
@@ -194,6 +278,9 @@ CREATE INDEX "StoreClosure_vendorId_idx" ON "StoreClosure"("vendorId");
 CREATE UNIQUE INDEX "MenuItem_vendor_name_unique" ON "MenuItem"("vendorId", lower(btrim("name")))
   WHERE "deletedAt" IS NULL;
 CREATE INDEX "MenuItem_vendorId_idx" ON "MenuItem"("vendorId") WHERE "deletedAt" IS NULL;
+CREATE UNIQUE INDEX "Order_vendor_orderNumber_key" ON "Order"("vendorId", "orderNumber");
+CREATE INDEX "Order_vendor_window_idx" ON "Order"("vendorId", "pickupWindowStart");
+CREATE INDEX "OrderItem_orderId_idx" ON "OrderItem"("orderId");
 
 -- ---------------------------------------------------------------------
 -- 7. Sample data (same as scripts/seed.js)
@@ -249,18 +336,54 @@ FROM (VALUES
 JOIN "Vendor" v ON v."email" = m."email"
 ORDER BY m."ord";
 
+-- A few sample orders per stall for today, around the time you run this script:
+-- one in each status, so the dashboard has something to show. (scripts/seed.js
+-- adds more, including the last 6 days for the sales chart.)
+INSERT INTO "Order" ("vendorId", "orderNumber", "customerName", "status", "pickupWindowStart",
+  "pickupWindowEnd", "totalCents", "createdAt", "preparingAt", "readyAt", "collectedAt")
+SELECT v."id", 1000 + s."n", s."customerName", s."status",
+  date_trunc('hour', NOW()) + s."startOffset",
+  date_trunc('hour', NOW()) + s."startOffset" + interval '15 minutes',
+  m."priceCents" * (1 + (s."n" % 2)), NOW() - interval '1 hour',
+  CASE WHEN s."status" <> 'CONFIRMED' THEN NOW() - interval '20 minutes' END,
+  CASE WHEN s."status" IN ('READY', 'COLLECTED') THEN NOW() - interval '10 minutes' END,
+  CASE WHEN s."status" = 'COLLECTED' THEN NOW() - interval '5 minutes' END
+FROM "Vendor" v
+-- each sample order is for the stall's first menu item (1 or 2 portions)
+JOIN LATERAL (
+  SELECT mi."priceCents" FROM "MenuItem" mi WHERE mi."vendorId" = v."id" ORDER BY mi."id" LIMIT 1
+) m ON TRUE
+CROSS JOIN (VALUES
+  (1, 'Alice', 'COLLECTED', interval '-30 minutes'),
+  (2, 'Bob', 'READY', interval '-15 minutes'),
+  (3, 'Carol', 'PREPARING', interval '0 minutes'),
+  (4, 'Dave', 'CONFIRMED', interval '15 minutes')
+) AS s("n", "customerName", "status", "startOffset");
+
+-- The matching order lines
+INSERT INTO "OrderItem" ("orderId", "menuItemId", "name", "unitPriceCents", "quantity")
+SELECT o."id", m."id", m."name", m."priceCents", 1 + (o."orderNumber" % 2)
+FROM "Order" o
+JOIN LATERAL (
+  SELECT * FROM "MenuItem" mi WHERE mi."vendorId" = o."vendorId" ORDER BY mi."id" LIMIT 1
+) m ON TRUE;
+
 COMMIT;
 
 -- ---------------------------------------------------------------------
--- 8. Check: should list 8 tables, then the 3 vendors and their menus
+-- 8. Check: should list 10 tables, then the 3 vendors, their menus and today's orders
 -- ---------------------------------------------------------------------
 SELECT table_name AS "Tables created"
   FROM information_schema.tables
  WHERE table_schema = 'public'
    AND table_name IN ('Person', 'Something', 'Vendor', 'VendorLogo', 'StoreClosure',
-                      'MenuItem', 'MenuItemImage', 'MenuBanner')
+                      'MenuItem', 'MenuItemImage', 'MenuBanner', 'Order', 'OrderItem')
  ORDER BY table_name;
 
 SELECT "id", "stallName", "isOpen", "logoUrl" FROM "Vendor" ORDER BY "id";
 
 SELECT "vendorId", "name", "priceCents", "quantityLeft", "isSoldOut" FROM "MenuItem" ORDER BY "id";
+
+SELECT o."vendorId", o."orderNumber", o."status", o."totalCents",
+       to_char(o."pickupWindowStart" AT TIME ZONE 'Asia/Singapore', 'HH24:MI') AS "windowStart"
+FROM "Order" o ORDER BY o."vendorId", o."orderNumber";

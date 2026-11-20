@@ -1,0 +1,844 @@
+/* ─────────────────────────────────────────────────────────
+   Vendor dashboard
+   Depends on theme.css (colours, fonts, buttons), vendor-home.css
+   (header, dialog, toast, signed-out panel) and vendor-profile.css
+   (title, underline, fields).
+
+   Chart colours: categorical slots 1–4 validated together against the card
+   surface (#fffdf9) – worst adjacent CVD ΔE 9.1, normal-vision ΔE 22.9. Ready
+   and Collected sit below 3:1 contrast, so every status also has a visible
+   text label and count (never colour alone).
+   ───────────────────────────────────────────────────────── */
+
+/* Defined on :root so the handover dialog and tooltip (outside <main>) get them too */
+:root {
+  --db-surface: var(--ml-paper);
+  --db-series: #2a78d6; /* single-series charts */
+  --db-series-track: #cde2fb; /* lighter step of the same ramp */
+  --db-confirmed: #2a78d6;
+  --db-preparing: #eb6834;
+  --db-ready: #1baf7a;
+  --db-collected: #eda100;
+  --db-grid: #ebe4dc;
+  --db-axis: #d3c9bf;
+  --db-muted: #7d756f;
+}
+
+.db-main {
+  max-width: 1180px;
+}
+
+/* While refreshing, charts keep their last render, slightly faded (no layout jump) */
+.db-tiles,
+.db-charts {
+  transition: opacity 150ms ease;
+}
+
+.is-refreshing .db-tiles,
+.is-refreshing .db-charts {
+  opacity: 0.75;
+}
+
+.db-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+  flex-wrap: wrap;
+}
+
+.db-date {
+  margin: 0 0 1.5rem;
+  font-weight: 700;
+  color: var(--ml-ink-soft);
+}
+
+.db-updated {
+  margin: 0 0 1.5rem;
+  font-size: 0.82rem;
+  color: var(--ml-ink-soft);
+}
+
+/* ── Stat tiles ─────────────────────────────────────────── */
+.db-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.db-tile,
+.db-card,
+.db-board {
+  background: var(--db-surface);
+  border: 1px solid var(--ml-line);
+  border-radius: var(--ml-radius);
+  box-shadow: var(--ml-shadow-card);
+}
+
+.db-tile {
+  padding: 1.1rem 1.25rem 1.15rem;
+}
+
+.db-tile__label {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--ml-ink-soft);
+}
+
+.db-tile__value {
+  margin: 0.2rem 0 0;
+  font-size: 2.2rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.db-tile__note {
+  margin: 0.25rem 0 0;
+  font-size: 0.82rem;
+  color: var(--ml-ink-soft);
+}
+
+/* ── Chart cards (layout follows the reference: 2 wide, then 3) ── */
+.db-charts {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.db-card {
+  grid-column: span 2;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0 1.4rem 1.3rem;
+}
+
+.db-card--wide {
+  grid-column: span 3;
+}
+
+.db-card__head {
+  margin: 0 -1.4rem 1.1rem;
+  padding: 1.05rem 1.4rem 0.9rem;
+  border-bottom: 1px solid var(--ml-line);
+}
+
+.db-card__title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.db-card__sub {
+  margin: 0.15rem 0 0;
+  font-size: 0.82rem;
+  color: var(--ml-ink-soft);
+}
+
+.db-chart__empty {
+  margin: 1.5rem 0;
+  text-align: center;
+  color: var(--ml-ink-soft);
+}
+
+/* Column chart: y-axis | plot, then the x labels under the plot */
+.db-columns {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: 180px auto;
+  column-gap: 0.6rem;
+}
+
+.db-columns__axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  margin: -0.45rem 0;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--db-muted);
+  text-align: right;
+}
+
+.db-columns__plot {
+  position: relative;
+  border-bottom: 1px solid var(--db-axis);
+}
+
+.db-columns__grid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--db-grid);
+}
+
+.db-columns__bars,
+.db-columns__labels {
+  display: flex;
+  gap: 2px;
+}
+
+.db-columns__bars {
+  position: absolute;
+  inset: 0;
+}
+
+.db-columns__slot {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: flex-end;
+  justify-content: center;
+  border-radius: 6px;
+  cursor: default;
+}
+
+/* The slot is the hit target, bigger than the bar */
+.db-columns__slot:hover,
+.db-columns__slot:focus-visible {
+  background: rgb(42 120 214 / 0.06);
+}
+
+.db-columns__bar {
+  position: relative;
+  width: min(24px, 70%);
+  min-height: 2px;
+  background: var(--db-series);
+  border-radius: 4px 4px 0 0;
+}
+
+.db-columns__bar.is-zero {
+  min-height: 0;
+}
+
+.db-columns__cap {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.74rem;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--ml-ink);
+}
+
+.db-columns__labels {
+  grid-column: 2;
+  padding-top: 0.4rem;
+}
+
+.db-columns__labels.is-dense span:nth-child(even) {
+  visibility: hidden;
+}
+
+.db-columns__labels span {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--db-muted);
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Tall segmented bar (order status) */
+.db-segbar {
+  display: flex;
+  gap: 2px;
+  height: 28px;
+  margin-top: 0.4rem;
+}
+
+.db-segbar__part {
+  display: flex;
+  align-items: center;
+  min-width: 4px;
+  padding: 0 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #fff;
+  cursor: default;
+}
+
+.db-segbar__part:hover,
+.db-segbar__part:focus-visible {
+  filter: brightness(1.08);
+}
+
+.db-segbar__part--confirmed {
+  background: var(--db-confirmed);
+}
+
+.db-segbar__part--preparing {
+  background: var(--db-preparing);
+}
+
+.db-segbar__part--ready {
+  background: var(--db-ready);
+}
+
+.db-segbar__part--collected {
+  background: var(--db-collected);
+  color: #0b0b0b;
+}
+
+.db-legend {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1.1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.db-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.88rem;
+}
+
+.db-legend__key {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.db-legend__key--confirmed,
+.db-status--confirmed::before {
+  background: var(--db-confirmed);
+}
+
+.db-legend__key--preparing,
+.db-status--preparing::before {
+  background: var(--db-preparing);
+}
+
+.db-legend__key--ready,
+.db-status--ready::before {
+  background: var(--db-ready);
+}
+
+.db-legend__key--collected,
+.db-status--collected::before {
+  background: var(--db-collected);
+}
+
+.db-legend__name {
+  flex: 1;
+  color: var(--ml-ink-soft);
+}
+
+.db-legend__value {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Meter (ready on time) */
+.db-meter__value {
+  margin: 0.2rem 0 0.6rem;
+  font-size: 2.2rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.db-meter {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--db-series-track);
+}
+
+.db-meter__fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--db-series);
+}
+
+.db-meter__note {
+  margin: 0.75rem 0 0;
+  font-size: 0.86rem;
+  color: var(--ml-ink-soft);
+}
+
+/* Horizontal bars (top items) */
+.db-hbars {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0.2rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.db-hbars__row {
+  display: grid;
+  grid-template-columns: minmax(0, 7.5rem) minmax(0, 1fr) 2rem;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.86rem;
+}
+
+.db-hbars__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ml-ink-soft);
+}
+
+.db-hbars__track {
+  height: 12px;
+}
+
+.db-hbars__bar {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: 0 4px 4px 0;
+  background: var(--db-series);
+}
+
+.db-hbars__value {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Table view under a chart */
+.db-table-view {
+  margin-top: 0.9rem;
+  font-size: 0.82rem;
+}
+
+.db-table-view summary {
+  width: fit-content;
+  font-weight: 700;
+  color: var(--ml-ink-soft);
+  cursor: pointer;
+}
+
+.db-table {
+  width: 100%;
+  margin-top: 0.5rem;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.db-table th,
+.db-table td {
+  padding: 0.35rem 0.25rem;
+  text-align: left;
+  border-bottom: 1px solid var(--db-grid);
+}
+
+.db-table td:last-child,
+.db-table th:last-child {
+  text-align: right;
+}
+
+.db-tooltip {
+  position: absolute;
+  z-index: 50;
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.8rem;
+  color: #fff;
+  background: var(--ml-charcoal);
+  border-radius: 9px;
+  box-shadow: var(--ml-shadow-pop);
+  pointer-events: none;
+}
+
+.db-tooltip strong {
+  font-size: 0.92rem;
+}
+
+.db-tooltip span {
+  color: #d6d1cc;
+}
+
+/* ── Preparation board ──────────────────────────────────── */
+.db-board {
+  padding: 1.25rem 1.4rem 1.5rem;
+}
+
+.db-board__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+  flex-wrap: wrap;
+}
+
+.db-board__title {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.db-find__label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.db-find__row {
+  position: relative;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.db-find__hash {
+  position: absolute;
+  top: 50%;
+  left: 0.9rem;
+  transform: translateY(-50%);
+  font-weight: 800;
+  color: var(--ml-ink-soft);
+}
+
+.db-find__input {
+  width: 9rem;
+  padding-left: 1.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.db-find__error {
+  min-height: 1.2em;
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ml-red);
+}
+
+.db-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.75rem 0 1.25rem;
+}
+
+.db-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 38px;
+  padding: 0.3rem 0.95rem;
+  font: 800 0.86rem/1 var(--ml-font-ui);
+  color: var(--ml-ink-soft);
+  background: #fff;
+  border: 1px solid var(--ml-line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.db-filter[aria-pressed='true'] {
+  color: #fff;
+  background: var(--ml-charcoal);
+  border-color: var(--ml-charcoal);
+}
+
+.db-filter__count {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+.db-windows {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.db-window__head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.65rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid var(--ml-line);
+}
+
+.db-window__time {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.db-window__tag {
+  padding: 0.15rem 0.6rem;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: var(--ml-ink-soft);
+  background: var(--ml-surface);
+  border-radius: 999px;
+}
+
+.db-window__tag.is-now {
+  color: #fff;
+  background: var(--ml-charcoal);
+}
+
+.db-window__tag.is-late {
+  color: var(--ml-red);
+  background: var(--ml-red-tint);
+}
+
+.db-window__count {
+  margin-left: auto;
+  font-size: 0.82rem;
+  color: var(--ml-ink-soft);
+}
+
+.db-window__orders {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.85rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.db-order {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.9rem 1rem 1rem;
+  background: #fff;
+  border: 1px solid var(--ml-line);
+  border-radius: 14px;
+}
+
+.db-order--collected {
+  background: var(--ml-surface);
+}
+
+.db-order__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.db-order__number {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.db-order__name {
+  margin: -0.2rem 0 0;
+  font-size: 0.82rem;
+  color: var(--ml-ink-soft);
+}
+
+.db-order__items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9rem;
+}
+
+.db-order__qty {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.db-order__foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 0.25rem;
+}
+
+.db-order__total {
+  font-weight: 900;
+}
+
+.db-order__ready {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ml-green);
+}
+
+.db-order__ready.is-late {
+  color: var(--ml-red);
+}
+
+.db-order__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.db-order__done {
+  font-size: 0.8rem;
+  color: var(--ml-ink-soft);
+}
+
+.db-btn--small {
+  min-height: 36px;
+  padding: 0.35rem 0.95rem;
+  font-size: 0.84rem;
+}
+
+.db-order [aria-disabled='true'] {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* Status pill: colour dot + text */
+.db-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.6rem 0.2rem 0.5rem;
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: var(--ml-ink);
+  background: var(--ml-surface);
+  border: 1px solid var(--ml-line);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.db-status::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.db-empty {
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--ml-ink-soft);
+  border: 1px dashed var(--ml-line);
+  border-radius: var(--ml-radius);
+}
+
+/* ── Handover dialog ────────────────────────────────────── */
+.db-handover {
+  width: min(30rem, calc(100vw - 2rem));
+}
+
+.db-handover__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.db-handover__label {
+  margin: 1rem 0 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--ml-ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.db-handover__items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.db-handover__items li {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr auto;
+  gap: 0.5rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--ml-line);
+}
+
+.db-handover__qty {
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.db-handover__line {
+  font-variant-numeric: tabular-nums;
+  color: var(--ml-ink-soft);
+}
+
+.db-handover__amount {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 1rem 0 1.1rem;
+  padding: 0.9rem 1rem;
+  background: var(--ml-surface);
+  border-radius: var(--ml-radius-sm);
+}
+
+.db-handover__amount span {
+  font-weight: 800;
+}
+
+.db-handover__amount strong {
+  font-size: 1.9rem;
+  letter-spacing: -0.03em;
+}
+
+.db-handover__state {
+  margin: 0 0 0.5rem;
+  padding: 0.75rem 0.9rem;
+  font-weight: 700;
+  background: var(--ml-surface);
+  border-left: 3px solid var(--ml-ink-soft);
+  border-radius: 6px;
+}
+
+.db-check {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.db-check input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--ml-red);
+}
+
+/* ── Small screens ──────────────────────────────────────── */
+@media (max-width: 960px) {
+  .db-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .db-charts {
+    grid-template-columns: 1fr;
+  }
+
+  .db-card,
+  .db-card--wide {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 520px) {
+  .db-board {
+    padding: 1rem;
+  }
+
+  .db-find,
+  .db-find__input {
+    width: 100%;
+  }
+}

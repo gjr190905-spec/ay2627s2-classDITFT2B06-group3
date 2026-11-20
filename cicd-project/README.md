@@ -70,16 +70,19 @@ This project demonstrates a CRUD web application with a complete CI/CD workflow.
 │   ├── server.js               # Server startup + graceful shutdown
 │   ├── controllers/
 │   │   ├── Vendor.controller.js # Vendor request validation + responses
-│   │   └── Menu.controller.js  # Menu request validation + responses
+│   │   ├── Menu.controller.js  # Menu request validation + responses
+│   │   └── Order.controller.js # Order request validation + responses
 │   ├── models/
 │   │   ├── db.js               # PostgreSQL connection pool
 │   │   ├── Vendor.model.js     # Vendor lookup + open/close (transaction)
 │   │   ├── Menu.model.js       # Menu items, photos, banner, checkout validation
+│   │   ├── Order.model.js      # Orders: place, prepare, ready, collect, dashboard figures
 │   │   ├── Person.model.js     # Person model
 │   │   └── Something.model.js  # Something model (full CRUD)
 │   ├── routers/
 │   │   ├── Vendor.router.js    # /vendors
 │   │   ├── Menu.router.js      # /vendors/:vendorId/menu
+│   │   ├── Order.router.js     # /vendors/:vendorId/orders
 │   │   ├── Person.router.js    # GET /persons
 │   │   └── Something.router.js # CRUD /somethings
 │   └── public/
@@ -87,12 +90,14 @@ This project demonstrates a CRUD web application with a complete CI/CD workflow.
 │       ├── index.js            # Frontend JavaScript
 │       ├── vendor/home.html    # Vendor home page
 │       ├── vendor/menu.html    # Vendor menu management page
+│       ├── vendor/dashboard.html # Vendor dashboard: figures, preparation, handover
 │       ├── stall.html          # Customer view of a stall's menu (live availability)
 │       ├── css/theme.css       # Shared Makan Liao? theme (fonts, colours, buttons)
 │       ├── css/vendor-home.css # Vendor home page styles
 │       ├── js/vendor-home.js   # Vendor home page logic
 │       ├── css/vendor-menu.css, js/vendor-menu.js   # Vendor menu page
 │       ├── css/stall-menu.css, js/stall-menu.js     # Customer stall page
+│       ├── css/vendor-dashboard.css, js/vendor-dashboard.js # Vendor dashboard
 │       ├── fonts/              # Patrick Hand + Montserrat (OFL licences included)
 │       └── images/vendors/     # Sample vendor logos used by the seed data
 ├── e2e-tests/                  # Playwright E2E test specs
@@ -150,7 +155,7 @@ npm run migration:reset
 ```
 
 This reads `schema.sql` and creates the `Person`, `Something`, `Vendor`, `VendorLogo`, `StoreClosure`,
-`MenuItem`, `MenuItemImage` and `MenuBanner` tables.
+`MenuItem`, `MenuItemImage`, `MenuBanner`, `Order` and `OrderItem` tables.
 
 ### 5. Seed sample data (optional)
 
@@ -158,7 +163,9 @@ This reads `schema.sql` and creates the `Person`, `Something`, `Vendor`, `Vendor
 npm run seed
 ```
 
-Inserts 20 sample persons, 2 sample somethings and 3 sample vendors, each with a 3-item starter menu.
+Inserts 20 sample persons, 2 sample somethings and 3 sample vendors, each with a 3-item starter menu
+and sample orders: today's windows around the time you run it (in every status) plus 6 days of
+collected orders for the sales chart.
 
 ### 6. Start the server
 
@@ -281,6 +288,49 @@ Availability rules:
 Pages: the vendor manages the menu at `/vendor/menu.html` (opened from the Menu tile on the
 home page). Customers see it at `/stall.html?vendorId=1`; that page rechecks availability every
 15 seconds.
+
+### Orders (vendor dashboard: preparation and handover)
+
+All routes are under `/vendors/:vendorId/orders`. Days and "today" are Singapore time. An order
+always belongs to the stall in the address: another stall's order id or number gives `404`.
+
+| Method  | Endpoint                 | Description                                               | Status Codes       |
+| ------- | ------------------------ | --------------------------------------------------------- | ------------------ |
+| `GET`   | `/?date=YYYY-MM-DD`      | The day's orders grouped by pickup window, earliest first | 200, 400, 404      |
+| `GET`   | `/stats?date=YYYY-MM-DD` | Dashboard figures (counts, money, on-time rate, charts)   | 200, 400, 404      |
+| `GET`   | `/number/:orderNumber`   | Find an order by the number the student shows             | 200, 400, 404      |
+| `GET`   | `/:orderId`              | One order                                                 | 200, 400, 404      |
+| `POST`  | `/`                      | Place an order (student side)                             | 201, 400, 404, 409 |
+| `PATCH` | `/:orderId/status`       | `{ "status": "PREPARING" }` then `{ "status": "READY" }`  | 200, 400, 404, 409 |
+| `POST`  | `/:orderId/collect`      | Mark a Ready order Collected                              | 200, 400, 404, 409 |
+
+```jsonc
+// POST /  (window 5–120 minutes long, starting between 12 hours ago and 7 days ahead)
+{ "customerName": "Alice", "pickupWindowStart": "2026-11-20T04:00:00Z",
+  "pickupWindowEnd": "2026-11-20T04:15:00Z", "items": [{ "itemId": 7, "quantity": 2 }] }
+// 409 { "error": "...", "problems": [...] }  same codes as /menu/checkout-check
+
+// POST /:orderId/collect – the vendor's three handover checks
+{ "orderNumber": 1042, "paymentReceived": true, "foodHandedOver": true }
+```
+
+Order rules:
+
+- Statuses go **Confirmed → Preparing → Ready → Collected**, one step at a time. Skipping a step,
+  going back, or repeating a step gives `409` (one conditional `UPDATE`, so double clicks are safe).
+- `preparingAt`, `readyAt` and `collectedAt` are recorded at each step. Every order carries
+  `readyOnTime` (`readyAt <= pickupWindowEnd`), and `/stats` reports the on-time rate.
+- Collection needs a **Ready** order of this stall **and** the matching order number, plus
+  `paymentReceived` and `foodHandedOver` set to `true`. A second collection gives `409` and changes
+  nothing; the database trigger `Order_collected_is_final` refuses any change to a collected order.
+- Placing an order locks the stall and item rows, applies the same rules as checkout validation,
+  reduces `quantityLeft` (selling out at 0) and assigns the stall's next number (1001, 1002…),
+  all in one transaction. Item names and prices are copied into `OrderItem`.
+- `totalCents` is the amount to collect at the stall (students pay on pickup).
+
+Page: `/vendor/dashboard.html` (the Dashboard tile on the home page). It shows today's tiles and
+charts, the preparation board grouped by pickup window, and a handover dialog that opens from a
+Ready order or from "Find an order". It refreshes every 20 seconds.
 
 ### Persons (read-only)
 

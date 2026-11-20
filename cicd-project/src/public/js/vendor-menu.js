@@ -493,9 +493,33 @@ function openItemDialog(item = null) {
     el.itemPrice.value = (item.priceCents / 100).toFixed(2);
     el.itemQuantity.value = item.quantityLeft === null ? '' : String(item.quantityLeft);
   }
+  el.itemStock.value = item && item.quantityLeft !== null ? 'limited' : 'unlimited';
+  renderStockField();
   renderDialogPhoto();
   el.itemDialog.showModal();
   el.itemName.focus();
+}
+
+// Show the quantity box only when "Set quantity left" is chosen
+function renderStockField() {
+  const limited = el.itemStock.value === 'limited';
+  el.quantityField.hidden = !limited;
+  el.stockNote.textContent = limited
+    ? 'At 0 left the item shows as sold out. Choose No limit any time to stop counting.'
+    : 'No limit: the item stays available until you mark it sold out. You can switch this any time.';
+}
+
+function onStockChanged() {
+  setItemError('');
+  renderStockField();
+  if (el.itemStock.value === 'limited') {
+    // Switching back to counting: start from the item's last count, if it had one
+    const previous = state.editing && state.editing.quantityLeft;
+    if (el.itemQuantity.value === '' && Number.isInteger(previous)) {
+      el.itemQuantity.value = String(previous);
+    }
+    el.itemQuantity.focus();
+  }
 }
 
 /**
@@ -511,13 +535,19 @@ function readItemForm() {
     return { error: 'Enter a price from 0.01 to 999.99, e.g. 4.50.', field: el.itemPrice };
   }
 
-  const quantityText = el.itemQuantity.value.trim();
+  // "No limit" sends null; "Set quantity left" needs a number
   let quantityLeft = null;
-  if (quantityText !== '') {
+  if (el.itemStock.value === 'limited') {
+    const quantityText = el.itemQuantity.value.trim();
     quantityLeft = Number(quantityText);
-    if (!Number.isInteger(quantityLeft) || quantityLeft < 0 || quantityLeft > QUANTITY_MAX) {
+    if (
+      quantityText === '' ||
+      !Number.isInteger(quantityLeft) ||
+      quantityLeft < 0 ||
+      quantityLeft > QUANTITY_MAX
+    ) {
       return {
-        error: `Quantity left must be a whole number from 0 to ${QUANTITY_MAX}, or empty.`,
+        error: `Enter how many are left, a whole number from 0 to ${QUANTITY_MAX}. Or choose No limit.`,
         field: el.itemQuantity,
       };
     }
@@ -696,6 +726,9 @@ function cacheElements() {
     itemDescription: byId('itemDescription'),
     itemPrice: byId('itemPrice'),
     itemQuantity: byId('itemQuantity'),
+    itemStock: byId('itemStock'),
+    quantityField: byId('quantityField'),
+    stockNote: byId('stockNote'),
     itemError: byId('itemError'),
     cancelItem: byId('cancelItem'),
     saveItem: byId('saveItem'),
@@ -744,6 +777,7 @@ function bindEvents() {
   el.itemForm.addEventListener('submit', submitItem);
   el.cancelItem.addEventListener('click', () => el.itemDialog.close('cancel'));
   el.photoInput.addEventListener('change', onPhotoChosen);
+  el.itemStock.addEventListener('change', onStockChanged);
   el.removePhoto.addEventListener('click', onRemovePhoto);
   openPickerOnKey(el.choosePhoto, el.photoInput);
   [el.itemName, el.itemPrice, el.itemQuantity, el.itemDescription].forEach((input) =>

@@ -9,6 +9,9 @@
 -- ─────────────────────────────────────────────────────────
 
 -- Drop existing tables
+DROP TABLE IF EXISTS "OrderItem" CASCADE;
+DROP TABLE IF EXISTS "Order" CASCADE;
+DROP FUNCTION IF EXISTS "Order_collected_is_final"() CASCADE;
 DROP TABLE IF EXISTS "MenuBanner" CASCADE;
 DROP TABLE IF EXISTS "MenuItemImage" CASCADE;
 DROP TABLE IF EXISTS "MenuItem" CASCADE;
@@ -151,6 +154,84 @@ CREATE TABLE "MenuBanner" (
   )
 );
 
+-- ── Order (a student's pickup order at one stall) ──
+--  "orderNumber"  : the number the student shows at the stall, unique per stall (1001, 1002…)
+--  "status"       : CONFIRMED → PREPARING → READY → COLLECTED, one step at a time
+--  "pickupWindow*": the window the student booked; the dashboard groups orders by it
+--  "totalCents"   : the amount to collect at the stall (students pay on pickup)
+--  "readyAt"      : when the vendor marked it Ready, so on-time readiness
+--                   ("readyAt" <= "pickupWindowEnd") can be checked
+--  "collectedAt"  : when it was handed over. Once COLLECTED the row can't change
+--                   (trigger "Order_collected_is_final").
+CREATE TABLE "Order" (
+  "id" SERIAL NOT NULL,
+  "vendorId" INTEGER NOT NULL,
+  "orderNumber" INTEGER NOT NULL,
+  "customerName" TEXT,
+  "status" TEXT NOT NULL DEFAULT 'CONFIRMED',
+  "pickupWindowStart" TIMESTAMPTZ NOT NULL,
+  "pickupWindowEnd" TIMESTAMPTZ NOT NULL,
+  "totalCents" INTEGER NOT NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "preparingAt" TIMESTAMPTZ,
+  "readyAt" TIMESTAMPTZ,
+  "collectedAt" TIMESTAMPTZ,
+  CONSTRAINT "Order_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "Order_vendorId_fkey" FOREIGN KEY ("vendorId")
+    REFERENCES "Vendor"("id") ON DELETE CASCADE,
+  CONSTRAINT "Order_status_check" CHECK (
+    "status" IN ('CONFIRMED', 'PREPARING', 'READY', 'COLLECTED')
+  ),
+  CONSTRAINT "Order_window_check" CHECK ("pickupWindowEnd" > "pickupWindowStart"),
+  CONSTRAINT "Order_totalCents_check" CHECK ("totalCents" >= 0),
+  CONSTRAINT "Order_customerName_check" CHECK (
+    "customerName" IS NULL OR char_length("customerName") <= 60
+  ),
+  -- Each status has the timestamps of every step before it
+  CONSTRAINT "Order_timestamps_check" CHECK (
+    ("status" = 'CONFIRMED' AND "readyAt" IS NULL AND "collectedAt" IS NULL)
+    OR ("status" = 'PREPARING' AND "preparingAt" IS NOT NULL AND "readyAt" IS NULL
+        AND "collectedAt" IS NULL)
+    OR ("status" = 'READY' AND "preparingAt" IS NOT NULL AND "readyAt" IS NOT NULL
+        AND "collectedAt" IS NULL)
+    OR ("status" = 'COLLECTED' AND "preparingAt" IS NOT NULL AND "readyAt" IS NOT NULL
+        AND "collectedAt" IS NOT NULL)
+  )
+);
+
+-- ── OrderItem (the lines of an order) ──
+--  Name and price are copied at order time, so later menu edits don't change past orders.
+CREATE TABLE "OrderItem" (
+  "id" SERIAL NOT NULL,
+  "orderId" INTEGER NOT NULL,
+  "menuItemId" INTEGER,
+  "name" TEXT NOT NULL,
+  "unitPriceCents" INTEGER NOT NULL,
+  "quantity" INTEGER NOT NULL,
+  CONSTRAINT "OrderItem_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "OrderItem_orderId_fkey" FOREIGN KEY ("orderId")
+    REFERENCES "Order"("id") ON DELETE CASCADE,
+  CONSTRAINT "OrderItem_menuItemId_fkey" FOREIGN KEY ("menuItemId")
+    REFERENCES "MenuItem"("id") ON DELETE SET NULL,
+  CONSTRAINT "OrderItem_unitPriceCents_check" CHECK ("unitPriceCents" >= 0),
+  CONSTRAINT "OrderItem_quantity_check" CHECK ("quantity" BETWEEN 1 AND 99)
+);
+
+-- A collected order is final: no second collection (or any other change) can alter it
+CREATE FUNCTION "Order_collected_is_final"() RETURNS trigger AS $$
+BEGIN
+  IF OLD."status" = 'COLLECTED' THEN
+    RAISE EXCEPTION 'Order % has already been collected', OLD."orderNumber"
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER "Order_collected_is_final"
+  BEFORE UPDATE ON "Order"
+  FOR EACH ROW EXECUTE FUNCTION "Order_collected_is_final"();
+
 -- Indexes
 CREATE UNIQUE INDEX "Person_email_key" ON "Person"("email");
 CREATE UNIQUE INDEX "Vendor_email_key" ON "Vendor"("email");
@@ -163,3 +244,6 @@ CREATE INDEX "StoreClosure_vendorId_idx" ON "StoreClosure"("vendorId");
 CREATE UNIQUE INDEX "MenuItem_vendor_name_unique" ON "MenuItem"("vendorId", lower(btrim("name")))
   WHERE "deletedAt" IS NULL;
 CREATE INDEX "MenuItem_vendorId_idx" ON "MenuItem"("vendorId") WHERE "deletedAt" IS NULL;
+CREATE UNIQUE INDEX "Order_vendor_orderNumber_key" ON "Order"("vendorId", "orderNumber");
+CREATE INDEX "Order_vendor_window_idx" ON "Order"("vendorId", "pickupWindowStart");
+CREATE INDEX "OrderItem_orderId_idx" ON "OrderItem"("orderId");

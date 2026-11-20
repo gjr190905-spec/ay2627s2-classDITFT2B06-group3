@@ -10,6 +10,12 @@ const LOGIN_PAGE = '/'; // TODO: point at the login page once it exists
 const SESSION_KEY = 'vendorId';
 const OTHER_CODE = 'OTHER';
 
+// Open / Closed sign pictures. The alt text is what screen readers announce.
+const STATUS_SIGNS = {
+  open: { src: '../images/status/open-sign.png', alt: 'Open' },
+  closed: { src: '../images/status/closed-sign.png', alt: 'Closed' },
+};
+
 const state = {
   vendorId: null,
   vendor: null,
@@ -128,7 +134,10 @@ function renderStatus(vendor, { animate = false } = {}) {
     : "Your stall is closed. Students can't order from you right now.";
   el.statusSince.textContent = formatSince(vendor.statusUpdatedAt);
 
-  el.statusWord.textContent = open ? 'Open' : 'Closed';
+  const sign = open ? STATUS_SIGNS.open : STATUS_SIGNS.closed;
+  if (el.statusSign.getAttribute('src') !== sign.src) el.statusSign.src = sign.src;
+  el.statusSign.alt = sign.alt;
+  el.statusSign.hidden = false;
 
   el.toggle.hidden = false;
   el.toggle.textContent = open ? 'Close stall' : 'Open stall';
@@ -136,10 +145,10 @@ function renderStatus(vendor, { animate = false } = {}) {
   el.toggle.classList.toggle('ml-btn--blue', !open);
 
   if (animate) {
-    el.statusWord.classList.remove('is-changing');
+    el.statusSign.classList.remove('is-changing');
     // Force reflow so the animation restarts every time
-    void el.statusWord.offsetWidth;
-    el.statusWord.classList.add('is-changing');
+    void el.statusSign.offsetWidth;
+    el.statusSign.classList.add('is-changing');
   }
 }
 
@@ -289,7 +298,7 @@ function cacheElements() {
     statusHeading: byId('statusHeading'),
     statusLine: byId('statusLine'),
     statusSince: byId('statusSince'),
-    statusWord: byId('statusWord'),
+    statusSign: byId('statusSign'),
     toggle: byId('statusToggle'),
     services: byId('servicesNav'),
     signedOut: byId('signedOutPanel'),
@@ -329,7 +338,15 @@ function bindEvents() {
   el.otherReason.addEventListener('input', updateOtherCount);
 }
 
+// Load both signs up front so switching between them is instant
+function preloadSigns() {
+  Object.values(STATUS_SIGNS).forEach(({ src }) => {
+    new Image().src = src;
+  });
+}
+
 async function init() {
+  preloadSigns();
   cacheElements();
   bindEvents();
 

@@ -51,9 +51,7 @@
         <!-- ── Banner ─────────────────────────────────────── -->
         <section class="vp-card" aria-labelledby="bannerHeading">
           <h2 class="vp-card__heading" id="bannerHeading">Menu banner</h2>
-          <p class="vp-card__hint">
-            One banner at a time, shown across the top of your menu. A new one replaces the old one.
-          </p>
+          <p class="vp-card__hint">Only one banner allowed hor........</p>
 
           <div class="vm-banner" id="bannerFrame">
             <img id="bannerImg" class="vm-banner__img" alt="Your menu banner" hidden />
@@ -186,9 +184,14 @@
             </div>
           </div>
           <div>
-            <label for="itemQuantity" class="vp-label vm-label--spaced"
-              >Quantity left <span class="vm-optional">(optional)</span></label
-            >
+            <label for="itemStock" class="vp-label vm-label--spaced">Stock</label>
+            <select id="itemStock" class="vp-input vm-select" name="stock">
+              <option value="unlimited">No limit</option>
+              <option value="limited">Set quantity left</option>
+            </select>
+          </div>
+          <div class="vm-quantity-field" id="quantityField" hidden>
+            <label for="itemQuantity" class="vp-label vm-label--spaced">Quantity left</label>
             <input
               type="number"
               id="itemQuantity"
@@ -198,12 +201,13 @@
               max="9999"
               step="1"
               inputmode="numeric"
-              placeholder="No limit"
+              placeholder="e.g. 20"
             />
           </div>
         </div>
-        <p class="vp-note">
-          Leave quantity empty if you're not counting. At 0 it shows as sold out.
+        <p class="vp-note" id="stockNote">
+          No limit: the item stays available until you mark it sold out. You can switch this any
+          time.
         </p>
 
         <p class="vh-dialog__error" id="itemError" role="alert"></p>
@@ -246,7 +250,7 @@
             <span class="vm-qty__value" data-role="qtyValue"></span>
             <button type="button" class="vm-qty__btn" data-action="increase">+</button>
           </div>
-          <span class="vm-qty__off" data-role="qtyOff">Not counting</span>
+          <span class="vm-qty__off" data-role="qtyOff">No limit</span>
           <button type="button" class="vm-switch" role="switch" data-action="toggle">
             <span class="vm-switch__track" aria-hidden="true"
               ><span class="vm-switch__dot"></span

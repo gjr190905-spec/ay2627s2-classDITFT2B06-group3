@@ -393,9 +393,9 @@ module.exports.getMenuBanner = async function getMenuBanner(vendorId) {
  * Refuses items that are Sold out, deleted, from another stall, or short on quantity,
  * and refuses the whole basket when the stall is closed.
  *
- * This only checks; it does not reserve anything. The order step (not built yet) should
- * repeat these checks and reduce "quantityLeft" inside the same transaction that saves
- * the order, with the item rows locked (FOR UPDATE).
+ * This only checks; it does not reserve anything. Placing an order (Order.model.placeOrder)
+ * repeats the same checks with the rows locked and reduces "quantityLeft" in the same
+ * transaction that saves the order.
  *
  * @param {number} vendorId
  * @param {{itemId: number, quantity: number}[]} lines  one line per item (already merged)
@@ -413,10 +413,23 @@ module.exports.checkCheckoutItems = async function checkCheckoutItems(vendorId, 
      WHERE "vendorId" = $1 AND "id" = ANY($2::int[]) AND "deletedAt" IS NULL`,
     [vendorId, ids],
   );
+  return checkBasket(vendor.rows[0].isOpen, lines, rows);
+};
+
+/**
+ * The basket rules, shared by checkout validation and placing an order.
+ * A pure function: give it the stall's open state, the basket and the menu rows.
+ *
+ * @param {boolean} isOpen
+ * @param {{itemId: number, quantity: number}[]} lines
+ * @param {{id, name, priceCents, quantityLeft, isSoldOut}[]} rows  this stall's (not deleted) items
+ * @returns {{ok: boolean, items: object[], problems: object[], totalCents: number}}
+ */
+function checkBasket(isOpen, lines, rows) {
   const byId = new Map(rows.map((row) => [row.id, row]));
 
   const problems = [];
-  if (!vendor.rows[0].isOpen) {
+  if (!isOpen) {
     problems.push({ itemId: null, code: 'STALL_CLOSED', message: 'This stall is closed' });
   }
 
@@ -451,4 +464,6 @@ module.exports.checkCheckoutItems = async function checkCheckoutItems(vendorId, 
 
   const totalCents = items.reduce((sum, line) => sum + line.lineTotalCents, 0);
   return { ok: problems.length === 0, items, problems, totalCents };
-};
+}
+
+module.exports.checkBasket = checkBasket;

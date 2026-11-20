@@ -168,16 +168,146 @@ async function seed() {
         m.quantityLeft,
         m.isSoldOut,
       ]);
-      await pool.query(
-        `INSERT INTO "MenuItem" ("vendorId", "name", "description", "priceCents", "quantityLeft", "isSoldOut") VALUES ${itemPlaceholders.join(', ')}`,
+      const { rows: menuRows } = await pool.query(
+        `INSERT INTO "MenuItem" ("vendorId", "name", "description", "priceCents", "quantityLeft", "isSoldOut") VALUES ${itemPlaceholders.join(', ')} RETURNING "id", "vendorId", "name", "priceCents"`,
         itemValues,
       );
+
+      // Sample orders for the dashboard: today around the current time, plus the last 6 days
+      let orderCount = 0;
+      for (const vendor of insertedVendors) {
+        const vendorMenu = menuRows.filter((m) => m.vendorId === vendor.id);
+        const orders = buildSampleOrders(vendorMenu, new Date());
+        for (const order of orders) {
+          await insertOrder(vendor.id, order);
+        }
+        orderCount += orders.length;
+      }
+      console.log(`Inserted ${orderCount} sample orders.`);
     }
     console.log(`Inserted ${items.length} menu items.`);
   }
   console.log(`Inserted ${vendors.length} vendors.`);
 
   console.log('Seed data inserted successfully.');
+}
+
+// ── Sample orders ────────────────────────────────────────
+// Singapore has no daylight saving, so "SG time" is always UTC+8.
+const SG_OFFSET_MS = 8 * 60 * 60 * 1000;
+const MINUTE = 60 * 1000;
+const WINDOW_MINUTES = 15;
+const customerNames = persons.map((p) => p.name);
+
+// Midnight (SG) of the day `daysAgo` days before `now`
+function sgMidnight(now, daysAgo) {
+  const sg = new Date(now.getTime() + SG_OFFSET_MS);
+  return new Date(
+    Date.UTC(sg.getUTCFullYear(), sg.getUTCMonth(), sg.getUTCDate() - daysAgo) - SG_OFFSET_MS,
+  );
+}
+
+/**
+ * Decide an order's status and timestamps from its window and the current time,
+ * so the seeded data always obeys the "Order_timestamps_check" rule.
+ * `n` is a running counter used to vary the data without randomness.
+ */
+function sampleOrder(start, now, n, menu) {
+  const end = new Date(start.getTime() + WINDOW_MINUTES * MINUTE);
+  const late = n % 6 === 5; // every 6th order is made ready after its window ends
+  const preparingAt = new Date(start.getTime() - 12 * MINUTE);
+  const readyAt = late
+    ? new Date(end.getTime() + (3 + (n % 4)) * MINUTE)
+    : new Date(start.getTime() - (n % 5) * MINUTE);
+  const collectedAt = new Date(readyAt.getTime() + (2 + (n % 7)) * MINUTE);
+
+  let status = 'CONFIRMED';
+  if (collectedAt <= now && end.getTime() + 20 * MINUTE <= now.getTime()) status = 'COLLECTED';
+  else if (readyAt <= now) status = 'READY';
+  else if (preparingAt <= now) status = 'PREPARING';
+
+  const lineCount = 1 + (n % 3 === 0 ? 1 : 0);
+  const lines = [];
+  for (let i = 0; i < lineCount && i < menu.length; i += 1) {
+    const item = menu[(n + i * 2) % menu.length];
+    lines.push({ item, quantity: 1 + ((n + i) % 3 === 0 ? 1 : 0) });
+  }
+
+  return {
+    customerName: customerNames[n % customerNames.length],
+    status,
+    start,
+    end,
+    createdAt: new Date(start.getTime() - 45 * MINUTE),
+    preparingAt: status === 'CONFIRMED' ? null : preparingAt,
+    readyAt: status === 'READY' || status === 'COLLECTED' ? readyAt : null,
+    collectedAt: status === 'COLLECTED' ? collectedAt : null,
+    lines,
+  };
+}
+
+function buildSampleOrders(menu, now) {
+  if (menu.length === 0) return [];
+  const orders = [];
+  let n = 0;
+
+  // Last 6 days: lunch windows 11:30–13:30, a few orders each, all collected
+  for (let daysAgo = 6; daysAgo >= 1; daysAgo -= 1) {
+    const midnight = sgMidnight(now, daysAgo);
+    for (let w = 0; w < 8; w += 1) {
+      const start = new Date(midnight.getTime() + (11 * 60 + 30 + w * WINDOW_MINUTES) * MINUTE);
+      const perWindow = 1 + ((daysAgo + w) % 3);
+      for (let k = 0; k < perWindow; k += 1) {
+        orders.push(sampleOrder(start, now, n, menu));
+        n += 1;
+      }
+    }
+  }
+
+  // Today: windows from an hour before now to an hour and a half after
+  const current = Math.floor(now.getTime() / (WINDOW_MINUTES * MINUTE)) * WINDOW_MINUTES * MINUTE;
+  for (let w = -4; w <= 5; w += 1) {
+    const start = new Date(current + w * WINDOW_MINUTES * MINUTE);
+    const perWindow = 1 + ((w + 4) % 3);
+    for (let k = 0; k < perWindow; k += 1) {
+      orders.push(sampleOrder(start, now, n, menu));
+      n += 1;
+    }
+  }
+
+  return orders;
+}
+
+const nextOrderNumber = {};
+async function insertOrder(vendorId, order) {
+  nextOrderNumber[vendorId] = (nextOrderNumber[vendorId] || 1000) + 1;
+  const totalCents = order.lines.reduce((sum, l) => sum + l.item.priceCents * l.quantity, 0);
+  const { rows } = await pool.query(
+    `INSERT INTO "Order" ("vendorId", "orderNumber", "customerName", "status",
+       "pickupWindowStart", "pickupWindowEnd", "totalCents", "createdAt",
+       "preparingAt", "readyAt", "collectedAt")
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING "id"`,
+    [
+      vendorId,
+      nextOrderNumber[vendorId],
+      order.customerName,
+      order.status,
+      order.start,
+      order.end,
+      totalCents,
+      order.createdAt,
+      order.preparingAt,
+      order.readyAt,
+      order.collectedAt,
+    ],
+  );
+  for (const line of order.lines) {
+    await pool.query(
+      `INSERT INTO "OrderItem" ("orderId", "menuItemId", "name", "unitPriceCents", "quantity")
+       VALUES ($1, $2, $3, $4, $5)`,
+      [rows[0].id, line.item.id, line.item.name, line.item.priceCents, line.quantity],
+    );
+  }
 }
 
 seed()
