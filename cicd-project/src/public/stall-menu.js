@@ -58,6 +58,15 @@ async function apiGet(path) {
 }
 
 // ── Cart (kept in localStorage) ──────────────────────────
+function requireAuth() {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) {
+    window.location.href = LOGIN_PAGE;
+    return false;
+  }
+  return true;
+}
+
 function emptyCart() {
   return { stallId: null, stallName: '', items: [] };
 }
@@ -153,6 +162,7 @@ function updateRow(item) {
 }
 
 function changeQuantity(item, change) {
+  if (!requireAuth()) return;
   const cart = readCart();
   const cartIsForAnotherStall = cart.items.length > 0 && cart.stallId !== stall.id;
 
