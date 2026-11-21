@@ -7,34 +7,7 @@ const { ERROR_CODES, mapError } = require('../utils/errors');
 const parseId = require('../utils/parseId');
 
 const router = express.Router();
-router.use(authenticate);
-
-router.get('/', async (req, res, next) => {
-  try {
-    const stalls = await getAllStalls();
-    return res.status(200).json(stalls);
-  } catch (err) {
-    return next(err);
-  }
-});
-
-router.get('/:id', async (req, res, next) => {
-  try {
-    const stallId = parseId(req.params.id);
-    if (stallId === null) {
-      return next(mapError(ERROR_CODES.INVALID_INPUT, 'Invalid stall ID'));
-    }
-    const stall = await getStallById(stallId);
-    if (!stall) {
-      return next(mapError(ERROR_CODES.NOT_FOUND, 'Stall not found'));
-    }
-    return res.status(200).json(stall);
-  } catch (err) {
-    return next(err);
-  }
-});
-
-router.get('/:id/menu', async (req, res, next) => {
+router.get('/:id/menu',authenticate, async (req, res, next) => {
   try {
     const stallId = parseId(req.params.id);
     if (stallId === null) {
@@ -51,7 +24,7 @@ router.get('/:id/menu', async (req, res, next) => {
   }
 });
 
-router.get('/:id/windows',  requireRole('customer', 'vendor', 'admin'), async (req, res, next) => {
+router.get('/:id/windows', requireRole('customer', 'vendor', 'admin', 'staff'), async (req, res, next) => {
   try {
     const stallId = parseId(req.params.id);
     if (stallId === null) {
@@ -63,6 +36,29 @@ router.get('/:id/windows',  requireRole('customer', 'vendor', 'admin'), async (r
     }
     const windows = await getUpcomingWindowsByStallId(stall.id);
     return res.status(200).json(windows);
+  } catch (err) {
+    return next(err);
+  }
+});
+router.get('/:id',authenticate, async (req, res, next) => {
+  try {
+    const stallId = parseId(req.params.id);
+    if (stallId === null) {
+      return next(mapError(ERROR_CODES.INVALID_INPUT, 'Invalid stall ID'));
+    }
+    const stall = await getStallById(stallId);
+    if (!stall) {
+      return next(mapError(ERROR_CODES.NOT_FOUND, 'Stall not found'));
+    }
+    return res.status(200).json(stall);
+  } catch (err) {
+    return next(err);
+  }
+});
+router.get('/', async (req, res, next) => {
+  try {
+    const stalls = await getAllStalls();
+    return res.status(200).json(stalls);
   } catch (err) {
     return next(err);
   }
