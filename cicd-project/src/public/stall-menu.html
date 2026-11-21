@@ -4,8 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Stall menu | Makan Liao</title>
-    <link rel="stylesheet" href="menu.css" />
-    <link rel="stylesheet" href="stall-menu.css" />
+    <link rel="stylesheet" href="styles/menu.css" />
+    <link rel="stylesheet" href="styles/stall-menu.css" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -43,29 +43,41 @@
 
       <div id="stall-content" hidden>
         <section class="stall-hero" aria-labelledby="stall-name">
-          <p class="stall-hero__court" id="stall-court" hidden></p>
-          <h1 id="stall-name"></h1>
-          <p class="stall-hero__pickup" id="stall-pickup"></p>
-          <p class="stall-hero__note">Pay at pickup. You choose your pickup time at checkout.</p>
+          <div class="stall-hero__body">
+            <div class="stall-hero__tags">
+              <p class="tag" id="stall-court" hidden></p>
+              <p class="tag">Pre-order and collect</p>
+              <p class="tag">Pay at pickup</p>
+            </div>
+            <h1 id="stall-name"></h1>
+            <p class="stall-hero__pickup" id="stall-pickup"></p>
+            <p class="stall-hero__note">You choose your pickup time at checkout.</p>
+          </div>
+          <div class="stall-hero__art" aria-hidden="true"></div>
         </section>
 
-        <section class="cart-summary" aria-labelledby="cart-summary-title">
-          <h2 id="cart-summary-title">Your order</h2>
-          <p id="cart-summary-text" role="status">Your cart is empty.</p>
-          <a class="button button--primary" href="cart.html">View cart</a>
-        </section>
+        <div class="stall-layout">
+          <section class="menu" aria-labelledby="menu-title">
+            <h2 id="menu-title">The menu</h2>
+            <p class="section-hint">Prices are in SGD. Availability can change.</p>
+            <p class="message" id="menu-empty" hidden>This stall has no menu items yet.</p>
+            <ul class="menu-list" id="menu-list"></ul>
+          </section>
 
-        <section class="menu" aria-labelledby="menu-title">
-          <h2 id="menu-title">Menu</h2>
-          <p class="message" id="menu-empty" hidden>This stall has no menu items yet.</p>
-          <ul class="menu-list" id="menu-list"></ul>
-        </section>
+          <aside class="stall-side" aria-label="Your order and pickup times">
+            <section class="cart-summary" aria-labelledby="cart-summary-title">
+              <h2 id="cart-summary-title">Your order</h2>
+              <p id="cart-summary-text" role="status">Your cart is empty.</p>
+              <a class="button button--primary" href="cart.html">View cart</a>
+            </section>
 
-        <section class="windows" aria-labelledby="windows-title">
-          <h2 id="windows-title">Pickup times</h2>
-          <p class="message" id="windows-message" role="status">Loading pickup times...</p>
-          <ul class="window-list" id="window-list"></ul>
-        </section>
+            <section class="windows" aria-labelledby="windows-title">
+              <h2 id="windows-title">Pickup times</h2>
+              <p class="message" id="windows-message" role="status">Loading pickup times...</p>
+              <ul class="window-list" id="window-list"></ul>
+            </section>
+          </aside>
+        </div>
       </div>
     </main>
 
@@ -87,19 +99,23 @@
       </div>
     </dialog>
 
+    <!-- Used by stall-menu.js. The image area is pure CSS, so every item gets the same placeholder. -->
     <template id="menu-item-template">
       <li class="menu-item">
-        <div class="menu-item__info">
+        <div class="menu-item__image" aria-hidden="true"></div>
+        <div class="menu-item__body">
           <h3 class="menu-item__name"></h3>
-          <p class="menu-item__price"></p>
-        </div>
-        <p class="status status--closed menu-item__status" hidden>Sold out</p>
-        <div class="menu-item__actions">
-          <button type="button" class="button button--outline add-button">Add to cart</button>
-          <div class="stepper" hidden>
-            <button type="button" class="stepper__minus">&minus;</button>
-            <span class="stepper__qty">1</span>
-            <button type="button" class="stepper__plus">+</button>
+          <p class="status status--closed menu-item__status" hidden>Sold out</p>
+          <div class="menu-item__foot">
+            <p class="menu-item__price"></p>
+            <div class="menu-item__actions">
+              <button type="button" class="button button--outline add-button">Add to cart</button>
+              <div class="stepper" hidden>
+                <button type="button" class="stepper__minus">&minus;</button>
+                <span class="stepper__qty">1</span>
+                <button type="button" class="stepper__plus">+</button>
+              </div>
+            </div>
           </div>
         </div>
       </li>
@@ -108,3 +124,4 @@
     <script src="stall-menu.js" defer></script>
   </body>
 </html>
+  
