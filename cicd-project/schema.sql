@@ -67,8 +67,8 @@ CREATE TABLE pickup_windows (
     start_time TIMESTAMP NOT NULL,
     end_time TIMESTAMP NOT NULL,
     capacity INTEGER NOT NULL,
-    booked_count INTEGER DEFAULT 0,
-    is_active BOOLEAN DEFAULT TRUE,
+    booked_count INTEGER NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
 
     FOREIGN KEY (stall_id) REFERENCES stalls(stall_id),
 
@@ -84,13 +84,20 @@ CREATE TABLE orders (
     customer_id INTEGER NOT NULL,
     stall_id INTEGER NOT NULL,
     pickup_window_id INTEGER NOT NULL,
+    collection_reference VARCHAR(100) NOT NULL UNIQUE,
     total_amount NUMERIC(10,2) NOT NULL,
-    order_status VARCHAR(30) DEFAULT 'CONFIRMED',
+    order_status VARCHAR(30) NOT NULL DEFAULT 'CONFIRMED',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (customer_id) REFERENCES users(user_id),
     FOREIGN KEY (stall_id) REFERENCES stalls(stall_id),
-    FOREIGN KEY (pickup_window_id) REFERENCES pickup_windows(window_id)
+    FOREIGN KEY (pickup_window_id) REFERENCES pickup_windows(window_id),
+
+    CHECK (total_amount >= 0),
+    CHECK (order_status IN (
+        'CONFIRMED', 'PREPARING', 'READY',
+        'COMPLETED', 'CANCELLED'
+    ))
 );
 
 -- Create Order Items Table
@@ -112,14 +119,20 @@ CREATE TABLE payments (
     payment_id SERIAL PRIMARY KEY,
     order_id INTEGER NOT NULL UNIQUE,
     amount NUMERIC(10,2) NOT NULL,
-    payment_status VARCHAR(20) DEFAULT 'PENDING',
+    payment_status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
     payment_method VARCHAR(50),
     transaction_reference VARCHAR(255),
     paid_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    FOREIGN KEY (order_id) REFERENCES orders(order_id)
+    FOREIGN KEY (order_id) REFERENCES orders(order_id),
+
+    CHECK (amount >= 0),
+    CHECK (payment_status IN (
+        'PENDING', 'PAID', 'FAILED', 'REFUNDED'
+    ))
 );
+  
 
 -- Create Collections Table
 CREATE TABLE collections (
@@ -137,5 +150,3 @@ CREATE UNIQUE INDEX "Person_email_key" ON "Person"("email");
 
 CREATE INDEX idx_pickup_windows_stall_time
 ON pickup_windows(stall_id, start_time);
-
-
