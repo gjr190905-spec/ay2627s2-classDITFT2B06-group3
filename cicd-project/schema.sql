@@ -97,6 +97,7 @@ CREATE TABLE "Order" (
   "readyAt" TIMESTAMPTZ,
   "collectedAt" TIMESTAMPTZ,
   CONSTRAINT "Order_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "Order_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Person"("id"),
   CONSTRAINT "Order_stallId_fkey" FOREIGN KEY ("stallId") REFERENCES "Stall"("id"),
   CONSTRAINT "Order_pickupWindowId_fkey" FOREIGN KEY ("pickupWindowId") REFERENCES "PickupWindow"("id"),
   CONSTRAINT "Order_status_check" CHECK ("status" IN ('Confirmed', 'Preparing', 'Ready', 'Collected')),
