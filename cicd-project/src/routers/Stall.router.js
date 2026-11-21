@@ -7,7 +7,7 @@ const { ERROR_CODES, mapError } = require('../utils/errors');
 const parseId = require('../utils/parseId');
 
 const router = express.Router();
-router.get('/:id/menu',authenticate, async (req, res, next) => {
+router.get('/:id/menu', async (req, res, next) => {
   try {
     const stallId = parseId(req.params.id);
     if (stallId === null) {
@@ -24,7 +24,7 @@ router.get('/:id/menu',authenticate, async (req, res, next) => {
   }
 });
 
-router.get('/:id/windows', requireRole('customer', 'vendor', 'admin', 'staff'), async (req, res, next) => {
+router.get('/:id/windows',authenticate, requireRole('customer', 'vendor', 'admin', 'staff'), async (req, res, next) => {
   try {
     const stallId = parseId(req.params.id);
     if (stallId === null) {
@@ -40,7 +40,7 @@ router.get('/:id/windows', requireRole('customer', 'vendor', 'admin', 'staff'), 
     return next(err);
   }
 });
-router.get('/:id',authenticate, async (req, res, next) => {
+router.get('/:id', async (req, res, next) => {
   try {
     const stallId = parseId(req.params.id);
     if (stallId === null) {
