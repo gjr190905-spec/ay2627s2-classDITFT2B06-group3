@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const parseId = require('../utils/parseId');
 const { ERROR_CODES, mapError } = require('../utils/errors');
 
-const VALID_ROLES = ['customer', 'vendor', 'admin'];
+const VALID_ROLES = ['customer', 'vendor', 'admin', 'staff'];
 const TOKEN_LIFETIME = '8h';
 
 function getSecret() {
