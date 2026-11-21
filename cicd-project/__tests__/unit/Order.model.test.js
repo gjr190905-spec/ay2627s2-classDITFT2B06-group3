@@ -20,6 +20,22 @@ jest.mock('../../src/models/db', () => ({
   end: jest.fn(),
 }));
 
+// Ordering rules (order limit + notification choices) come from Settings.model
+const NO_LIMIT = {
+  maxActiveOrders: null,
+  activeOrders: 0,
+  notifications: { newOrder: true, soldOut: true, lowStock: true, lowStockThreshold: 3 },
+};
+jest.mock('../../src/models/Settings.model', () => ({ loadOrderingRules: jest.fn() }));
+const { loadOrderingRules } = require('../../src/models/Settings.model');
+
+// Notifications are saved through Notification.model; the rules themselves stay real
+jest.mock('../../src/models/Notification.model', () => ({
+  ...jest.requireActual('../../src/models/Notification.model'),
+  createNotifications: jest.fn(),
+}));
+const { createNotifications } = require('../../src/models/Notification.model');
+
 const T = (hhmm) => new Date(`2026-11-20T${hhmm}:00+08:00`);
 
 const orderRow = (overrides = {}) => ({
@@ -44,6 +60,7 @@ const dbDown = new Error('connection lost');
 beforeEach(() => {
   jest.clearAllMocks();
   pool.connect.mockResolvedValue(client);
+  loadOrderingRules.mockResolvedValue(NO_LIMIT);
 });
 
 /** Answer pool.query with the given results in order. */
@@ -241,6 +258,41 @@ describe('Order.model - placeOrder', () => {
     clientAnswers({ rows: [{ isOpen: false }] }, { rows: [menuRow] });
     const result = await placeOrder(3, input);
     expect(result.problems[0].code).toBe('STALL_CLOSED');
+  });
+
+  // Error handling: the vendor's "orders at once" limit, read with the stall row locked
+  test('should refuse when the stall is at its order limit', async () => {
+    loadOrderingRules.mockResolvedValue({ ...NO_LIMIT, maxActiveOrders: 3, activeOrders: 3 });
+    clientAnswers({ rows: [{ isOpen: true }] }, { rows: [menuRow] });
+
+    const result = await placeOrder(3, input);
+
+    expect(result.problems[0].code).toBe('STALL_BUSY');
+    expect(loadOrderingRules).toHaveBeenCalledWith(client, 3);
+    expect(clientSql()).toContain('ROLLBACK');
+  });
+
+  // Valid partition: notifications for the order, using stock before and after
+  test('should create the notifications the vendor has switched on', async () => {
+    clientAnswers(
+      { rows: [{ isOpen: true }] },
+      { rows: [menuRow] }, // 5 left, order takes 2 → 3 left (= threshold 3)
+      { rows: [] },
+      { rows: [{ orderNumber: 1043 }] },
+      { rows: [{ id: 11 }] },
+      { rows: [] },
+      { rows: [orderRow({ id: 11, orderNumber: 1043, totalCents: 300 })] },
+      { rows: [{ ...itemRow, orderId: 11 }] },
+    );
+
+    await placeOrder(3, input);
+
+    const [db, vendorId, list] = createNotifications.mock.calls[0];
+    expect(db).toBe(client);
+    expect(vendorId).toBe(3);
+    expect(list.map((n) => n.type)).toEqual(['NEW_ORDER', 'LOW_STOCK']);
+    expect(list[0].message).toBe('New order #1043 for 12:00 pm – 12:15 pm (2 items, $3.00)');
+    expect(list[1]).toMatchObject({ message: 'Only 3 Kopi left', menuItemId: 7, orderId: 11 });
   });
 
   test('should return undefined for an unknown vendor', async () => {

@@ -29,6 +29,15 @@ jest.mock('../../src/models/db', () => ({
   end: jest.fn(),
 }));
 
+// Ordering rules (order limit + notification choices) come from Settings.model
+const NO_LIMIT = {
+  maxActiveOrders: null,
+  activeOrders: 0,
+  notifications: { newOrder: true, soldOut: true, lowStock: true, lowStockThreshold: 3 },
+};
+jest.mock('../../src/models/Settings.model', () => ({ loadOrderingRules: jest.fn() }));
+const { loadOrderingRules } = require('../../src/models/Settings.model');
+
 const IMAGE_TIME = new Date('2026-11-19T10:00:00Z');
 
 // A row as the database returns it
@@ -449,9 +458,28 @@ describe('Menu.model - checkCheckoutItems', () => {
     { id: 3, name: 'Otah', priceCents: 150, quantityLeft: null, isSoldOut: true },
   ];
 
-  function answer(isOpen, rows = menuRows) {
+  function answer(isOpen, rows = menuRows, rules = NO_LIMIT) {
     pool.query.mockResolvedValueOnce({ rows: [{ isOpen }] }).mockResolvedValueOnce({ rows });
+    loadOrderingRules.mockResolvedValueOnce(rules);
   }
+
+  // Boundary: at the vendor's order limit the basket is refused; one below is fine
+  test.each([
+    [5, 5, false],
+    [4, 5, true],
+  ])('with %p of %p orders in progress ok=%p (boundary)', async (active, max, ok) => {
+    answer(true, menuRows, { ...NO_LIMIT, maxActiveOrders: max, activeOrders: active });
+    const result = await checkCheckoutItems(2, [{ itemId: 1, quantity: 1 }]);
+    expect(result.ok).toBe(ok);
+    if (!ok) expect(result.problems[0]).toMatchObject({ itemId: null, code: 'STALL_BUSY' });
+  });
+
+  // Valid partition: no limit means any number of orders in progress is fine
+  test('should ignore the load when there is no limit', async () => {
+    answer(true, menuRows, { ...NO_LIMIT, activeOrders: 500 });
+    const result = await checkCheckoutItems(2, [{ itemId: 1, quantity: 1 }]);
+    expect(result.ok).toBe(true);
+  });
 
   // Valid partition: everything can be ordered
   test('should price a basket that can be ordered', async () => {

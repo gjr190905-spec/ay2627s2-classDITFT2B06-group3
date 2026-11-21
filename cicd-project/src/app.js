@@ -8,6 +8,7 @@ const personRouter = require('./routers/Person.router');
 const vendorRouter = require('./routers/Vendor.router');
 const menuRouter = require('./routers/Menu.router');
 const orderRouter = require('./routers/Order.router');
+const { settingsRouter, notificationsRouter } = require('./routers/Settings.router');
 
 const app = express();
 
@@ -26,6 +27,8 @@ app.use('/somethings', somethingRouter);
 app.use('/persons', personRouter);
 app.use('/vendors/:vendorId/menu', menuRouter);
 app.use('/vendors/:vendorId/orders', orderRouter);
+app.use('/vendors/:vendorId/settings', settingsRouter);
+app.use('/vendors/:vendorId/notifications', notificationsRouter);
 app.use('/vendors', vendorRouter);
 
 // 404 handler — if no route above matched the request,

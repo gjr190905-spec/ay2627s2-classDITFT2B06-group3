@@ -6,7 +6,7 @@
 --    -> Query Tool -> open or paste this file -> Execute (F5).
 --
 --  WARNING: this REBUILDS the app's tables. Every vendor, closure record,
---  profile picture, menu item, item photo, menu banner, order, person and something
+--  profile picture, menu item, item photo, menu banner, order, setting, notification, person and something
 --  in them is deleted and replaced
 --  with the sample data at the bottom. It does the same as
 --  `npm run migration:reset`, so the two always give the same database.
@@ -26,6 +26,8 @@ BEGIN;   -- all or nothing: if any step fails, nothing is changed
 -- ---------------------------------------------------------------------
 -- 1. Remove the old tables (pictures and closures first, they depend on Vendor)
 -- ---------------------------------------------------------------------
+DROP TABLE IF EXISTS "VendorNotification" CASCADE;
+DROP TABLE IF EXISTS "VendorSettings" CASCADE;
 DROP TABLE IF EXISTS "OrderItem" CASCADE;
 DROP TABLE IF EXISTS "Order" CASCADE;
 DROP FUNCTION IF EXISTS "Order_collected_is_final"() CASCADE;
@@ -265,6 +267,57 @@ CREATE TRIGGER "Order_collected_is_final"
   FOR EACH ROW EXECUTE FUNCTION "Order_collected_is_final"();
 
 -- ---------------------------------------------------------------------
+-- 5d. Settings (order limit, notification choices) and notifications
+-- ---------------------------------------------------------------------
+-- ── VendorSettings (one row per vendor; no row = the defaults below) ──
+--  "maxActiveOrders" : how many orders the stall takes on at once, counting orders that
+--                      are Confirmed or Preparing. NULL = no limit. At the limit, new
+--                      orders (and the checkout check) are refused until some are Ready.
+--  "notify*"         : which in-app notifications the vendor wants
+--  "lowStockThreshold": "low stock" means this many or fewer left
+CREATE TABLE "VendorSettings" (
+  "vendorId" INTEGER NOT NULL,
+  "maxActiveOrders" INTEGER,
+  "notifyNewOrder" BOOLEAN NOT NULL DEFAULT TRUE,
+  "notifySoldOut" BOOLEAN NOT NULL DEFAULT TRUE,
+  "notifyLowStock" BOOLEAN NOT NULL DEFAULT TRUE,
+  "lowStockThreshold" INTEGER NOT NULL DEFAULT 3,
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT "VendorSettings_pkey" PRIMARY KEY ("vendorId"),
+  CONSTRAINT "VendorSettings_vendorId_fkey" FOREIGN KEY ("vendorId")
+    REFERENCES "Vendor"("id") ON DELETE CASCADE,
+  CONSTRAINT "VendorSettings_maxActiveOrders_check" CHECK (
+    "maxActiveOrders" IS NULL OR "maxActiveOrders" BETWEEN 1 AND 200
+  ),
+  CONSTRAINT "VendorSettings_lowStockThreshold_check" CHECK ("lowStockThreshold" BETWEEN 1 AND 50)
+);
+
+-- ── VendorNotification (in-app notifications, newest first) ──
+--  Created when orders come in, only for the types the vendor has switched on.
+--  "type": NEW_ORDER, SOLD_OUT or LOW_STOCK. "readAt" NULL = unread.
+CREATE TABLE "VendorNotification" (
+  "id" SERIAL NOT NULL,
+  "vendorId" INTEGER NOT NULL,
+  "type" TEXT NOT NULL,
+  "message" TEXT NOT NULL,
+  "orderId" INTEGER,
+  "menuItemId" INTEGER,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "readAt" TIMESTAMPTZ,
+  CONSTRAINT "VendorNotification_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "VendorNotification_vendorId_fkey" FOREIGN KEY ("vendorId")
+    REFERENCES "Vendor"("id") ON DELETE CASCADE,
+  CONSTRAINT "VendorNotification_orderId_fkey" FOREIGN KEY ("orderId")
+    REFERENCES "Order"("id") ON DELETE SET NULL,
+  CONSTRAINT "VendorNotification_menuItemId_fkey" FOREIGN KEY ("menuItemId")
+    REFERENCES "MenuItem"("id") ON DELETE SET NULL,
+  CONSTRAINT "VendorNotification_type_check" CHECK (
+    "type" IN ('NEW_ORDER', 'SOLD_OUT', 'LOW_STOCK')
+  ),
+  CONSTRAINT "VendorNotification_message_check" CHECK (char_length("message") BETWEEN 1 AND 200)
+);
+
+-- ---------------------------------------------------------------------
 -- 6. Indexes
 -- ---------------------------------------------------------------------
 CREATE UNIQUE INDEX "Person_email_key" ON "Person"("email");
@@ -281,6 +334,7 @@ CREATE INDEX "MenuItem_vendorId_idx" ON "MenuItem"("vendorId") WHERE "deletedAt"
 CREATE UNIQUE INDEX "Order_vendor_orderNumber_key" ON "Order"("vendorId", "orderNumber");
 CREATE INDEX "Order_vendor_window_idx" ON "Order"("vendorId", "pickupWindowStart");
 CREATE INDEX "OrderItem_orderId_idx" ON "OrderItem"("orderId");
+CREATE INDEX "VendorNotification_vendor_idx" ON "VendorNotification"("vendorId", "createdAt" DESC);
 
 -- ---------------------------------------------------------------------
 -- 7. Sample data (same as scripts/seed.js)
@@ -316,10 +370,12 @@ INSERT INTO "Something" ("name") VALUES
 INSERT INTO "Vendor" ("email", "stallName", "logoUrl", "isOpen") VALUES
   ('ahseng@makanliao.sg', 'Ah Seng Chicken Rice', '/images/vendors/ah-seng-chicken-rice.svg', TRUE),
   ('mdmlim@makanliao.sg', 'Mdm Lim Laksa', '/images/vendors/mdm-lim-laksa.svg', FALSE),
-  ('kopi@makanliao.sg', 'Kopi Corner', NULL, TRUE);
+  ('kopi@makanliao.sg', 'Kopi Corner', NULL, TRUE),
+  ('wong@makanliao.sg', 'Wong''s Nasi Lemak', NULL, TRUE);
 
 -- Starter menus (prices in cents; quantityLeft NULL = not counting).
--- Vendor 2 (Mdm Lim Laksa) is the one the menu page tests use.
+-- Vendor 2 (Mdm Lim Laksa) is the one the menu page tests use; vendor 4 (Wong's)
+-- the settings tests.
 INSERT INTO "MenuItem" ("vendorId", "name", "description", "priceCents", "quantityLeft", "isSoldOut")
 SELECT v."id", m."name", m."description", m."priceCents", m."quantityLeft", m."isSoldOut"
 FROM (VALUES
@@ -331,7 +387,9 @@ FROM (VALUES
   (6, 'mdmlim@makanliao.sg', 'Otah', 'Grilled spiced fish cake.', 150, NULL, TRUE),
   (7, 'kopi@makanliao.sg', 'Kopi', 'Coffee with condensed milk.', 150, NULL, FALSE),
   (8, 'kopi@makanliao.sg', 'Teh Tarik', 'Pulled milk tea.', 170, NULL, FALSE),
-  (9, 'kopi@makanliao.sg', 'Kaya Toast Set', 'Two slices of kaya toast with soft-boiled eggs.', 380, 15, FALSE)
+  (9, 'kopi@makanliao.sg', 'Kaya Toast Set', 'Two slices of kaya toast with soft-boiled eggs.', 380, 15, FALSE),
+  (10, 'wong@makanliao.sg', 'Nasi Lemak', 'Coconut rice, sambal, egg, anchovies and peanuts.', 400, NULL, FALSE),
+  (11, 'wong@makanliao.sg', 'Chicken Wing', 'Fried, crispy, one piece.', 180, 30, FALSE)
 ) AS m("ord", "email", "name", "description", "priceCents", "quantityLeft", "isSoldOut")
 JOIN "Vendor" v ON v."email" = m."email"
 ORDER BY m."ord";
@@ -371,13 +429,14 @@ JOIN LATERAL (
 COMMIT;
 
 -- ---------------------------------------------------------------------
--- 8. Check: should list 10 tables, then the 3 vendors, their menus and today's orders
+-- 8. Check: should list 12 tables, then the 4 vendors, their menus and today's orders
 -- ---------------------------------------------------------------------
 SELECT table_name AS "Tables created"
   FROM information_schema.tables
  WHERE table_schema = 'public'
    AND table_name IN ('Person', 'Something', 'Vendor', 'VendorLogo', 'StoreClosure',
-                      'MenuItem', 'MenuItemImage', 'MenuBanner', 'Order', 'OrderItem')
+                      'MenuItem', 'MenuItemImage', 'MenuBanner', 'Order', 'OrderItem',
+                      'VendorSettings', 'VendorNotification')
  ORDER BY table_name;
 
 SELECT "id", "stallName", "isOpen", "logoUrl" FROM "Vendor" ORDER BY "id";

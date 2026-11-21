@@ -45,6 +45,8 @@ const vendors = [
   },
   // No logo configured – exercises the header's fallback badge
   { email: 'kopi@makanliao.sg', stallName: 'Kopi Corner', logoUrl: null, isOpen: true },
+  // Vendor 4 is the one the settings E2E tests use
+  { email: 'wong@makanliao.sg', stallName: "Wong's Nasi Lemak", logoUrl: null, isOpen: true },
 ];
 
 // Starter menus, keyed by stall name. quantityLeft: null = not counting.
@@ -88,6 +90,22 @@ const menuItems = {
       priceCents: 150,
       quantityLeft: null,
       isSoldOut: true,
+    },
+  ],
+  "Wong's Nasi Lemak": [
+    {
+      name: 'Nasi Lemak',
+      description: 'Coconut rice, sambal, egg, anchovies and peanuts.',
+      priceCents: 400,
+      quantityLeft: null,
+      isSoldOut: false,
+    },
+    {
+      name: 'Chicken Wing',
+      description: 'Fried, crispy, one piece.',
+      priceCents: 180,
+      quantityLeft: 30,
+      isSoldOut: false,
     },
   ],
   'Kopi Corner': [

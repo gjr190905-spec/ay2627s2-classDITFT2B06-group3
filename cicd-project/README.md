@@ -71,18 +71,22 @@ This project demonstrates a CRUD web application with a complete CI/CD workflow.
 │   ├── controllers/
 │   │   ├── Vendor.controller.js # Vendor request validation + responses
 │   │   ├── Menu.controller.js  # Menu request validation + responses
-│   │   └── Order.controller.js # Order request validation + responses
+│   │   ├── Order.controller.js # Order request validation + responses
+│   │   └── Settings.controller.js # Settings + notifications validation + responses
 │   ├── models/
 │   │   ├── db.js               # PostgreSQL connection pool
 │   │   ├── Vendor.model.js     # Vendor lookup + open/close (transaction)
 │   │   ├── Menu.model.js       # Menu items, photos, banner, checkout validation
 │   │   ├── Order.model.js      # Orders: place, prepare, ready, collect, dashboard figures
+│   │   ├── Settings.model.js   # Order limit + notification choices
+│   │   ├── Notification.model.js # In-app notifications (rules, list, read, clear)
 │   │   ├── Person.model.js     # Person model
 │   │   └── Something.model.js  # Something model (full CRUD)
 │   ├── routers/
 │   │   ├── Vendor.router.js    # /vendors
 │   │   ├── Menu.router.js      # /vendors/:vendorId/menu
 │   │   ├── Order.router.js     # /vendors/:vendorId/orders
+│   │   ├── Settings.router.js  # /vendors/:vendorId/settings and /notifications
 │   │   ├── Person.router.js    # GET /persons
 │   │   └── Something.router.js # CRUD /somethings
 │   └── public/
@@ -91,6 +95,7 @@ This project demonstrates a CRUD web application with a complete CI/CD workflow.
 │       ├── vendor/home.html    # Vendor home page
 │       ├── vendor/menu.html    # Vendor menu management page
 │       ├── vendor/dashboard.html # Vendor dashboard: figures, preparation, handover
+│       ├── vendor/settings.html # Vendor settings: orders at once, notifications
 │       ├── stall.html          # Customer view of a stall's menu (live availability)
 │       ├── css/theme.css       # Shared Makan Liao? theme (fonts, colours, buttons)
 │       ├── css/vendor-home.css # Vendor home page styles
@@ -98,6 +103,7 @@ This project demonstrates a CRUD web application with a complete CI/CD workflow.
 │       ├── css/vendor-menu.css, js/vendor-menu.js   # Vendor menu page
 │       ├── css/stall-menu.css, js/stall-menu.js     # Customer stall page
 │       ├── css/vendor-dashboard.css, js/vendor-dashboard.js # Vendor dashboard
+│       ├── css/vendor-settings.css, js/vendor-settings.js   # Vendor settings
 │       ├── fonts/              # Patrick Hand + Montserrat (OFL licences included)
 │       └── images/vendors/     # Sample vendor logos used by the seed data
 ├── e2e-tests/                  # Playwright E2E test specs
@@ -155,7 +161,8 @@ npm run migration:reset
 ```
 
 This reads `schema.sql` and creates the `Person`, `Something`, `Vendor`, `VendorLogo`, `StoreClosure`,
-`MenuItem`, `MenuItemImage`, `MenuBanner`, `Order` and `OrderItem` tables.
+`MenuItem`, `MenuItemImage`, `MenuBanner`, `Order`, `OrderItem`, `VendorSettings` and
+`VendorNotification` tables.
 
 ### 5. Seed sample data (optional)
 
@@ -163,7 +170,7 @@ This reads `schema.sql` and creates the `Person`, `Something`, `Vendor`, `Vendor
 npm run seed
 ```
 
-Inserts 20 sample persons, 2 sample somethings and 3 sample vendors, each with a 3-item starter menu
+Inserts 20 sample persons, 2 sample somethings and 4 sample vendors, each with a starter menu
 and sample orders: today's windows around the time you run it (in every status) plus 6 days of
 collected orders for the sales chart.
 
@@ -331,6 +338,38 @@ Order rules:
 Page: `/vendor/dashboard.html` (the Dashboard tile on the home page). It shows today's tiles and
 charts, the preparation board grouped by pickup window, and a handover dialog that opens from a
 Ready order or from "Find an order". It refreshes every 20 seconds.
+
+### Settings and notifications
+
+| Method   | Endpoint                                    | Description                                   | Status Codes  |
+| -------- | ------------------------------------------- | --------------------------------------------- | ------------- |
+| `GET`    | `/vendors/:vendorId/settings`               | Settings plus how many orders are in progress | 200, 400, 404 |
+| `PUT`    | `/vendors/:vendorId/settings`               | Save all settings                             | 200, 400, 404 |
+| `GET`    | `/vendors/:vendorId/notifications`          | Latest 50 notifications and the unread count  | 200, 400, 404 |
+| `POST`   | `/vendors/:vendorId/notifications/read-all` | Mark every notification read                  | 200, 400, 404 |
+| `DELETE` | `/vendors/:vendorId/notifications`          | Delete all notifications                      | 200, 400, 404 |
+
+```jsonc
+// PUT /vendors/:vendorId/settings (every field required)
+{
+  "maxActiveOrders": 10, // 1–200, or null for no limit
+  "notifications": { "newOrder": true, "soldOut": true, "lowStock": true, "lowStockThreshold": 3 },
+}
+// GET also returns "activeOrders": the orders in progress right now
+```
+
+Rules:
+
+- **Orders at once** counts orders that are Confirmed or Preparing. At the limit, placing an
+  order and `/menu/checkout-check` give `409` with the problem code `STALL_BUSY`; marking orders
+  Ready frees places. The count is read with the stall row locked, so two orders can't both take
+  the last place. A vendor with no saved settings has no limit.
+- **Notifications** are created in the same transaction as the order, only for the types the
+  vendor has switched on: `NEW_ORDER`, `SOLD_OUT` (an order took the last one) and `LOW_STOCK`
+  (an order took a counted item down to the threshold or below; told once, when it first
+  crosses it).
+- Page: `/vendor/settings.html` (the Settings tile). The home page shows the unread count on the
+  Settings tile.
 
 ### Persons (read-only)
 

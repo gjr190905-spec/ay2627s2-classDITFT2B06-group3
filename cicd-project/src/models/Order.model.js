@@ -1,5 +1,7 @@
 const pool = require('./db');
 const { checkBasket } = require('./Menu.model');
+const { loadOrderingRules } = require('./Settings.model');
+const { notificationsForOrder, createNotifications } = require('./Notification.model');
 
 // Days, "today" and pickup-window dates are all Singapore time
 const TIME_ZONE = 'Asia/Singapore';
@@ -118,6 +120,19 @@ async function resolveDay(vendorId, date) {
   return rows[0] && rows[0].day;
 }
 
+const timeSg = new Intl.DateTimeFormat('en-SG', {
+  hour: 'numeric',
+  minute: '2-digit',
+  timeZone: TIME_ZONE,
+});
+
+/** "12:00 pm – 12:15 pm" in Singapore time */
+function formatWindowSg(start, end) {
+  return `${timeSg.format(start)} – ${timeSg.format(end)}`;
+}
+
+module.exports.formatWindowSg = formatWindowSg;
+
 // Orders whose pickup window starts on day $2 (Singapore time)
 const ON_DAY = `o."vendorId" = $1 AND (o."pickupWindowStart" AT TIME ZONE '${TIME_ZONE}')::date = $2::date`;
 
@@ -186,7 +201,9 @@ module.exports.placeOrder = async function placeOrder(vendorId, input) {
        FOR UPDATE`,
       [vendorId, input.lines.map((line) => line.itemId)],
     );
-    const basket = checkBasket(vendor.rows[0].isOpen, input.lines, menu.rows);
+    // The stall row is locked, so the in-progress count can't change under us
+    const rules = await loadOrderingRules(client, vendorId);
+    const basket = checkBasket(vendor.rows[0].isOpen, input.lines, menu.rows, rules);
     if (!basket.ok) {
       await client.query('ROLLBACK');
       return { problems: basket.problems };
@@ -236,6 +253,28 @@ module.exports.placeOrder = async function placeOrder(vendorId, input) {
     );
 
     const order = await loadOrder(client, vendorId, orderId);
+
+    // In-app notifications the vendor has switched on (new order, sold out, low stock)
+    const byId = new Map(menu.rows.map((row) => [row.id, row]));
+    const stock = basket.items
+      .filter((line) => byId.get(line.itemId).quantityLeft !== null)
+      .map((line) => {
+        const before = byId.get(line.itemId).quantityLeft;
+        return { menuItemId: line.itemId, name: line.name, before, after: before - line.quantity };
+      });
+    const notes = notificationsForOrder(
+      {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        totalCents: order.totalCents,
+        itemCount: basket.items.reduce((sum, line) => sum + line.quantity, 0),
+        windowLabel: formatWindowSg(order.pickupWindowStart, order.pickupWindowEnd),
+      },
+      stock,
+      rules.notifications,
+    );
+    await createNotifications(client, vendorId, notes);
+
     await client.query('COMMIT');
     return { order };
   } catch (error) {

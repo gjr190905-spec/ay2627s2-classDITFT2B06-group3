@@ -1,4 +1,5 @@
 const pool = require('./db');
+const { loadOrderingRules } = require('./Settings.model');
 
 // Postgres error codes
 const UNIQUE_VIOLATION = '23505';
@@ -413,24 +414,35 @@ module.exports.checkCheckoutItems = async function checkCheckoutItems(vendorId, 
      WHERE "vendorId" = $1 AND "id" = ANY($2::int[]) AND "deletedAt" IS NULL`,
     [vendorId, ids],
   );
-  return checkBasket(vendor.rows[0].isOpen, lines, rows);
+  const rules = await loadOrderingRules(pool, vendorId);
+  return checkBasket(vendor.rows[0].isOpen, lines, rows, rules);
 };
 
 /**
  * The basket rules, shared by checkout validation and placing an order.
- * A pure function: give it the stall's open state, the basket and the menu rows.
+ * A pure function: give it the stall's open state, the basket, the menu rows and
+ * (optionally) the stall's order limit and how many orders it has in progress.
  *
  * @param {boolean} isOpen
  * @param {{itemId: number, quantity: number}[]} lines
  * @param {{id, name, priceCents, quantityLeft, isSoldOut}[]} rows  this stall's (not deleted) items
+ * @param {{maxActiveOrders: number|null, activeOrders: number}} [capacity]
  * @returns {{ok: boolean, items: object[], problems: object[], totalCents: number}}
  */
-function checkBasket(isOpen, lines, rows) {
+function checkBasket(isOpen, lines, rows, capacity = { maxActiveOrders: null, activeOrders: 0 }) {
   const byId = new Map(rows.map((row) => [row.id, row]));
 
   const problems = [];
   if (!isOpen) {
     problems.push({ itemId: null, code: 'STALL_CLOSED', message: 'This stall is closed' });
+  }
+  // The vendor's "orders at once" setting: full until some orders are marked Ready
+  if (capacity.maxActiveOrders !== null && capacity.activeOrders >= capacity.maxActiveOrders) {
+    problems.push({
+      itemId: null,
+      code: 'STALL_BUSY',
+      message: 'This stall has as many orders as it can take right now. Please try again shortly.',
+    });
   }
 
   const items = [];

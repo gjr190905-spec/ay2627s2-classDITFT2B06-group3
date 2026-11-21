@@ -68,7 +68,20 @@ const api = {
   getClosureReasons: () => request('/vendors/closure-reasons'),
   setStatus: (id, payload) =>
     request(`/vendors/${id}/status`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  getNotifications: (id) => request(`/vendors/${id}/notifications`),
 };
+
+// Unread notifications show as a badge on the Settings tile. Not essential, so a
+// failure here just leaves the badge hidden.
+async function renderUnreadBadge() {
+  try {
+    const { unreadCount } = await api.getNotifications(state.vendorId);
+    el.settingsBadge.hidden = unreadCount === 0;
+    el.settingsBadge.textContent = unreadCount > 99 ? '99+ new' : `${unreadCount} new`;
+  } catch {
+    el.settingsBadge.hidden = true;
+  }
+}
 
 /* ── Rendering ──────────────────────────────────────────── */
 
@@ -299,6 +312,7 @@ function cacheElements() {
     statusLine: byId('statusLine'),
     statusSince: byId('statusSince'),
     statusSign: byId('statusSign'),
+    settingsBadge: byId('settingsBadge'),
     toggle: byId('statusToggle'),
     services: byId('servicesNav'),
     signedOut: byId('signedOutPanel'),
@@ -366,6 +380,7 @@ async function init() {
     renderHeader(vendor);
     renderStatus(vendor);
     renderReasons(reasons);
+    renderUnreadBadge();
   } catch (error) {
     if (error.status === 404 || error.status === 400) {
       // Stale or bad session – treat as signed out

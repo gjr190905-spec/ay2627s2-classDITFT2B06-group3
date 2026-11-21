@@ -9,6 +9,8 @@
 -- ─────────────────────────────────────────────────────────
 
 -- Drop existing tables
+DROP TABLE IF EXISTS "VendorNotification" CASCADE;
+DROP TABLE IF EXISTS "VendorSettings" CASCADE;
 DROP TABLE IF EXISTS "OrderItem" CASCADE;
 DROP TABLE IF EXISTS "Order" CASCADE;
 DROP FUNCTION IF EXISTS "Order_collected_is_final"() CASCADE;
@@ -232,6 +234,54 @@ CREATE TRIGGER "Order_collected_is_final"
   BEFORE UPDATE ON "Order"
   FOR EACH ROW EXECUTE FUNCTION "Order_collected_is_final"();
 
+-- ── VendorSettings (one row per vendor; no row = the defaults below) ──
+--  "maxActiveOrders" : how many orders the stall takes on at once, counting orders that
+--                      are Confirmed or Preparing. NULL = no limit. At the limit, new
+--                      orders (and the checkout check) are refused until some are Ready.
+--  "notify*"         : which in-app notifications the vendor wants
+--  "lowStockThreshold": "low stock" means this many or fewer left
+CREATE TABLE "VendorSettings" (
+  "vendorId" INTEGER NOT NULL,
+  "maxActiveOrders" INTEGER,
+  "notifyNewOrder" BOOLEAN NOT NULL DEFAULT TRUE,
+  "notifySoldOut" BOOLEAN NOT NULL DEFAULT TRUE,
+  "notifyLowStock" BOOLEAN NOT NULL DEFAULT TRUE,
+  "lowStockThreshold" INTEGER NOT NULL DEFAULT 3,
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT "VendorSettings_pkey" PRIMARY KEY ("vendorId"),
+  CONSTRAINT "VendorSettings_vendorId_fkey" FOREIGN KEY ("vendorId")
+    REFERENCES "Vendor"("id") ON DELETE CASCADE,
+  CONSTRAINT "VendorSettings_maxActiveOrders_check" CHECK (
+    "maxActiveOrders" IS NULL OR "maxActiveOrders" BETWEEN 1 AND 200
+  ),
+  CONSTRAINT "VendorSettings_lowStockThreshold_check" CHECK ("lowStockThreshold" BETWEEN 1 AND 50)
+);
+
+-- ── VendorNotification (in-app notifications, newest first) ──
+--  Created when orders come in, only for the types the vendor has switched on.
+--  "type": NEW_ORDER, SOLD_OUT or LOW_STOCK. "readAt" NULL = unread.
+CREATE TABLE "VendorNotification" (
+  "id" SERIAL NOT NULL,
+  "vendorId" INTEGER NOT NULL,
+  "type" TEXT NOT NULL,
+  "message" TEXT NOT NULL,
+  "orderId" INTEGER,
+  "menuItemId" INTEGER,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "readAt" TIMESTAMPTZ,
+  CONSTRAINT "VendorNotification_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "VendorNotification_vendorId_fkey" FOREIGN KEY ("vendorId")
+    REFERENCES "Vendor"("id") ON DELETE CASCADE,
+  CONSTRAINT "VendorNotification_orderId_fkey" FOREIGN KEY ("orderId")
+    REFERENCES "Order"("id") ON DELETE SET NULL,
+  CONSTRAINT "VendorNotification_menuItemId_fkey" FOREIGN KEY ("menuItemId")
+    REFERENCES "MenuItem"("id") ON DELETE SET NULL,
+  CONSTRAINT "VendorNotification_type_check" CHECK (
+    "type" IN ('NEW_ORDER', 'SOLD_OUT', 'LOW_STOCK')
+  ),
+  CONSTRAINT "VendorNotification_message_check" CHECK (char_length("message") BETWEEN 1 AND 200)
+);
+
 -- Indexes
 CREATE UNIQUE INDEX "Person_email_key" ON "Person"("email");
 CREATE UNIQUE INDEX "Vendor_email_key" ON "Vendor"("email");
@@ -247,3 +297,4 @@ CREATE INDEX "MenuItem_vendorId_idx" ON "MenuItem"("vendorId") WHERE "deletedAt"
 CREATE UNIQUE INDEX "Order_vendor_orderNumber_key" ON "Order"("vendorId", "orderNumber");
 CREATE INDEX "Order_vendor_window_idx" ON "Order"("vendorId", "pickupWindowStart");
 CREATE INDEX "OrderItem_orderId_idx" ON "OrderItem"("orderId");
+CREATE INDEX "VendorNotification_vendor_idx" ON "VendorNotification"("vendorId", "createdAt" DESC);
