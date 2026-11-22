@@ -53,14 +53,14 @@ async function seed() {
   console.log('Inserted food courts.');
 
   await pool.query(`
-    INSERT INTO "Stall" ("foodCourtId", "name", "pickupLocation", "isActive") VALUES
-      ((SELECT "id" FROM "FoodCourt" WHERE "name" = 'Food Court 6'), 'Our Sweet Toast',        'Counter A', true),
-      ((SELECT "id" FROM "FoodCourt" WHERE "name" = 'Food Court 6'), 'Canopy Greens',          'Counter B', true),
-      ((SELECT "id" FROM "FoodCourt" WHERE "name" = 'Food Court 6'), 'Foodgonomy',             'Counter C', true),
-      ((SELECT "id" FROM "FoodCourt" WHERE "name" = 'Food Court 6'), 'Japanese Food',          'Counter D', true),
-      ((SELECT "id" FROM "FoodCourt" WHERE "name" = 'Food Court 6'), 'Western Food',           'Counter E', true),
-      ((SELECT "id" FROM "FoodCourt" WHERE "name" = 'Food Court 6'), 'Hello Handmade Noodles', 'Counter F', true)
-    ON CONFLICT DO NOTHING;
+  INSERT INTO "Vendor" ("foodCourtId", "stallName", "pickupLocation", "isActive", "isOpen") VALUES
+    ((SELECT "id" FROM "FoodCourt" WHERE "name" = 'Food Court 6'), 'Our Sweet Toast', 'Counter A', true, true),
+    ((SELECT "id" FROM "FoodCourt" WHERE "name" = 'Food Court 6'), 'Canopy Greens', 'Counter B', true, true),
+    ((SELECT "id" FROM "FoodCourt" WHERE "name" = 'Food Court 6'), 'Foodgonomy', 'Counter C', true, true),
+    ((SELECT "id" FROM "FoodCourt" WHERE "name" = 'Food Court 6'), 'Japanese Food', 'Counter D', true, true),
+    ((SELECT "id" FROM "FoodCourt" WHERE "name" = 'Food Court 6'), 'Western Food', 'Counter E', true, true),
+    ((SELECT "id" FROM "FoodCourt" WHERE "name" = 'Food Court 6'), 'Hello Handmade Noodles', 'Counter F', true, true)
+  ON CONFLICT DO NOTHING;
   `);
   console.log('Inserted stalls.');
 
