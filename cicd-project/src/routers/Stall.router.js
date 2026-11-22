@@ -2,7 +2,6 @@ const express = require('express');
 const { getAllStalls, getStallById } = require('../models/Stall.model');
 const { getMenuItemsByStallId } = require('../models/MenuItem.model');
 const { getUpcomingWindowsByStallId } = require('../models/PickupWindow.model');
-const { authenticate, requireRole } = require('../middleware/auth');
 const { ERROR_CODES, mapError } = require('../utils/errors');
 const parseId = require('../utils/parseId');
 
@@ -24,7 +23,7 @@ router.get('/:id/menu', async (req, res, next) => {
   }
 });
 
-router.get('/:id/windows',authenticate, requireRole('customer', 'vendor', 'admin', 'staff'), async (req, res, next) => {
+router.get('/:id/windows', async (req, res, next) => {
   try {
     const stallId = parseId(req.params.id);
     if (stallId === null) {

@@ -7,7 +7,7 @@ const { toHttpError } = require('./utils/errors');
 const somethingRouter = require('./routers/Something.router');
 const personRouter = require('./routers/Person.router');
 const stallRouter = require('./routers/Stall.router');
-const orderRouter = require('./routers/Order.router');
+
 
 
 const app = express();
@@ -26,7 +26,7 @@ app.get('/favicon.ico', (req, res) => res.status(204).end());
 app.use('/somethings', somethingRouter);
 app.use('/persons', personRouter);
 app.use('/stalls', stallRouter);
-app.use('/orders', orderRouter);
+
 
 // 404 handler — MUST come before error handler
 app.use((req, res, next) => {
