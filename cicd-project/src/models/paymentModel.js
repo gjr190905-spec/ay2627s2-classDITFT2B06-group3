@@ -18,6 +18,14 @@ module.exports.processPayment = async function processPayment(
   paymentMethod,
   paymentStatus
 ) {
+  // Validate payment method
+  if (!['CARD', 'PAYNOW', 'CASH'].includes(paymentMethod)) {
+    const error = new Error('Invalid payment method');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // Validate payment outcome
   if (!['PAID', 'FAILED'].includes(paymentStatus)) {
     const error = new Error('Invalid payment status');
     error.statusCode = 400;
@@ -29,11 +37,12 @@ module.exports.processPayment = async function processPayment(
   try {
     await client.query('BEGIN');
 
-    // Check whether payment record exists
+    // Retrieve payment and lock the record
     const { rows } = await client.query(
       `SELECT payment_id, payment_status
        FROM payments
-       WHERE order_id = $1`,
+       WHERE order_id = $1
+       FOR UPDATE`,
       [orderId]
     );
 
@@ -45,9 +54,9 @@ module.exports.processPayment = async function processPayment(
 
     const payment = rows[0];
 
-    // Check whether payment has already been processed
-    if (payment.payment_status !== 'PENDING') {
-      const error = new Error('Payment has already been processed');
+    // Prevent duplicate successful payments
+    if (payment.payment_status === 'PAID') {
+      const error = new Error('Payment has already been completed');
       error.statusCode = 400;
       throw error;
     }
@@ -66,17 +75,10 @@ module.exports.processPayment = async function processPayment(
              WHEN $1 = 'PAID' THEN CURRENT_TIMESTAMP
              ELSE NULL
            END
-       WHERE order_id = $4
-       AND payment_status = 'PENDING'
+       WHERE payment_id = $4
        RETURNING *`,
-      [paymentStatus, paymentMethod, transactionReference, orderId]
+      [paymentStatus, paymentMethod, transactionReference, payment.payment_id]
     );
-
-    if (updatedRows.length === 0) {
-      const error = new Error('Payment could not be processed');
-      error.statusCode = 400;
-      throw error;
-    }
 
     await client.query('COMMIT');
 

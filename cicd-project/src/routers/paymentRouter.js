@@ -57,7 +57,9 @@ router.post('/:orderId/simulate', (req, res, next) => {
   processPayment(orderId, paymentMethod, paymentStatus)
     .then((payment) => {
       res.status(200).json({
-        message: 'Payment processed successfully',
+        message: payment.payment_status === 'PAID'
+          ? 'Payment successful'
+          : 'Payment failed',
         payment: payment
       });
     })
