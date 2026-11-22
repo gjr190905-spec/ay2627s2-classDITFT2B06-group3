@@ -12,6 +12,7 @@ const account = {
   email: 'user@example.com',
   role: 'customer',
   passwordHash: 'stored-hash',
+  isActive: true,
 };
 
 beforeEach(() => jest.resetAllMocks());
@@ -44,7 +45,14 @@ test('uses the stored role and excludes the password hash from the result', asyn
   expect(verifyPassword).toHaveBeenCalledWith(' example123 ', 'stored-hash');
   expect(result).toEqual({
     authenticated: true,
-    account: { id: 4, name: 'Jo', email: 'user@example.com', role: 'customer' },
+    account: {
+      id: 4,
+      name: 'Jo',
+      email: 'user@example.com',
+      role: 'customer',
+      stallId: null,
+      stallName: null,
+    },
     errors: {},
   });
 });
@@ -52,4 +60,12 @@ test('uses the stored role and excludes the password hash from the result', asyn
 test('propagates a database failure to the caller', async () => {
   findAccountByEmail.mockRejectedValue(new Error('Database unavailable'));
   await expect(authenticateAccount(credentials)).rejects.toThrow('Database unavailable');
+});
+
+test('rejects deactivated accounts before password verification', async () => {
+  findAccountByEmail.mockResolvedValue({ ...account, isActive: false });
+  const result = await authenticateAccount(credentials);
+  expect(result.authenticated).toBe(false);
+  expect(result.errors.form).toBe('Incorrect email or password.');
+  expect(verifyPassword).not.toHaveBeenCalled();
 });

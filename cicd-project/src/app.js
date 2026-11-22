@@ -5,11 +5,16 @@ const path = require('path');
 // Import route handlers
 const somethingRouter = require('./routers/Something.router');
 const personRouter = require('./routers/Person.router');
+const authRouter = require('./routers/Auth.router');
+const { loadSession } = require('./middleware/auth-session');
 
 const app = express();
 
 // Parse incoming JSON request bodies (e.g. from POST/PUT requests)
 app.use(express.json());
+
+// Load an identity only from a server-stored, unexpired session.
+app.use(loadSession);
 
 // Serve static files (HTML, CSS, JS, images) from the 'public' folder.
 // e.g. src/public/index.html is accessible at http://localhost:<port>/
@@ -17,6 +22,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Browsers automatically request /favicon.ico — return 204 (no content) to avoid 404 noise.
 app.get('/favicon.ico', (req, res) => res.status(204).end());
+
+app.use('/api/auth', authRouter);
 
 app.use('/somethings', somethingRouter);
 app.use('/persons', personRouter);
@@ -35,7 +42,7 @@ app.use((req, res, next) => {
 app.use((error, req, res, next) => {
   console.error(error);
   const status = error.status || 500;
-  res.status(status).json({ error: error.message });
+  res.status(status).json({ error: status >= 500 ? 'Internal server error.' : error.message });
 });
 
 module.exports = app;

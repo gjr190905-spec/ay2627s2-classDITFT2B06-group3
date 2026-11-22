@@ -64,8 +64,13 @@ describe('Shared platform role-based access', () => {
     expect(next).toHaveBeenCalledTimes(1);
   });
 
-  test('fails fast when an invalid role is configured', () => {
-    expect(() => requireRole('admin')).toThrow('valid role');
+  test('permits an authenticated admin only on explicitly admin-enabled routes', () => {
+    const { next } = check(requireRole('admin'), { user: { id: 1, role: 'admin' } });
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
+  test('fails fast when an unrecognised role is configured', () => {
+    expect(() => requireRole('owner')).toThrow('valid role');
   });
 
   test('allows a customer to access their own account route', () => {

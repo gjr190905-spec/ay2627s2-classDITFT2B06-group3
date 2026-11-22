@@ -3,9 +3,9 @@
  *
  * IMPORTANT: req.user must be populated ONLY by trusted server-side
  * authentication/session middleware, never from request headers or JSON input.
- * Wiring that authentication layer into the app is a separate backlog task.
+ * Session middleware populates it from the database before routers run.
  */
-const ROLES = new Set(['customer', 'vendor']);
+const ROLES = new Set(['customer', 'vendor', 'staff', 'admin']);
 
 function authenticatedUser(req) {
   const user = req.user;
