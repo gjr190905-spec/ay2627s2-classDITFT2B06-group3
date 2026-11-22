@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Stall menu | Makan Liao</title>
+    <link rel="stylesheet" href="styles/menu.css" />
+    <link rel="stylesheet" href="styles/stall-menu.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+
+    <p class="promo-bar">Order before your break. Pay at the stall when you collect.</p>
+
+    <header class="site-header">
+      <a class="brand" href="menu.html">
+        <img class="brand__logo" src="images/logo.webp" alt="Makan Liao" width="120" height="48" />
+      </a>
+
+      <nav class="site-nav" aria-label="Main">
+        <ul class="site-nav__list">
+          <li><a href="menu.html" aria-current="page">Food stalls</a></li>
+          <li><a href="orders.html">My orders</a></li>
+          <li>
+            <a href="cart.html">
+              Cart
+              <span class="cart-badge" id="cart-count" aria-live="polite">0</span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+
+      <div class="site-user">
+        <button type="button" class="button button--outline" id="sign-out">Sign out</button>
+      </div>
+    </header>
+
+    <main id="main">
+      <p class="back-link"><a href="menu.html">Back to food stalls</a></p>
+
+      <p class="message" id="page-loading" role="status">Loading menu...</p>
+      <p class="message message--error" id="page-error" role="alert" hidden></p>
+
+      <div id="stall-content" hidden>
+        <section class="stall-hero" aria-labelledby="stall-name">
+          <div class="stall-hero__body">
+            <div class="stall-hero__tags">
+              <p class="tag" id="stall-court" hidden></p>
+              <p class="tag">Pre-order and collect</p>
+              <p class="tag">Pay at pickup</p>
+            </div>
+            <h1 id="stall-name"></h1>
+            <p class="stall-hero__pickup" id="stall-pickup"></p>
+            <p class="stall-hero__note">You choose your pickup time at checkout.</p>
+          </div>
+          <div class="stall-hero__art" aria-hidden="true"></div>
+        </section>
+
+        <div class="stall-layout">
+          <section class="menu" aria-labelledby="menu-title">
+            <h2 id="menu-title">The menu</h2>
+            <p class="section-hint">Prices are in SGD. Availability can change.</p>
+            <p class="message" id="menu-empty" hidden>This stall has no menu items yet.</p>
+            <ul class="menu-list" id="menu-list"></ul>
+          </section>
+
+          <aside class="stall-side" aria-label="Your order and pickup times">
+            <section class="cart-summary" aria-labelledby="cart-summary-title">
+              <h2 id="cart-summary-title">Your order</h2>
+              <p id="cart-summary-text" role="status">Your cart is empty.</p>
+              <a class="button button--primary" href="cart.html">View cart</a>
+            </section>
+
+            <section class="windows" aria-labelledby="windows-title">
+              <h2 id="windows-title">Pickup times</h2>
+              <p class="message" id="windows-message" role="status">Loading pickup times...</p>
+              <ul class="window-list" id="window-list"></ul>
+            </section>
+          </aside>
+        </div>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <p>A campus food ordering platform for students and staff.</p>
+      <p class="site-footer__note">
+        Independent class project prototype. Locations, menus and accounts are fictional. Pay at pickup only. There is no
+        online payment.
+      </p>
+    </footer>
+
+    <!-- One cart can only hold one stall, so switching stalls needs a confirmation. -->
+    <dialog id="replace-dialog" aria-labelledby="replace-title">
+      <h2 id="replace-title">Start a new cart?</h2>
+      <p id="replace-text"></p>
+      <div class="dialog-actions">
+        <button type="button" class="button button--outline" id="replace-cancel">Keep my cart</button>
+        <button type="button" class="button button--primary" id="replace-confirm">Replace cart</button>
+      </div>
+    </dialog>
+
+    <!-- Used by stall-menu.js. The image area is pure CSS, so every item gets the same placeholder. -->
+    <template id="menu-item-template">
+      <li class="menu-item">
+        <div class="menu-item__image" aria-hidden="true"></div>
+        <div class="menu-item__body">
+          <h3 class="menu-item__name"></h3>
+          <p class="status status--closed menu-item__status" hidden>Sold out</p>
+          <div class="menu-item__foot">
+            <p class="menu-item__price"></p>
+            <div class="menu-item__actions">
+              <button type="button" class="button button--outline add-button">Add to cart</button>
+              <div class="stepper" hidden>
+                <button type="button" class="stepper__minus">&minus;</button>
+                <span class="stepper__qty">1</span>
+                <button type="button" class="stepper__plus">+</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </li>
+    </template>
+
+    <script src="stall-menu.js" defer></script>
+  </body>
+</html>
+  
