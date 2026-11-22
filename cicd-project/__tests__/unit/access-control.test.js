@@ -69,6 +69,27 @@ describe('Shared platform role-based access', () => {
     expect(next).toHaveBeenCalledTimes(1);
   });
 
+  test('permits a staff member only on explicitly staff-enabled routes', () => {
+    const staff = { id: 33, role: 'staff', stallId: null };
+    const permitted = check(requireRole('staff'), { user: staff });
+    expect(permitted.next).toHaveBeenCalledTimes(1);
+
+    const vendorOnly = check(requireRole('vendor'), { user: staff });
+    expect(vendorOnly.res.status).toHaveBeenCalledWith(403);
+    expect(vendorOnly.next).not.toHaveBeenCalled();
+
+    const adminOnly = check(requireRole('admin'), { user: staff });
+    expect(adminOnly.res.status).toHaveBeenCalledWith(403);
+    expect(adminOnly.next).not.toHaveBeenCalled();
+
+    const stallOwnership = check(requireVendorStall(), {
+      user: staff,
+      params: { stallId: '7' },
+    });
+    expect(stallOwnership.res.status).toHaveBeenCalledWith(403);
+    expect(stallOwnership.next).not.toHaveBeenCalled();
+  });
+
   test('fails fast when an unrecognised role is configured', () => {
     expect(() => requireRole('owner')).toThrow('valid role');
   });

@@ -53,6 +53,44 @@ test('loads identity, stall and CSRF exclusively from database session', async (
   expect(next).toHaveBeenCalledWith();
 });
 
+test('loads a legitimate staff session from the database', async () => {
+  findActiveSession.mockResolvedValue({
+    id: 25,
+    name: 'Staff Member',
+    email: 'staff@example.com',
+    role: 'staff',
+    stallId: null,
+    csrfToken: 'b'.repeat(64),
+  });
+  const req = { headers: { cookie: `ml_session=${'a'.repeat(64)}` } };
+  const next = jest.fn();
+
+  await loadSession(req, {}, next);
+
+  expect(req.user).toMatchObject({ id: 25, role: 'staff', stallId: null });
+  expect(req.user).not.toHaveProperty('csrfToken');
+  expect(req.csrfToken).toBe('b'.repeat(64));
+  expect(next).toHaveBeenCalledWith();
+});
+
+test('does not authenticate an unknown database role', async () => {
+  findActiveSession.mockResolvedValue({
+    id: 26,
+    name: 'Unknown Role',
+    email: 'unknown@example.com',
+    role: 'superuser',
+    stallId: null,
+    csrfToken: 'b'.repeat(64),
+  });
+  const req = { headers: { cookie: `ml_session=${'a'.repeat(64)}` } };
+  const next = jest.fn();
+
+  await loadSession(req, {}, next);
+
+  expect(req.user).toBeNull();
+  expect(next).toHaveBeenCalledWith();
+});
+
 test('rejects expired or forged identity and passes database errors to handler', async () => {
   findActiveSession.mockResolvedValueOnce(null).mockRejectedValueOnce(new Error('DB down'));
   const req = {

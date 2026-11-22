@@ -3,7 +3,8 @@ const { createSession, findActiveSession } = require('../models/Session.model');
 
 const COOKIE_NAME = 'ml_session';
 const SESSION_SECONDS = 7 * 24 * 60 * 60;
-const VALID_ROLES = new Set(['customer', 'vendor', 'admin']);
+// Match the roles accepted by Person.role and access-control middleware.
+const VALID_ROLES = new Set(['customer', 'staff', 'vendor', 'admin']);
 
 function readSessionToken(req) {
   const cookie = req.headers?.cookie;
