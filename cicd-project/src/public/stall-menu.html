@@ -13,8 +13,8 @@
     <p class="promo-bar">Order before your break. Pay at the stall when you collect.</p>
 
     <header class="site-header">
-      <a class="brand" href="menu.html">
-        <img class="brand__logo" src="images/logo.webp" alt="Makan Liao" width="120" height="48" />
+      <a class="brand" href="home.html">
+        <img class="brand__logo" src="images/makan-liao-logo.png" alt="Makan Liao" width="120" height="48" />
       </a>
 
       <nav class="site-nav" aria-label="Main">
@@ -31,9 +31,13 @@
       </nav>
 
       <div class="site-user">
-        <button type="button" class="button button--outline" id="sign-out">Sign out</button>
+        <span class="site-user__name" data-session-user data-session-name hidden></span>
+        <a href="/login.html" class="button button--outline" data-session-guest>Sign in</a>
+        <button type="button" class="button button--outline" data-session-user data-session-logout id="sign-out" hidden>Sign out</button>
       </div>
     </header>
+
+    <p class="message message--error" data-session-error role="alert" hidden></p>
 
     <main id="main">
       <p class="back-link"><a href="menu.html">Back to food stalls</a></p>
@@ -121,6 +125,7 @@
       </li>
     </template>
 
+    <script src="auth-shell.js" defer></script>
     <script src="stall-menu.js" defer></script>
   </body>
 </html>
