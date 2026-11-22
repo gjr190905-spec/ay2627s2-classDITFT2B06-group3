@@ -227,17 +227,13 @@ async function seed() {
     INSERT INTO "PickupWindow" ("stallId", "startTime", "endTime", "maxOrders", "bookedCount")
     SELECT s."id", slot, slot + interval '5 minutes', 5, 0
       FROM "Stall" s
-     CROSS JOIN generate_series(
+    CROSS JOIN generate_series(
             date_trunc('hour', NOW()) + interval '1 hour',
-            date_trunc('hour', NOW()) + interval '3 hours',
-            interval '5 minutes') AS slot
+            date_trunc('hour', NOW()) + interval '8 hours',
+            interval '5 minutes') AS gs(slot)
      WHERE s."isActive" = true;
   `);
 
-  await pool.query(`
-    UPDATE "PickupWindow" SET "bookedCount" = "maxOrders"
-     WHERE "id" = (SELECT MIN("id") FROM "PickupWindow" WHERE "stallId" = 1);
-  `);
   console.log('Inserted pickup windows.');
 
   console.log('Seed data inserted successfully.');
