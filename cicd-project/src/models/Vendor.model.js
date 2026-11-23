@@ -11,15 +11,29 @@ const CLOSURE_REASONS = Object.freeze([
   { code: 'OTHER', label: 'Other' },
 ]);
 
-const VENDOR_COLUMNS = '"id", "stallName", "logoUrl", "isOpen", "statusUpdatedAt"';
+// "isActive" is the admin switch in the shared schema: a deactivated stall can't be opened.
+// "foodCourtId", "pickupLocation" and "description" are shown to customers while browsing.
+const VENDOR_COLUMNS = `"id", "stallName", "logoUrl", "isOpen", "isActive", "statusUpdatedAt",
+  "foodCourtId", "pickupLocation", "description"`;
 
 module.exports.CLOSURE_REASONS = CLOSURE_REASONS;
 
 // Postgres error code for "unique_violation"
 const UNIQUE_VIOLATION = '23505';
 
+/**
+ * One stall, with the name of the food court it is in.
+ * (Vendor.id is the stall id; the owner's account is "ownerUserId" in "Person".)
+ */
 module.exports.getVendorById = async function getVendorById(id) {
-  const { rows } = await pool.query(`SELECT ${VENDOR_COLUMNS} FROM "Vendor" WHERE "id" = $1`, [id]);
+  const { rows } = await pool.query(
+    `SELECT v."id", v."stallName", v."logoUrl", v."isOpen", v."isActive", v."statusUpdatedAt",
+            v."foodCourtId", v."pickupLocation", v."description", f."name" AS "foodCourtName"
+     FROM "Vendor" v
+     JOIN "FoodCourt" f ON f."id" = v."foodCourtId"
+     WHERE v."id" = $1`,
+    [id],
+  );
   return rows[0];
 };
 
@@ -32,8 +46,9 @@ module.exports.getVendorById = async function getVendorById(id) {
  * @param {number} id                 Vendor id
  * @param {boolean} isOpen            Desired status
  * @param {{reason: string, otherReason: string|null}|null} closure  Required when closing
- * @returns {Promise<{vendor: object, changed: boolean}|undefined>}
- *          undefined if the vendor does not exist; changed=false if it was already in that state
+ * @returns {Promise<{vendor: object, changed: boolean}|{inactive: true, vendor: object}|undefined>}
+ *          undefined if the vendor does not exist; changed=false if it was already in that state;
+ *          inactive=true if an admin has deactivated the stall, so it can't be opened
  */
 module.exports.setVendorOpenStatus = async function setVendorOpenStatus(id, isOpen, closure) {
   const client = await pool.connect();
@@ -54,6 +69,11 @@ module.exports.setVendorOpenStatus = async function setVendorOpenStatus(id, isOp
     if (vendor.isOpen === isOpen) {
       await client.query('ROLLBACK');
       return { vendor, changed: false };
+    }
+
+    if (isOpen && !vendor.isActive) {
+      await client.query('ROLLBACK');
+      return { inactive: true, vendor };
     }
 
     const updated = await client.query(

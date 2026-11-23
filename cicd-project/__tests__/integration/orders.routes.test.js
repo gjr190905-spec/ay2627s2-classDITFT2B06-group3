@@ -1,6 +1,7 @@
 const request = require('supertest');
 const app = require('../../src/app');
 const pool = require('../../src/models/db');
+const { deleteVendors } = require('../helpers/cleanup');
 
 // ── DB Setup / Teardown ──────────────────────────────────
 // Each test starts with two vendors of its own: an open stall with three menu items
@@ -8,6 +9,8 @@ const pool = require('../../src/models/db');
 // Integration test files run one at a time (--runInBand).
 
 const EMAILS = ['orders-a@makanliao.sg', 'orders-b@makanliao.sg'];
+// Accounts some tests create: a stall owner and a customer who checks out
+const PERSON_EMAILS = ['orders-owner@makanliao.sg', 'orders-customer@makanliao.sg'];
 let vendorId;
 let otherVendorId;
 let laksaId; // $5.50, not counting
@@ -37,7 +40,7 @@ async function insertItem(vid, name, priceCents, quantityLeft, isSoldOut) {
 }
 
 beforeEach(async () => {
-  await pool.query('DELETE FROM "Vendor" WHERE "email" = ANY($1)', [EMAILS]);
+  await deleteVendors(pool, 'v."email" = ANY($1)', [EMAILS]);
   vendorId = await insertVendor(EMAILS[0], 'Orders Test Laksa', true);
   otherVendorId = await insertVendor(EMAILS[1], 'Orders Test Kopi', true);
   laksaId = await insertItem(vendorId, 'Curry Laksa', 550, null, false);
@@ -46,7 +49,8 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-  await pool.query('DELETE FROM "Vendor" WHERE "email" = ANY($1)', [EMAILS]);
+  await deleteVendors(pool, 'v."email" = ANY($1)', [EMAILS]);
+  await pool.query('DELETE FROM "Person" WHERE "email" = ANY($1)', [PERSON_EMAILS]);
   await pool.end();
 });
 
@@ -461,6 +465,7 @@ describe('GET /vendors/:vendorId/orders/stats', () => {
       PREPARING: 0,
       READY: 1,
       COLLECTED: 1,
+      CANCELLED: 0,
     });
     expect(res.body.collectedCents).toBe(550);
     expect(res.body.toCollectCents).toBe(ready.totalCents);
@@ -479,6 +484,156 @@ describe('GET /vendors/:vendorId/orders/stats', () => {
     expect(res.body.counts.total).toBe(0);
     expect(res.body.readyOnTime.rate).toBeNull();
     expect(res.body.byWindow).toEqual([]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────
+// Shared schema: cancelled orders, checkout orders, payments and collection records
+// ─────────────────────────────────────────────────────────
+describe('Shared order flow', () => {
+  async function person(email, name, role) {
+    await pool.query('DELETE FROM "Person" WHERE "email" = $1', [email]);
+    const { rows } = await pool.query(
+      'INSERT INTO "Person" ("email", "name", "role") VALUES ($1, $2, $3) RETURNING "id"',
+      [email, name, role],
+    );
+    return rows[0].id;
+  }
+
+  // The customer branch cancels through the shared table (allowed before READY)
+  async function cancel(order) {
+    await pool.query(
+      `UPDATE "Order" SET "status" = 'CANCELLED', "cancelledAt" = NOW() WHERE "id" = $1`,
+      [order.id],
+    );
+  }
+
+  // A real checkout through the customer branch's "orders" / "order_items" views
+  async function checkout(customerId) {
+    const start = new Date(Date.now() + 5 * MINUTE);
+    const { rows: windows } = await pool.query(
+      `INSERT INTO "PickupWindow" ("stallId", "startTime", "endTime", "maxOrders", "bookedCount")
+       VALUES ($1, $2, $3, 10, 1) RETURNING "id"`,
+      [vendorId, start, new Date(start.getTime() + 15 * MINUTE)],
+    );
+    const { rows } = await pool.query(
+      `INSERT INTO orders (customer_id, stall_id, pickup_window_id, collection_reference, total_amount)
+       VALUES ($1, $2, $3, 'ORD-TEST-1', 11.00) RETURNING order_id`,
+      [customerId, vendorId, windows[0].id],
+    );
+    const orderId = rows[0].order_id;
+    await pool.query(
+      `INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, subtotal)
+       VALUES ($1, $2, 2, 5.50, 11.00)`,
+      [orderId, laksaId],
+    );
+    await pool.query(
+      `INSERT INTO payments (order_id, amount, payment_status, payment_method, paid_at)
+       VALUES ($1, 11.00, 'PAID', 'PAYNOW', NOW())`,
+      [orderId],
+    );
+    return orderId;
+  }
+
+  test('should show a cancelled order on the board but leave it out of the charts', async () => {
+    const kept = await placeOk([{ itemId: laksaId, quantity: 1 }]);
+    const dropped = await placeOk([{ itemId: meeId, quantity: 1 }]);
+    await cancel(dropped);
+
+    const list = await request(app).get(base());
+    const orders = list.body.windows.flatMap((w) => w.orders);
+    const shown = orders.find((o) => o.id === dropped.id);
+    expect(shown.status).toBe('CANCELLED');
+    expect(shown.cancelledAt).not.toBeNull();
+
+    const stats = await request(app).get(`${base()}/stats`);
+    expect(stats.body.counts).toMatchObject({ total: 2, CONFIRMED: 1, CANCELLED: 1 });
+    expect(stats.body.byWindow.reduce((sum, w) => sum + w.orders, 0)).toBe(1);
+    expect(stats.body.topItems).toEqual([{ name: 'Curry Laksa', quantity: 1 }]);
+    expect(stats.body.last7Days.at(-1).orders).toBe(1);
+    expect(orders.find((o) => o.id === kept.id).status).toBe('CONFIRMED');
+  });
+
+  test('should not let a cancelled order move on or be collected', async () => {
+    const order = await placeOk();
+    await cancel(order);
+
+    const moved = await advance(order.id, 'PREPARING');
+    expect(moved.status).toBe(409);
+    expect(moved.body.error).toMatch(/Cancelled/);
+
+    const collected = await collect(order);
+    expect(collected.status).toBe(409);
+    expect(collected.body.error).toMatch(/Cancelled/);
+  });
+
+  test('should show a checkout order with its customer, reference and payment', async () => {
+    const customerId = await person(PERSON_EMAILS[1], 'Checkout Student', 'customer');
+    const orderId = await checkout(customerId);
+
+    const res = await request(app).get(`${base()}/${orderId}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      customerId,
+      customerName: 'Checkout Student',
+      collectionReference: 'ORD-TEST-1',
+      status: 'CONFIRMED',
+      totalCents: 1100,
+      payment: { status: 'PAID', method: 'PAYNOW' },
+      items: [{ menuItemId: laksaId, name: 'Curry Laksa', quantity: 2, unitPriceCents: 550 }],
+    });
+    expect(res.body.pickupWindowId).toEqual(expect.any(Number));
+  });
+
+  test('should not count a Ready order paid online as money to collect', async () => {
+    const customerId = await person(PERSON_EMAILS[1], 'Checkout Student', 'customer');
+    const orderId = await checkout(customerId);
+    await advance(orderId, 'PREPARING');
+    expect((await advance(orderId, 'READY')).status).toBe(200);
+    const cash = await readyOrder([{ itemId: meeId, quantity: 1 }]); // pays at the stall
+
+    const stats = await request(app).get(`${base()}/stats`);
+
+    expect(stats.body.counts.READY).toBe(2);
+    expect(stats.body.toCollectCents).toBe(cash.totalCents);
+  });
+
+  test('should give manual orders no customer, window or payment', async () => {
+    const order = await placeOk();
+    expect(order).toMatchObject({
+      customerId: null,
+      pickupWindowId: null,
+      collectionReference: null,
+      payment: null,
+    });
+  });
+
+  test('should record the handover against the stall owner', async () => {
+    const ownerId = await person(PERSON_EMAILS[0], 'Orders Owner', 'vendor');
+    await pool.query('UPDATE "Vendor" SET "ownerUserId" = $1 WHERE "id" = $2', [ownerId, vendorId]);
+    const order = await readyOrder();
+
+    expect((await collect(order)).status).toBe(200);
+    expect((await collect(order)).status).toBe(409);
+
+    const { rows } = await pool.query('SELECT * FROM collections WHERE order_id = $1', [order.id]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].collected_by).toBe(ownerId);
+  });
+
+  test('should collect without a handover record when the stall has no owner account', async () => {
+    const order = await readyOrder();
+    expect((await collect(order)).status).toBe(200);
+    const { rows } = await pool.query('SELECT * FROM collections WHERE order_id = $1', [order.id]);
+    expect(rows).toHaveLength(0);
+  });
+
+  test('should refuse orders while an admin has deactivated the stall', async () => {
+    await pool.query('UPDATE "Vendor" SET "isActive" = FALSE WHERE "id" = $1', [vendorId]);
+    const res = await place([{ itemId: laksaId, quantity: 1 }]);
+    expect(res.status).toBe(409);
+    expect(res.body.problems.map((p) => p.code)).toContain('STALL_CLOSED');
   });
 });
 

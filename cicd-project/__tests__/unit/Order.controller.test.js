@@ -324,6 +324,11 @@ describe('Order.controller - findOrderByNumber / getOneOrder', () => {
 });
 
 describe('Order.controller - createOrder', () => {
+  // createOrder checks the window against the real clock, so pin the clock to NOW
+  // (otherwise these tests start failing 12 hours after the date in NOW).
+  beforeEach(() => jest.useFakeTimers({ now: NOW, doNotFake: ['nextTick', 'queueMicrotask'] }));
+  afterEach(() => jest.useRealTimers());
+
   test('should return 201 with the new order', async () => {
     model.placeOrder.mockResolvedValue({ order });
     const { res } = await run(createOrder, { params: { vendorId: '3' }, body: validOrderBody() });

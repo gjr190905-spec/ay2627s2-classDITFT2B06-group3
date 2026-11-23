@@ -1,6 +1,7 @@
 const request = require('supertest');
 const app = require('../../src/app');
 const pool = require('../../src/models/db');
+const { deleteVendors } = require('../helpers/cleanup');
 
 // ── DB Setup / Teardown ──────────────────────────────────
 // Each test starts with two open stalls of its own; the first has two menu items
@@ -33,7 +34,7 @@ async function insertItem(vid, name, priceCents, quantityLeft) {
 }
 
 beforeEach(async () => {
-  await pool.query('DELETE FROM "Vendor" WHERE "email" = ANY($1)', [EMAILS]);
+  await deleteVendors(pool, 'v."email" = ANY($1)', [EMAILS]);
   vendorId = await insertVendor(EMAILS[0], 'Settings Test Kopi');
   otherVendorId = await insertVendor(EMAILS[1], 'Settings Test Other');
   kopiId = await insertItem(vendorId, 'Kopi', 150, null);
@@ -41,7 +42,7 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-  await pool.query('DELETE FROM "Vendor" WHERE "email" = ANY($1)', [EMAILS]);
+  await deleteVendors(pool, 'v."email" = ANY($1)', [EMAILS]);
   await pool.end();
 });
 

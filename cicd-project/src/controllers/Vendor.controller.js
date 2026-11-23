@@ -176,6 +176,11 @@ function updateVendorStatus(req, res, next) {
       if (!result) {
         return next(createError(404, 'Vendor not found'));
       }
+      if (result.inactive) {
+        return next(
+          createError(409, 'This stall has been deactivated by an admin, so it cannot be opened'),
+        );
+      }
       if (!result.changed) {
         const state = payload.isOpen ? 'open' : 'closed';
         return next(createError(409, `Stall is already ${state}`));

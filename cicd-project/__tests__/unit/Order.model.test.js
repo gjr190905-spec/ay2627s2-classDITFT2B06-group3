@@ -51,6 +51,12 @@ const orderRow = (overrides = {}) => ({
   preparingAt: null,
   readyAt: null,
   collectedAt: null,
+  cancelledAt: null,
+  customerId: null,
+  pickupWindowId: null,
+  collectionReference: null,
+  paymentStatus: null,
+  paymentMethod: null,
   ...overrides,
 });
 const itemRow = { orderId: 10, menuItemId: 7, name: 'Kopi', unitPriceCents: 150, quantity: 2 };
@@ -94,6 +100,29 @@ describe('Order.model - toOrder', () => {
         { menuItemId: 7, name: 'Kopi', unitPriceCents: 150, quantity: 2, lineTotalCents: 300 },
       ],
     });
+  });
+
+  // Valid partition: a checkout order carries its customer, window, reference and payment
+  test('should include the shared checkout fields and payment', () => {
+    const row = orderRow({
+      customerId: 5,
+      pickupWindowId: 9,
+      collectionReference: 'ORD-1',
+      paymentStatus: 'PAID',
+      paymentMethod: 'PAYNOW',
+    });
+    expect(toOrder(row, [])).toMatchObject({
+      customerId: 5,
+      pickupWindowId: 9,
+      collectionReference: 'ORD-1',
+      cancelledAt: null,
+      payment: { status: 'PAID', method: 'PAYNOW' },
+    });
+  });
+
+  // Valid partition: a manual order (no payment row) has no payment
+  test('should give an order without a payment row a null payment', () => {
+    expect(toOrder(orderRow({ paymentStatus: null }), []).payment).toBeNull();
   });
 
   // Boundary: ready exactly at the window end counts as on time; one second later is late
@@ -258,6 +287,8 @@ describe('Order.model - placeOrder', () => {
     clientAnswers({ rows: [{ isOpen: false }] }, { rows: [menuRow] });
     const result = await placeOrder(3, input);
     expect(result.problems[0].code).toBe('STALL_CLOSED');
+    // A deactivated stall reads as closed too
+    expect(clientSql()[1]).toContain('("isOpen" AND "isActive") AS "isOpen"');
   });
 
   // Error handling: the vendor's "orders at once" limit, read with the stall row locked
@@ -357,6 +388,27 @@ describe('Order.model - collectOrder', () => {
     expect(params).toEqual([10, 3, 1042]);
   });
 
+  // Valid partition: the same statement records the handover against the stall owner
+  test('should write the shared collection record in the same statement', async () => {
+    poolAnswers(
+      { rows: [{ id: 10 }] },
+      { rows: [orderRow({ status: 'COLLECTED' })] },
+      { rows: [] },
+    );
+    await collectOrder(3, 10, 1042);
+    const [sql] = pool.query.mock.calls[0];
+    expect(sql).toContain('INSERT INTO collections (order_id, collected_by)');
+    expect(sql).toContain('v."ownerUserId" IS NOT NULL');
+    expect(sql).toContain('ON CONFLICT (order_id) DO NOTHING');
+  });
+
+  // Error handling: a cancelled order can't be collected
+  test('should report a cancelled order as not ready', async () => {
+    const cancelled = orderRow({ status: 'CANCELLED', cancelledAt: T('11:30') });
+    poolAnswers({ rows: [] }, { rows: [cancelled] }, { rows: [] });
+    await expect(collectOrder(3, 10, 1042)).resolves.toEqual({ notReady: 'CANCELLED' });
+  });
+
   // Error handling: each reason the update matched nothing
   const ready = { preparingAt: T('11:50'), readyAt: T('11:58') };
   test.each([
@@ -378,11 +430,12 @@ describe('Order.model - collectOrder', () => {
 // ── getOrderStats ────────────────────────────────────────
 describe('Order.model - getOrderStats', () => {
   const totals = {
-    total: 5,
+    total: 6,
     confirmed: 1,
     preparing: 1,
     ready: 1,
     collected: 2,
+    cancelled: 1,
     collectedCents: 1000,
     toCollectCents: 300,
     onTime: 2,
@@ -409,7 +462,7 @@ describe('Order.model - getOrderStats', () => {
 
     expect(stats).toEqual({
       date: '2026-11-20',
-      counts: { total: 5, CONFIRMED: 1, PREPARING: 1, READY: 1, COLLECTED: 2 },
+      counts: { total: 6, CONFIRMED: 1, PREPARING: 1, READY: 1, COLLECTED: 2, CANCELLED: 1 },
       collectedCents: 1000,
       toCollectCents: 300,
       readyOnTime: { onTime: 2, late: 1, rate: 2 / 3 },
@@ -417,6 +470,22 @@ describe('Order.model - getOrderStats', () => {
       topItems: [{ name: 'Kopi', quantity: 4 }],
       last7Days: [{ date: '2026-11-20', orders: 5, collectedCents: 1000 }],
     });
+  });
+
+  // Valid partition: cancelled orders are counted, but left out of the demand charts
+  test('should leave cancelled orders out of the window, item and week charts', async () => {
+    answerStats();
+    await getOrderStats(3, null);
+    const sql = pool.query.mock.calls.map(([q]) => q);
+    const chartSql = sql.filter(
+      (q) =>
+        q.includes('GROUP BY 1, 2') ||
+        q.includes('SUM(i."quantity")') ||
+        q.includes('generate_series'),
+    );
+    expect(chartSql).toHaveLength(3);
+    chartSql.forEach((q) => expect(q).toContain(`o."status" <> 'CANCELLED'`));
+    expect(sql.find((q) => q.includes('COUNT(*) FILTER'))).not.toContain(`<> 'CANCELLED'`);
   });
 
   // Boundary: nothing ready yet → rate is null (not 0% and not a division by zero)

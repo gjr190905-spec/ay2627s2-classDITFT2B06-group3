@@ -1,6 +1,7 @@
 const request = require('supertest');
 const app = require('../../src/app');
 const pool = require('../../src/models/db');
+const { deleteVendors } = require('../helpers/cleanup');
 
 // ── DB Setup / Teardown ──────────────────────────────────
 // Tables come from the Jest globalSetup (configs/jest-integration-setup.js).
@@ -41,7 +42,7 @@ async function insertItem(vid, name, priceCents, quantityLeft, isSoldOut) {
 }
 
 beforeEach(async () => {
-  await pool.query('DELETE FROM "Vendor" WHERE "email" = ANY($1)', [EMAILS]);
+  await deleteVendors(pool, 'v."email" = ANY($1)', [EMAILS]);
   vendorId = await insertVendor(EMAILS[0], 'Menu Test Laksa', true);
   otherVendorId = await insertVendor(EMAILS[1], 'Menu Test Kopi', false);
   laksaId = await insertItem(vendorId, 'Curry Laksa', 550, null, false);
@@ -50,7 +51,7 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-  await pool.query('DELETE FROM "Vendor" WHERE "email" = ANY($1)', [EMAILS]);
+  await deleteVendors(pool, 'v."email" = ANY($1)', [EMAILS]);
   await pool.end();
 });
 
@@ -75,6 +76,7 @@ describe('GET /vendors/:vendorId/menu', () => {
     expect(res.headers['cache-control']).toBe('no-store');
     expect(res.body.vendor).toEqual({
       id: vendorId,
+      isActive: true,
       stallName: 'Menu Test Laksa',
       logoUrl: null,
       isOpen: true,
@@ -473,6 +475,16 @@ describe('Menu banner routes', () => {
 // POST /vendors/:vendorId/menu/checkout-check
 // ─────────────────────────────────────────────────────────
 describe('POST /vendors/:vendorId/menu/checkout-check', () => {
+  // Invalid partition: a stall an admin has deactivated is treated as closed
+  test('should refuse the basket while the stall is deactivated', async () => {
+    await pool.query('UPDATE "Vendor" SET "isActive" = FALSE WHERE "id" = $1', [vendorId]);
+    const res = await request(app)
+      .post(`/vendors/${vendorId}/menu/checkout-check`)
+      .send({ items: [{ itemId: laksaId, quantity: 1 }] });
+    expect(res.status).toBe(409);
+    expect(res.body.problems.map((p) => p.code)).toContain('STALL_CLOSED');
+  });
+
   const check = (body, vid = vendorId) =>
     request(app)
       .post(`${base(vid)}/checkout-check`)
@@ -586,7 +598,7 @@ describe('MenuItem table rules', () => {
 
   // Deleting a vendor removes their menu
   test('should delete the menu when the vendor is deleted', async () => {
-    await pool.query('DELETE FROM "Vendor" WHERE "id" = $1', [vendorId]);
+    await deleteVendors(pool, 'v."id" = $1', [vendorId]);
     const { rows } = await pool.query('SELECT 1 FROM "MenuItem" WHERE "vendorId" = $1', [vendorId]);
     expect(rows).toHaveLength(0);
   });

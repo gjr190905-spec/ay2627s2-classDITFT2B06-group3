@@ -121,6 +121,7 @@ describe('Menu.model - getMenu', () => {
     stallName: 'Mdm Lim Laksa',
     logoUrl: null,
     isOpen: true,
+    isActive: true,
     bannerUpdatedAt: null,
   };
 
@@ -131,7 +132,7 @@ describe('Menu.model - getMenu', () => {
     const menu = await getMenu(2);
 
     expect(menu).toEqual({
-      vendor: { id: 2, stallName: 'Mdm Lim Laksa', logoUrl: null, isOpen: true },
+      vendor: { id: 2, stallName: 'Mdm Lim Laksa', logoUrl: null, isOpen: true, isActive: true },
       bannerUrl: null,
       items: [toMenuItem(row)],
     });
@@ -462,6 +463,14 @@ describe('Menu.model - checkCheckoutItems', () => {
     pool.query.mockResolvedValueOnce({ rows: [{ isOpen }] }).mockResolvedValueOnce({ rows });
     loadOrderingRules.mockResolvedValueOnce(rules);
   }
+
+  // Valid partition: a stall an admin deactivated counts as closed
+  test('should read the stall as open only when it is also active', async () => {
+    answer(false);
+    const result = await checkCheckoutItems(2, [{ itemId: 1, quantity: 1 }]);
+    expect(pool.query.mock.calls[0][0]).toContain('("isOpen" AND "isActive") AS "isOpen"');
+    expect(result.problems[0].code).toBe('STALL_CLOSED');
+  });
 
   // Boundary: at the vendor's order limit the basket is refused; one below is fine
   test.each([

@@ -77,7 +77,8 @@ async function withTransaction(fn) {
  */
 module.exports.getMenu = async function getMenu(vendorId) {
   const vendorResult = await pool.query(
-    `SELECT v."id", v."stallName", v."logoUrl", v."isOpen", b."updatedAt" AS "bannerUpdatedAt"
+    `SELECT v."id", v."stallName", v."logoUrl", v."isOpen", v."isActive",
+            b."updatedAt" AS "bannerUpdatedAt"
      FROM "Vendor" v
      LEFT JOIN "MenuBanner" b ON b."vendorId" = v."id"
      WHERE v."id" = $1`,
@@ -96,7 +97,13 @@ module.exports.getMenu = async function getMenu(vendorId) {
   );
 
   return {
-    vendor: { id: row.id, stallName: row.stallName, logoUrl: row.logoUrl, isOpen: row.isOpen },
+    vendor: {
+      id: row.id,
+      stallName: row.stallName,
+      logoUrl: row.logoUrl,
+      isOpen: row.isOpen,
+      isActive: row.isActive,
+    },
     bannerUrl: row.bannerUpdatedAt ? bannerUrlFor(row.id, row.bannerUpdatedAt.getTime()) : null,
     items: itemsResult.rows.map(toMenuItem),
   };
@@ -128,6 +135,9 @@ module.exports.getMenuItem = async function getMenuItem(vendorId, itemId) {
  *          the new item, undefined if the vendor does not exist,
  *          or null if the vendor already has an item with that name
  */
+// The shared schema also has "stallId" and "isAvailable" on "MenuItem" (the customer
+// branch's spellings). The "MenuItem_sync_aliases" trigger fills them from "vendorId" and
+// "isSoldOut"/"deletedAt", so this model only writes the vendor spellings.
 module.exports.createMenuItem = async function createMenuItem(vendorId, fields) {
   const { name, description, priceCents, quantityLeft } = fields;
   try {
@@ -404,7 +414,12 @@ module.exports.getMenuBanner = async function getMenuBanner(vendorId) {
  *          undefined if the vendor does not exist
  */
 module.exports.checkCheckoutItems = async function checkCheckoutItems(vendorId, lines) {
-  const vendor = await pool.query('SELECT "isOpen" FROM "Vendor" WHERE "id" = $1', [vendorId]);
+  // A stall an admin has deactivated takes no orders, the same as a closed one
+  // (the shared checkout path in schema.sql checks "isActive" AND "isOpen" too).
+  const vendor = await pool.query(
+    'SELECT ("isOpen" AND "isActive") AS "isOpen" FROM "Vendor" WHERE "id" = $1',
+    [vendorId],
+  );
   if (vendor.rows.length === 0) return undefined;
 
   const ids = lines.map((line) => line.itemId);

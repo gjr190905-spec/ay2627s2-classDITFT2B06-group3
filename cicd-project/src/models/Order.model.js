@@ -10,21 +10,33 @@ const TIME_ZONE = 'Asia/Singapore';
 const PREVIOUS_STATUS = { PREPARING: 'CONFIRMED', READY: 'PREPARING' };
 const STEP_TIMESTAMP = { PREPARING: 'preparingAt', READY: 'readyAt' };
 
+// "o" is "Order", "p" is the shared "payments" table (one row per checkout order that was
+// paid, or is being paid, online). Manual orders have no customer, window or payment row.
 const ORDER_COLUMNS = `
-  o."id", o."vendorId", o."orderNumber", o."customerName", o."status",
+  o."id", o."vendorId", o."orderNumber", o."customerId", o."pickupWindowId",
+  o."collectionReference", o."customerName", o."status",
   o."pickupWindowStart", o."pickupWindowEnd", o."totalCents", o."createdAt",
-  o."preparingAt", o."readyAt", o."collectedAt"`;
+  o."preparingAt", o."readyAt", o."collectedAt", o."cancelledAt",
+  p.payment_status AS "paymentStatus", p.payment_method AS "paymentMethod"`;
+
+// Orders that count towards the figures on the dashboard charts
+const NOT_CANCELLED = `o."status" <> 'CANCELLED'`;
 
 /**
  * Turn an order row and its item rows into the shape the API sends.
  * "readyOnTime" answers "was it ready by the end of the booked window?"
  * (null until the order has been marked Ready).
+ * "payment" is the online payment for a checkout order, or null when the student pays at
+ * the stall (manual orders, or checkout orders without a payment record).
  */
 function toOrder(row, itemRows) {
   return {
     id: row.id,
     vendorId: row.vendorId,
     orderNumber: row.orderNumber,
+    customerId: row.customerId,
+    pickupWindowId: row.pickupWindowId,
+    collectionReference: row.collectionReference,
     customerName: row.customerName,
     status: row.status,
     pickupWindowStart: row.pickupWindowStart,
@@ -41,6 +53,8 @@ function toOrder(row, itemRows) {
     preparingAt: row.preparingAt,
     readyAt: row.readyAt,
     collectedAt: row.collectedAt,
+    cancelledAt: row.cancelledAt,
+    payment: row.paymentStatus ? { status: row.paymentStatus, method: row.paymentMethod } : null,
     readyOnTime: row.readyAt ? row.readyAt.getTime() <= row.pickupWindowEnd.getTime() : null,
   };
 }
@@ -81,6 +95,7 @@ async function loadOrders(db, whereSql, params) {
   const { rows } = await db.query(
     `SELECT ${ORDER_COLUMNS}
      FROM "Order" o
+     LEFT JOIN payments p ON p.order_id = o."id"
      WHERE ${whereSql}
      ORDER BY o."pickupWindowStart", o."pickupWindowEnd", o."orderNumber"`,
     params,
@@ -169,7 +184,12 @@ module.exports.getOrderByNumber = async function getOrderByNumber(vendorId, orde
 // ── Placing an order ─────────────────────────────────────
 
 /**
- * Place a pickup order. Runs the same basket rules as checkout validation, but with the
+ * Place a manual pickup order (the vendor demo / walk-up path). Students' real orders come
+ * through the shared checkout path in schema.sql, which books a pickup window and records a
+ * payment; a manual order has no customer account, pickup window or payment row, which the
+ * shared schema allows.
+ *
+ * Runs the same basket rules as checkout validation, but with the
  * stall and item rows locked, then reduces "quantityLeft" (selling out at 0), gives the
  * order the stall's next number and saves it – all in one transaction, so two students
  * can't both buy the last one.
@@ -185,9 +205,10 @@ module.exports.placeOrder = async function placeOrder(vendorId, input) {
     await client.query('BEGIN');
 
     // Locking the stall row also makes order numbers safe to hand out one by one
-    const vendor = await client.query('SELECT "isOpen" FROM "Vendor" WHERE "id" = $1 FOR UPDATE', [
-      vendorId,
-    ]);
+    const vendor = await client.query(
+      'SELECT ("isOpen" AND "isActive") AS "isOpen" FROM "Vendor" WHERE "id" = $1 FOR UPDATE',
+      [vendorId],
+    );
     if (vendor.rows.length === 0) {
       await client.query('ROLLBACK');
       return undefined;
@@ -318,16 +339,29 @@ module.exports.advanceOrder = async function advanceOrder(vendorId, orderId, nex
  * Mark a Ready order Collected, after the vendor has checked the order number, taken
  * payment and handed over the food. Only a READY order of this stall whose number
  * matches can be collected. The collection time is recorded once: a second attempt
- * changes nothing (and the "Order_collected_is_final" trigger backs this up).
+ * changes nothing (and the "Order_enforce_status_transition" trigger backs this up).
+ *
+ * The same statement writes the handover to the shared "collections" table, recorded
+ * against the stall owner's account ("Vendor"."ownerUserId"). Stalls without an owner
+ * account (the demo stalls) have nobody to record it against, so only "Order" changes.
  *
  * @param {number} orderNumber  the number the vendor checked against the student's
  * @returns {Promise<{order}|{alreadyCollected: object}|{notReady: string}|{numberMismatch: number}|undefined>}
  */
 module.exports.collectOrder = async function collectOrder(vendorId, orderId, orderNumber) {
   const updated = await pool.query(
-    `UPDATE "Order" SET "status" = 'COLLECTED', "collectedAt" = NOW()
-     WHERE "id" = $1 AND "vendorId" = $2 AND "status" = 'READY' AND "orderNumber" = $3
-     RETURNING "id"`,
+    `WITH done AS (
+       UPDATE "Order" SET "status" = 'COLLECTED', "collectedAt" = NOW()
+       WHERE "id" = $1 AND "vendorId" = $2 AND "status" = 'READY' AND "orderNumber" = $3
+       RETURNING "id", "vendorId"
+     ), handover AS (
+       INSERT INTO collections (order_id, collected_by)
+       SELECT done."id", v."ownerUserId"
+       FROM done JOIN "Vendor" v ON v."id" = done."vendorId"
+       WHERE v."ownerUserId" IS NOT NULL
+       ON CONFLICT (order_id) DO NOTHING
+     )
+     SELECT "id" FROM done`,
     [orderId, vendorId, orderNumber],
   );
   if (updated.rows.length > 0) return { order: await loadOrder(pool, vendorId, orderId) };
@@ -343,6 +377,9 @@ module.exports.collectOrder = async function collectOrder(vendorId, orderId, ord
 
 /**
  * The figures behind the dashboard charts, for one day (Singapore time).
+ * counts.total includes cancelled orders (it is the sum of the status counts); the
+ * pickup-window, top-item and last-7-days charts leave cancelled orders out.
+ * toCollectCents is the money still to take at the counter: Ready orders not paid online.
  *
  * @returns {Promise<object|undefined>} undefined if the vendor does not exist
  */
@@ -359,23 +396,28 @@ module.exports.getOrderStats = async function getOrderStats(vendorId, date) {
          COUNT(*) FILTER (WHERE o."status" = 'PREPARING')::int AS "preparing",
          COUNT(*) FILTER (WHERE o."status" = 'READY')::int AS "ready",
          COUNT(*) FILTER (WHERE o."status" = 'COLLECTED')::int AS "collected",
+         COUNT(*) FILTER (WHERE o."status" = 'CANCELLED')::int AS "cancelled",
          COALESCE(SUM(o."totalCents") FILTER (WHERE o."status" = 'COLLECTED'), 0)::int AS "collectedCents",
-         COALESCE(SUM(o."totalCents") FILTER (WHERE o."status" = 'READY'), 0)::int AS "toCollectCents",
+         COALESCE(SUM(o."totalCents") FILTER (
+           WHERE o."status" = 'READY' AND p.payment_status IS DISTINCT FROM 'PAID'
+         ), 0)::int AS "toCollectCents",
          COUNT(*) FILTER (WHERE o."readyAt" <= o."pickupWindowEnd")::int AS "onTime",
          COUNT(*) FILTER (WHERE o."readyAt" > o."pickupWindowEnd")::int AS "late"
-       FROM "Order" o WHERE ${ON_DAY}`,
+       FROM "Order" o
+       LEFT JOIN payments p ON p.order_id = o."id"
+       WHERE ${ON_DAY}`,
       params,
     ),
     pool.query(
       `SELECT o."pickupWindowStart" AS "start", o."pickupWindowEnd" AS "end", COUNT(*)::int AS "orders"
-       FROM "Order" o WHERE ${ON_DAY}
+       FROM "Order" o WHERE ${ON_DAY} AND ${NOT_CANCELLED}
        GROUP BY 1, 2 ORDER BY 1, 2`,
       params,
     ),
     pool.query(
       `SELECT i."name", SUM(i."quantity")::int AS "quantity"
        FROM "OrderItem" i JOIN "Order" o ON o."id" = i."orderId"
-       WHERE ${ON_DAY}
+       WHERE ${ON_DAY} AND ${NOT_CANCELLED}
        GROUP BY i."name" ORDER BY 2 DESC, 1 LIMIT 5`,
       params,
     ),
@@ -387,6 +429,7 @@ module.exports.getOrderStats = async function getOrderStats(vendorId, date) {
        LEFT JOIN "Order" o
          ON o."vendorId" = $1
         AND (o."pickupWindowStart" AT TIME ZONE '${TIME_ZONE}')::date = d.day::date
+        AND ${NOT_CANCELLED}
        GROUP BY d.day ORDER BY d.day`,
       params,
     ),
@@ -402,6 +445,7 @@ module.exports.getOrderStats = async function getOrderStats(vendorId, date) {
       PREPARING: t.preparing,
       READY: t.ready,
       COLLECTED: t.collected,
+      CANCELLED: t.cancelled,
     },
     collectedCents: t.collectedCents,
     toCollectCents: t.toCollectCents,

@@ -2,7 +2,7 @@
    Vendor dashboard
    - Today's figures: stat tiles and charts (/orders/stats)
    - Preparation board: orders grouped by pickup window, earliest first
-     (Confirmed → Preparing → Ready)
+     (Confirmed → Preparing → Ready; students can cancel before Ready)
    - Handover: find a ready order by number (or open it from the board),
      check the number, take payment, hand over, mark Collected
    Charts follow the data-viz rules: thin columns from one baseline, hairline
@@ -14,14 +14,15 @@ const SESSION_KEY = 'vendorId';
 const TIME_ZONE = 'Asia/Singapore';
 const REFRESH_MS = 20000;
 
-// Status colours: categorical slots 1–4 (validated as a set, see README).
-// Status is never shown by colour alone – there is always a text label.
-const STATUSES = ['CONFIRMED', 'PREPARING', 'READY', 'COLLECTED'];
+// Status colours: categorical slots 1–4 (validated as a set, see README), plus a neutral
+// grey for Cancelled. Status is never shown by colour alone – there is always a text label.
+const STATUSES = ['CONFIRMED', 'PREPARING', 'READY', 'COLLECTED', 'CANCELLED'];
 const STATUS_LABEL = {
   CONFIRMED: 'Confirmed',
   PREPARING: 'Preparing',
   READY: 'Ready',
   COLLECTED: 'Collected',
+  CANCELLED: 'Cancelled',
 };
 
 // Which statuses each board filter shows
@@ -159,6 +160,11 @@ function showToast(message, { error = false } = {}) {
   el.toast.classList.toggle('is-error', error);
   el.toast.classList.add('is-visible');
   toastTimer = setTimeout(() => el.toast.classList.remove('is-visible'), 3200);
+}
+
+/** True when the student has already paid for this order online (shared "payments" table). */
+function isPaidOnline(order) {
+  return Boolean(order.payment && order.payment.status === 'PAID');
 }
 
 /** A status pill: colour dot + text label (never colour alone). */
@@ -383,7 +389,8 @@ function renderTopItems(container, items) {
 function renderStats(stats) {
   const c = stats.counts;
   el.tileOrders.textContent = String(c.total);
-  el.tileOrdersNote.textContent = `${stats.byWindow.length} pickup windows`;
+  const cancelled = c.CANCELLED ? ` · ${c.CANCELLED} cancelled` : '';
+  el.tileOrdersNote.textContent = `${stats.byWindow.length} pickup windows${cancelled}`;
   el.tilePrepare.textContent = String(c.CONFIRMED + c.PREPARING);
   el.tilePrepareNote.textContent = `${c.CONFIRMED} confirmed · ${c.PREPARING} preparing`;
   el.tileReady.textContent = String(c.READY);
@@ -469,10 +476,11 @@ function orderActions(order) {
     button.type = 'button';
     button.dataset.action = 'open';
     button.setAttribute('aria-label', `Details of order ${order.orderNumber}`);
-    wrap.append(
-      button,
-      make('span', 'db-order__done', `Collected ${formatTime(order.collectedAt)}`),
-    );
+    const done =
+      order.status === 'CANCELLED'
+        ? `Cancelled ${formatTime(order.cancelledAt)}`
+        : `Collected ${formatTime(order.collectedAt)}`;
+    wrap.append(button, make('span', 'db-order__done', done));
   }
   return wrap;
 }
@@ -501,6 +509,7 @@ function orderCard(order) {
 
   const foot = make('div', 'db-order__foot');
   foot.append(make('span', 'db-order__total', formatMoney(order.totalCents)));
+  if (isPaidOnline(order)) foot.append(make('span', 'db-order__paid', 'Paid online'));
   const readiness = readinessText(order);
   if (readiness) {
     const note = make('span', `db-order__ready${order.readyOnTime ? '' : ' is-late'}`, readiness);
@@ -630,7 +639,8 @@ function renderHandover() {
   el.handoverHeading.textContent = `Order #${order.orderNumber}`;
   statusPill(order.status, el.handoverStatus);
   const who = order.customerName ? ` · ${order.customerName}` : '';
-  el.handoverMeta.textContent = `Pickup ${formatWindow(order.pickupWindowStart, order.pickupWindowEnd)}${who}`;
+  const ref = order.collectionReference ? ` · Ref ${order.collectionReference}` : '';
+  el.handoverMeta.textContent = `Pickup ${formatWindow(order.pickupWindowStart, order.pickupWindowEnd)}${who}${ref}`;
 
   el.handoverItems.replaceChildren(
     ...order.items.map((item) => {
@@ -644,13 +654,21 @@ function renderHandover() {
     }),
   );
   el.handoverAmount.textContent = formatMoney(order.totalCents);
+  const paidOnline = isPaidOnline(order);
+  el.handoverAmountLabel.textContent = paidOnline ? 'Paid online' : 'Amount to collect';
 
   const ready = order.status === 'READY';
   el.collectForm.hidden = !ready;
   el.handoverCloseRow.hidden = ready;
   el.handoverState.hidden = ready;
   if (ready) {
-    el.collectPaidLabel.textContent = `I've taken payment of ${formatMoney(order.totalCents)}`;
+    // Paid online: nothing to take at the counter, so the payment check is already done
+    el.collectPaidLabel.textContent = paidOnline
+      ? `Paid online (${formatMoney(order.totalCents)}), nothing to take`
+      : `I've taken payment of ${formatMoney(order.totalCents)}`;
+    el.collectPaid.checked = paidOnline;
+  } else if (order.status === 'CANCELLED') {
+    el.handoverState.textContent = `Cancelled at ${formatTime(order.cancelledAt)}. Don't hand this order over.`;
   } else if (order.status === 'COLLECTED') {
     el.handoverState.textContent = `Collected at ${formatTime(order.collectedAt)}. This order is closed.`;
   } else {
@@ -797,6 +815,7 @@ function cacheElements() {
     handoverMeta: byId('handoverMeta'),
     handoverItems: byId('handoverItems'),
     handoverAmount: byId('handoverAmount'),
+    handoverAmountLabel: byId('handoverAmountLabel'),
     handoverState: byId('handoverState'),
     handoverCloseRow: byId('handoverCloseRow'),
     collectForm: byId('collectForm'),

@@ -54,7 +54,8 @@ This project demonstrates a CRUD web application with a complete CI/CD workflow.
 │   └── cd.yml                  # CD pipeline (deployment placeholder)
 ├── __tests__/
 │   ├── unit/                   # Jest unit tests
-│   └── integration/            # Jest + Supertest integration tests
+│   ├── integration/            # Jest + Supertest integration tests
+│   └── helpers/cleanup.js      # Deletes test vendors/persons with their kept order history
 ├── configs/
 │   ├── eslint.config.mjs       # ESLint config
 │   ├── jest-integration-setup.js
@@ -107,7 +108,7 @@ This project demonstrates a CRUD web application with a complete CI/CD workflow.
 │       ├── fonts/              # Patrick Hand + Montserrat (OFL licences included)
 │       └── images/vendors/     # Sample vendor logos used by the seed data
 ├── e2e-tests/                  # Playwright E2E test specs
-├── schema.sql                  # Database schema (single source of truth)
+├── schema.sql                  # Shared branch schema from the Gitmaster (do not edit here)
 ├── package.json
 └── README.md
 ```
@@ -160,9 +161,16 @@ PORT=3001
 npm run migration:reset
 ```
 
-This reads `schema.sql` and creates the `Person`, `Something`, `Vendor`, `VendorLogo`, `StoreClosure`,
-`MenuItem`, `MenuItemImage`, `MenuBanner`, `Order`, `OrderItem`, `VendorSettings` and
-`VendorNotification` tables.
+This **drops and recreates the `public` schema**, then runs `schema.sql`: the shared branch schema
+from the Gitmaster, which is written for a fresh database. Only point `DATABASE_URL` at your own
+dev/test databases. `schema.sql` is kept exactly as the Gitmaster gave it; changes to it go through
+the Gitmaster, not this branch.
+
+Besides the vendor tables (`Vendor`, `VendorLogo`, `StoreClosure`, `MenuItem`, `MenuItemImage`,
+`MenuBanner`, `Order`, `OrderItem`, `VendorSettings`, `VendorNotification`) it creates the shared
+ones the other branches use (`FoodCourt`, `PersonCredential`, `Cart`, `CartItem`, `PickupWindow`,
+`payments`, `collections`) and the customer branch's views (`users`, `stalls`, `menu_items`,
+`pickup_windows`, `orders`, `order_items`). See [Shared schema notes](#shared-schema-notes).
 
 ### 5. Seed sample data (optional)
 
@@ -170,9 +178,13 @@ This reads `schema.sql` and creates the `Person`, `Something`, `Vendor`, `Vendor
 npm run seed
 ```
 
-Inserts 20 sample persons, 2 sample somethings and 4 sample vendors, each with a starter menu
-and sample orders: today's windows around the time you run it (in every status) plus 6 days of
-collected orders for the sales chart.
+Inserts 20 sample customers, 2 sample somethings, one food court and 4 sample vendors (each with an
+owner account in `Person`, role `vendor`), each with a starter menu and sample orders. Today's
+orders, in windows around the time you run it, are seeded the way the shared checkout makes them:
+a customer, a booked `PickupWindow`, a collection reference and a `payments` row (mostly paid
+online, some pending, cancelled ones refunded), in every status including Cancelled. The previous
+6 days are collected manual orders for the sales chart. Passwords are not seeded: accounts and
+hashes come from the role-access account model.
 
 ### 6. Start the server
 
@@ -218,14 +230,14 @@ The app runs at `http://localhost:3000` by default.
 
 ### Vendors (vendor home and profile pages)
 
-| Method  | Endpoint                   | Description                                        | Status Codes       |
-| ------- | -------------------------- | -------------------------------------------------- | ------------------ |
-| `GET`   | `/vendors/closure-reasons` | Reasons offered when a vendor closes their stall   | 200                |
-| `GET`   | `/vendors/:id`             | Stall name, logo, and open/closed status           | 200, 400, 404      |
-| `PATCH` | `/vendors/:id/status`      | Open or close the stall (closing needs a `reason`) | 200, 400, 404, 409 |
-| `PATCH` | `/vendors/:id/profile`     | Change the shop name (must be unique)              | 200, 400, 404, 409 |
-| `PUT`   | `/vendors/:id/logo`        | Replace the profile picture (PNG, JPEG or WebP)    | 200, 400, 404      |
-| `GET`   | `/vendors/:id/logo`        | The stored profile picture itself                  | 200, 400, 404      |
+| Method  | Endpoint                   | Description                                                                  | Status Codes       |
+| ------- | -------------------------- | ---------------------------------------------------------------------------- | ------------------ |
+| `GET`   | `/vendors/closure-reasons` | Reasons offered when a vendor closes their stall                             | 200                |
+| `GET`   | `/vendors/:id`             | Stall name, logo, open/closed and active status, food court, pickup location | 200, 400, 404      |
+| `PATCH` | `/vendors/:id/status`      | Open or close the stall (closing needs a `reason`)                           | 200, 400, 404, 409 |
+| `PATCH` | `/vendors/:id/profile`     | Change the shop name (must be unique)                                        | 200, 400, 404, 409 |
+| `PUT`   | `/vendors/:id/logo`        | Replace the profile picture (PNG, JPEG or WebP)                              | 200, 400, 404      |
+| `GET`   | `/vendors/:id/logo`        | The stored profile picture itself                                            | 200, 400, 404      |
 
 `PATCH /vendors/:id/status` body:
 
@@ -235,7 +247,8 @@ The app runs at `http://localhost:3000` by default.
 { "isOpen": false, "reason": "OTHER", "otherReason": "Gas ran out" } // close with typed reason (1–255 chars)
 ```
 
-Each close is recorded in the `StoreClosure` table. `409` means the stall is already in the requested state.
+Each close is recorded in the `StoreClosure` table. `409` means the stall is already in the requested state,
+or that an admin has deactivated the stall (`isActive = false`), which can't be opened (it can still be closed).
 
 `PUT /vendors/:id/logo` body is `{ "image": "data:image/jpeg;base64,..." }` (max 1 MB). The picture is
 stored in the database (`VendorLogo` table, one row per vendor), not as a file in the project.
@@ -325,19 +338,49 @@ Order rules:
 
 - Statuses go **Confirmed → Preparing → Ready → Collected**, one step at a time. Skipping a step,
   going back, or repeating a step gives `409` (one conditional `UPDATE`, so double clicks are safe).
+- Students can cancel an order before it is Ready (the customer branch does this through the shared
+  `Order` table). A **Cancelled** order shows on the board under "All", can't be moved on or
+  collected (`409`), and is counted in `counts.CANCELLED` but left out of the pickup-window,
+  top-item and last-7-days charts.
 - `preparingAt`, `readyAt` and `collectedAt` are recorded at each step. Every order carries
   `readyOnTime` (`readyAt <= pickupWindowEnd`), and `/stats` reports the on-time rate.
 - Collection needs a **Ready** order of this stall **and** the matching order number, plus
   `paymentReceived` and `foodHandedOver` set to `true`. A second collection gives `409` and changes
-  nothing; the database trigger `Order_collected_is_final` refuses any change to a collected order.
+  nothing; the database trigger `Order_enforce_status_transition` refuses any change to a collected
+  or cancelled order. Collecting also writes the shared `collections` row, recorded against the
+  stall owner (`Vendor.ownerUserId`); stalls without an owner account only update `Order`.
+- `POST /` places a **manual** order (vendor demo / walk-up): no customer account, pickup window or
+  payment row, which the shared schema allows. Students' real orders come through the customer
+  branch's checkout (the `orders` / `order_items` views), and show on the dashboard the same way.
 - Placing an order locks the stall and item rows, applies the same rules as checkout validation,
   reduces `quantityLeft` (selling out at 0) and assigns the stall's next number (1001, 1002…),
   all in one transaction. Item names and prices are copied into `OrderItem`.
-- `totalCents` is the amount to collect at the stall (students pay on pickup).
+- Every order carries `customerId`, `pickupWindowId`, `collectionReference` (null for manual orders),
+  `cancelledAt`, and `payment` (`{ status, method }` from the shared `payments` table, or null).
+  When `payment.status` is `PAID`, there is nothing to take at the counter: the handover dialog says
+  "Paid online" and ticks the payment check, and `/stats` leaves it out of `toCollectCents`.
+- A stall an admin has deactivated is treated as closed (`STALL_CLOSED`), the same as the shared
+  checkout path.
 
 Page: `/vendor/dashboard.html` (the Dashboard tile on the home page). It shows today's tiles and
 charts, the preparation board grouped by pickup window, and a handover dialog that opens from a
 Ready order or from "Find an order". It refreshes every 20 seconds.
+
+### Shared schema notes
+
+How this vendor branch uses the shared schema (`schema.sql`):
+
+- `Vendor.id` is the stall id used in every vendor route; the owner's account is `Vendor.ownerUserId`
+  in `Person`. Stalls created without a food court go into the schema's placeholder
+  "Vendor Demo" food court (trigger `Vendor_default_foodCourt`).
+- `MenuItem` has both spellings: this branch writes `vendorId` / `isSoldOut`, and the
+  `MenuItem_sync_aliases` trigger keeps the customer branch's `stallId` / `isAvailable` in step.
+- Orders are history: `Order` rows block deleting their vendor or customer. Integration tests use
+  `__tests__/helpers/cleanup.js` to delete their own rows in the right order.
+- The customer checkout path (`orders` / `order_items` views) does **not** create
+  `VendorNotification` rows or check the vendor's "orders at once" limit. Only manual orders placed
+  through `POST /vendors/:vendorId/orders` do. Closing that gap needs a change to `schema.sql`, so it
+  is raised with the Gitmaster rather than patched here.
 
 ### Settings and notifications
 

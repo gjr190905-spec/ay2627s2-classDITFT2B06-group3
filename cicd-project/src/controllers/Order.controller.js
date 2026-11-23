@@ -23,6 +23,7 @@ const STATUS_LABEL = {
   PREPARING: 'Preparing',
   READY: 'Ready',
   COLLECTED: 'Collected',
+  CANCELLED: 'Cancelled',
 };
 
 // ── Validators ───────────────────────────────────────────

@@ -267,6 +267,21 @@ describe('Vendor.controller - updateVendorStatus', () => {
     expect(err.message).toBe(`Stall is already ${word}`);
   });
 
+  // Invalid partition: an admin has deactivated the stall
+  test('should pass a 409 error when the stall is deactivated', async () => {
+    model.setVendorOpenStatus.mockResolvedValue({ inactive: true, vendor });
+
+    const { res, next } = await run(updateVendorStatus, {
+      params: { id: '1' },
+      body: { isOpen: true },
+    });
+
+    const err = next.mock.calls[0][0];
+    expect(err.status).toBe(409);
+    expect(err.message).toMatch(/deactivated/);
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
   // Error handling: model errors go to the error handler
   test('should pass model errors to next', async () => {
     const err = new Error('db down');

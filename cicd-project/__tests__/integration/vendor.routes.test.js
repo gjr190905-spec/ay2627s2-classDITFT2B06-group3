@@ -3,6 +3,7 @@ const path = require('path');
 const request = require('supertest');
 const app = require('../../src/app');
 const pool = require('../../src/models/db');
+const { deleteVendors } = require('../helpers/cleanup');
 
 // ── DB Setup / Teardown ──────────────────────────────────
 // Tables are created via the Jest globalSetup (configs/jest-integration-setup.js).
@@ -12,7 +13,7 @@ let vendorId;
 
 beforeEach(async () => {
   await pool.query('DELETE FROM "StoreClosure"');
-  await pool.query('DELETE FROM "Vendor"');
+  await deleteVendors(pool, 'TRUE');
   const { rows } = await pool.query(
     `INSERT INTO "Vendor" ("email", "stallName", "logoUrl", "isOpen")
      VALUES ('test@makanliao.sg', 'Test Stall', '/images/vendors/test.svg', TRUE)
@@ -23,7 +24,7 @@ beforeEach(async () => {
 
 afterAll(async () => {
   await pool.query('DELETE FROM "StoreClosure"');
-  await pool.query('DELETE FROM "Vendor"');
+  await deleteVendors(pool, 'TRUE');
   await pool.end();
 });
 
@@ -73,6 +74,20 @@ describe('GET /vendors/:id', () => {
     expect(res.body).not.toHaveProperty('email');
   });
 
+  // Valid partition: the shared-schema stall details customers see while browsing
+  test('should include the food court, pickup location and active flag', async () => {
+    const res = await request(app).get(`/vendors/${vendorId}`);
+
+    expect(res.body).toMatchObject({
+      isActive: true,
+      pickupLocation: 'Stall counter',
+      description: null,
+      foodCourtId: expect.any(Number),
+      // Stalls created without a food court go into the schema's placeholder one
+      foodCourtName: 'Vendor Demo',
+    });
+  });
+
   // Boundary: non-existent id
   test('should return 404 for a non-existing id (boundary)', async () => {
     const res = await request(app).get('/vendors/999999');
@@ -94,6 +109,27 @@ describe('GET /vendors/:id', () => {
 // PATCH /vendors/:id/status
 // ─────────────────────────────────────────────────────────
 describe('PATCH /vendors/:id/status', () => {
+  // Invalid partition: an admin has deactivated the stall, so it can't be opened
+  test('should refuse to open a deactivated stall', async () => {
+    await pool.query('UPDATE "Vendor" SET "isOpen" = FALSE, "isActive" = FALSE WHERE "id" = $1', [
+      vendorId,
+    ]);
+
+    const res = await patchStatus(vendorId, { isOpen: true });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatch(/deactivated/);
+    const getRes = await request(app).get(`/vendors/${vendorId}`);
+    expect(getRes.body.isOpen).toBe(false);
+  });
+
+  // Valid partition: a deactivated stall can still be closed
+  test('should still close a deactivated stall', async () => {
+    await pool.query('UPDATE "Vendor" SET "isActive" = FALSE WHERE "id" = $1', [vendorId]);
+    const res = await patchStatus(vendorId, { isOpen: false, reason: 'END_OF_DAY' });
+    expect(res.status).toBe(200);
+  });
+
   // Valid partition: close with a listed reason → status persisted + closure logged
   test('should close the stall and record the reason', async () => {
     const res = await patchStatus(vendorId, { isOpen: false, reason: 'SOLD_OUT' });
@@ -352,7 +388,7 @@ describe('GET /vendors/:id/logo', () => {
   test('should delete the picture when the vendor is deleted', async () => {
     await putLogo(vendorId, PNG_1PX);
 
-    await pool.query('DELETE FROM "Vendor" WHERE "id" = $1', [vendorId]);
+    await deleteVendors(pool, 'v."id" = $1', [vendorId]);
 
     expect(await storedLogos()).toHaveLength(0);
   });

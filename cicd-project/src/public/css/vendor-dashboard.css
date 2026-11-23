@@ -19,6 +19,7 @@
   --db-preparing: #eb6834;
   --db-ready: #1baf7a;
   --db-collected: #eda100;
+  --db-cancelled: #9a918a; /* neutral: a cancelled order needs no action */
   --db-grid: #ebe4dc;
   --db-axis: #d3c9bf;
   --db-muted: #7d756f;
@@ -288,6 +289,11 @@
   color: #0b0b0b;
 }
 
+.db-segbar__part--cancelled {
+  background: var(--db-cancelled);
+  color: #0b0b0b;
+}
+
 .db-legend {
   display: grid;
   gap: 0.5rem;
@@ -327,6 +333,11 @@
 .db-legend__key--collected,
 .db-status--collected::before {
   background: var(--db-collected);
+}
+
+.db-legend__key--cancelled,
+.db-status--cancelled::before {
+  background: var(--db-cancelled);
 }
 
 .db-legend__name {
@@ -615,8 +626,20 @@
   border-radius: 14px;
 }
 
-.db-order--collected {
+.db-order--collected,
+.db-order--cancelled {
   background: var(--ml-surface);
+}
+
+.db-order--cancelled .db-order__items {
+  color: var(--db-muted);
+  text-decoration: line-through;
+}
+
+.db-order__paid {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ml-ink-soft);
 }
 
 .db-order__top {

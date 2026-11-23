@@ -58,7 +58,7 @@ test.describe('Vendor dashboard – figures', () => {
     await expect(page.locator('#windowsChart .db-columns__bar').first()).toBeVisible();
     await expect(page.locator('#salesChart .db-columns__bar')).toHaveCount(7);
     await expect(page.getByRole('meter', { name: 'Ready on time' })).toBeVisible();
-    await expect(page.locator('#statusChart .db-legend li')).toHaveCount(4);
+    await expect(page.locator('#statusChart .db-legend li')).toHaveCount(5);
   });
 
   // Valid partition: the chart numbers are reachable without hovering

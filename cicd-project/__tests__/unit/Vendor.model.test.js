@@ -19,7 +19,7 @@ jest.mock('../../src/models/db', () => ({
   end: jest.fn(),
 }));
 
-const openVendor = { id: 1, stallName: 'Ah Seng', logoUrl: null, isOpen: true };
+const openVendor = { id: 1, stallName: 'Ah Seng', logoUrl: null, isOpen: true, isActive: true };
 const closedVendor = { ...openVendor, isOpen: false };
 
 beforeEach(() => {
@@ -55,7 +55,8 @@ describe('Vendor.model - getVendorById', () => {
 
     expect(pool.query).toHaveBeenCalledTimes(1);
     const [sql, params] = pool.query.mock.calls[0];
-    expect(sql).toContain('FROM "Vendor" WHERE "id" = $1');
+    expect(sql).toContain('JOIN "FoodCourt" f ON f."id" = v."foodCourtId"');
+    expect(sql).toContain('WHERE v."id" = $1');
     expect(params).toEqual([1]);
     expect(result).toEqual(openVendor);
   });
@@ -127,6 +128,21 @@ describe('Vendor.model - setVendorOpenStatus', () => {
     const sql = clientSql();
     expect(sql.some((s) => s.includes('StoreClosure'))).toBe(false);
     expect(sql[sql.length - 1]).toBe('COMMIT');
+  });
+
+  // Invalid partition: an admin has deactivated the stall – it stays closed, nothing saved
+  test('should refuse to open a deactivated stall and roll back', async () => {
+    const deactivated = { ...closedVendor, isActive: false };
+    client.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({ rows: [deactivated] })
+      .mockResolvedValueOnce({});
+
+    const result = await setVendorOpenStatus(1, true, null);
+
+    expect(result).toEqual({ inactive: true, vendor: deactivated });
+    expect(clientSql()).toEqual(['BEGIN', expect.stringContaining('FOR UPDATE'), 'ROLLBACK']);
+    expect(client.release).toHaveBeenCalledTimes(1);
   });
 
   // Boundary: status already matches – nothing changes, transaction rolled back
