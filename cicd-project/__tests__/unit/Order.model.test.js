@@ -398,7 +398,7 @@ describe('Order.model - collectOrder', () => {
     await collectOrder(3, 10, 1042);
     const [sql] = pool.query.mock.calls[0];
     expect(sql).toContain('INSERT INTO collections (order_id, collected_by)');
-    expect(sql).toContain('v."ownerUserId" IS NOT NULL');
+    expect(sql).toContain(`owner."role" = 'vendor' AND owner."isActive"`);
     expect(sql).toContain('ON CONFLICT (order_id) DO NOTHING');
   });
 

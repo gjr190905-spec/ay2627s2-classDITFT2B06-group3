@@ -342,8 +342,10 @@ module.exports.advanceOrder = async function advanceOrder(vendorId, orderId, nex
  * changes nothing (and the "Order_enforce_status_transition" trigger backs this up).
  *
  * The same statement writes the handover to the shared "collections" table, recorded
- * against the stall owner's account ("Vendor"."ownerUserId"). Stalls without an owner
- * account (the demo stalls) have nobody to record it against, so only "Order" changes.
+ * against the stall owner's account ("Vendor"."ownerUserId"). The shared schema only accepts
+ * that record from an active owner with the 'vendor' role ("makan_collection_guard"), so it
+ * is written only then; otherwise (e.g. the demo stalls, which have no owner) only "Order"
+ * changes and the collection itself still succeeds.
  *
  * @param {number} orderNumber  the number the vendor checked against the student's
  * @returns {Promise<{order}|{alreadyCollected: object}|{notReady: string}|{numberMismatch: number}|undefined>}
@@ -357,8 +359,10 @@ module.exports.collectOrder = async function collectOrder(vendorId, orderId, ord
      ), handover AS (
        INSERT INTO collections (order_id, collected_by)
        SELECT done."id", v."ownerUserId"
-       FROM done JOIN "Vendor" v ON v."id" = done."vendorId"
-       WHERE v."ownerUserId" IS NOT NULL
+       FROM done
+       JOIN "Vendor" v ON v."id" = done."vendorId"
+       JOIN "Person" owner ON owner."id" = v."ownerUserId"
+       WHERE owner."role" = 'vendor' AND owner."isActive"
        ON CONFLICT (order_id) DO NOTHING
      )
      SELECT "id" FROM done`,

@@ -508,26 +508,43 @@ describe('Shared order flow', () => {
     );
   }
 
-  // A real checkout through the customer branch's "orders" / "order_items" views
+  // A real checkout through the customer branch's "orders" / "order_items" views.
+  // One transaction, like the real checkout: the shared schema checks at COMMIT that a
+  // customer order has items adding up to its total.
   async function checkout(customerId) {
+    const db = await pool.connect();
+    try {
+      await db.query('BEGIN');
+      const orderId = await checkoutRows(db, customerId);
+      await db.query('COMMIT');
+      return orderId;
+    } catch (err) {
+      await db.query('ROLLBACK');
+      throw err;
+    } finally {
+      db.release();
+    }
+  }
+
+  async function checkoutRows(db, customerId) {
     const start = new Date(Date.now() + 5 * MINUTE);
-    const { rows: windows } = await pool.query(
+    const { rows: windows } = await db.query(
       `INSERT INTO "PickupWindow" ("stallId", "startTime", "endTime", "maxOrders", "bookedCount")
        VALUES ($1, $2, $3, 10, 1) RETURNING "id"`,
       [vendorId, start, new Date(start.getTime() + 15 * MINUTE)],
     );
-    const { rows } = await pool.query(
+    const { rows } = await db.query(
       `INSERT INTO orders (customer_id, stall_id, pickup_window_id, collection_reference, total_amount)
        VALUES ($1, $2, $3, 'ORD-TEST-1', 11.00) RETURNING order_id`,
       [customerId, vendorId, windows[0].id],
     );
     const orderId = rows[0].order_id;
-    await pool.query(
+    await db.query(
       `INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, subtotal)
        VALUES ($1, $2, 2, 5.50, 11.00)`,
       [orderId, laksaId],
     );
-    await pool.query(
+    await db.query(
       `INSERT INTO payments (order_id, amount, payment_status, payment_method, paid_at)
        VALUES ($1, 11.00, 'PAID', 'PAYNOW', NOW())`,
       [orderId],
@@ -620,6 +637,19 @@ describe('Shared order flow', () => {
     const { rows } = await pool.query('SELECT * FROM collections WHERE order_id = $1', [order.id]);
     expect(rows).toHaveLength(1);
     expect(rows[0].collected_by).toBe(ownerId);
+  });
+
+  test('should collect without a handover record when the owner is not an active vendor', async () => {
+    const ownerId = await person(PERSON_EMAILS[0], 'Orders Owner', 'customer');
+    await pool.query('UPDATE "Vendor" SET "ownerUserId" = $1 WHERE "id" = $2', [ownerId, vendorId]);
+    const order = await readyOrder();
+
+    expect((await collect(order)).status).toBe(200);
+
+    const { rows } = await pool.query('SELECT * FROM collections WHERE order_id = $1', [order.id]);
+    expect(rows).toHaveLength(0);
+    const status = await request(app).get(`${base()}/${order.id}`);
+    expect(status.body.status).toBe('COLLECTED');
   });
 
   test('should collect without a handover record when the stall has no owner account', async () => {

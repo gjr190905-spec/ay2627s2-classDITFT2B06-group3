@@ -26,7 +26,7 @@ const persons = [
   { email: 'zara@example.com', name: 'Zara' },
   { email: 'leo@example.com', name: 'Leo' },
 ];
-// eslint-disable-next-line no-unused-vars
+
 const somethings = [{ name: 'Seed 1' }, { name: 'Seed 2' }];
 
 // Every seeded stall is in this food court ("Vendor"."foodCourtId" is required).
@@ -175,10 +175,106 @@ async function seed() {
     customers.push(...rows);
   }
   console.log(`Inserted ${persons.length} persons.`);
-// ─────────────────────────────────────────────────────────
-//  Food Court 6 seed data
-// ─────────────────────────────────────────────────────────
 
+  // Insert somethings (batch)
+  if (somethings.length > 0) {
+    const somethingPlaceholders = somethings.map((_, i) => `($${i + 1})`);
+    const somethingValues = somethings.map((s) => s.name);
+    await pool.query(
+      `INSERT INTO "Something" ("name") VALUES ${somethingPlaceholders.join(', ')}`,
+      somethingValues,
+    );
+  }
+  console.log(`Inserted ${somethings.length} somethings.`);
+
+  const { rows: courts } = await pool.query(
+    'INSERT INTO "FoodCourt" ("name", "location") VALUES ($1, $2) RETURNING "id"',
+    [foodCourt.name, foodCourt.location],
+  );
+  const foodCourtId = courts[0].id;
+  console.log('Inserted 1 food court.');
+
+  // Insert vendors (batch): owner accounts first, then their stalls in the same order
+  if (vendors.length > 0) {
+    const ownerPlaceholders = vendors.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2}, 'vendor')`);
+    const { rows: owners } = await pool.query(
+      `INSERT INTO "Person" ("email", "name", "role") VALUES ${ownerPlaceholders.join(', ')}
+       RETURNING "id"`,
+      vendors.flatMap((v) => [v.email, v.ownerName]),
+    );
+
+    const COLS = 8;
+    const vendorPlaceholders = vendors.map(
+      (_, i) => `(${Array.from({ length: COLS }, (__, c) => `$${i * COLS + c + 1}`).join(', ')})`,
+    );
+    const vendorValues = vendors.flatMap((v, i) => [
+      v.email,
+      v.stallName,
+      v.logoUrl,
+      v.isOpen,
+      foodCourtId,
+      owners[i].id,
+      v.pickupLocation,
+      v.description,
+    ]);
+    const { rows: insertedVendors } = await pool.query(
+      `INSERT INTO "Vendor" ("email", "stallName", "logoUrl", "isOpen", "foodCourtId",
+         "ownerUserId", "pickupLocation", "description")
+       VALUES ${vendorPlaceholders.join(', ')} RETURNING "id", "stallName", "ownerUserId"`,
+      vendorValues,
+    );
+    console.log(`Inserted ${owners.length} vendor owner accounts.`);
+
+    // Insert each vendor's starter menu (batch)
+    const items = insertedVendors.flatMap((v) =>
+      (menuItems[v.stallName] || []).map((item) => ({ vendorId: v.id, ...item })),
+    );
+    if (items.length > 0) {
+      const itemPlaceholders = items.map(
+        (_, i) =>
+          `($${i * 6 + 1}, $${i * 6 + 2}, $${i * 6 + 3}, $${i * 6 + 4}, $${i * 6 + 5}, $${i * 6 + 6})`,
+      );
+      const itemValues = items.flatMap((m) => [
+        m.vendorId,
+        m.name,
+        m.description,
+        m.priceCents,
+        m.quantityLeft,
+        m.isSoldOut,
+      ]);
+      const { rows: menuRows } = await pool.query(
+        `INSERT INTO "MenuItem" ("vendorId", "name", "description", "priceCents", "quantityLeft", "isSoldOut") VALUES ${itemPlaceholders.join(', ')} RETURNING "id", "vendorId", "name", "priceCents"`,
+        itemValues,
+      );
+
+      // Sample orders for the dashboard: today around the current time, plus the last 6 days
+      let orderCount = 0;
+      for (const vendor of insertedVendors) {
+        const vendorMenu = menuRows.filter((m) => m.vendorId === vendor.id);
+        const orders = buildSampleOrders(vendorMenu, new Date());
+        for (const order of orders) {
+          await insertOrder(vendor, order);
+        }
+        orderCount += orders.length;
+      }
+      console.log(`Inserted ${orderCount} sample orders.`);
+    }
+    console.log(`Inserted ${items.length} menu items.`);
+  }
+  console.log(`Inserted ${vendors.length} vendors.`);
+
+  await seedFoodCourt6();
+
+  console.log('Seed data inserted successfully.');
+}
+
+// ─────────────────────────────────────────────────────────
+//  Food Court 6 seed data (customer browsing, from main)
+//  Seeded after the vendor stalls so those keep ids 1–4 (the vendor E2E tests use them).
+//  These stalls have no owner account and no sample orders. The customer seed writes the
+//  "stallId" / "isAvailable" spellings; the MenuItem_sync_aliases trigger fills the rest.
+// ─────────────────────────────────────────────────────────
+async function seedFoodCourt6() {
   await pool.query(`
     INSERT INTO "FoodCourt" ("name", "location") VALUES
       ('Food Court 6', 'Block F, Level 1')
@@ -369,84 +465,6 @@ async function seed() {
   `);
 
   console.log('Inserted pickup windows.');
-
-  const { rows: courts } = await pool.query(
-    'INSERT INTO "FoodCourt" ("name", "location") VALUES ($1, $2) RETURNING "id"',
-    [foodCourt.name, foodCourt.location],
-  );
-  const foodCourtId = courts[0].id;
-  console.log('Inserted 1 food court.');
-
-  // Insert vendors (batch): owner accounts first, then their stalls in the same order
-  if (vendors.length > 0) {
-    const ownerPlaceholders = vendors.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2}, 'vendor')`);
-    const { rows: owners } = await pool.query(
-      `INSERT INTO "Person" ("email", "name", "role") VALUES ${ownerPlaceholders.join(', ')}
-       RETURNING "id"`,
-      vendors.flatMap((v) => [v.email, v.ownerName]),
-    );
-
-    const COLS = 8;
-    const vendorPlaceholders = vendors.map(
-      (_, i) => `(${Array.from({ length: COLS }, (__, c) => `$${i * COLS + c + 1}`).join(', ')})`,
-    );
-    const vendorValues = vendors.flatMap((v, i) => [
-      v.email,
-      v.stallName,
-      v.logoUrl,
-      v.isOpen,
-      foodCourtId,
-      owners[i].id,
-      v.pickupLocation,
-      v.description,
-    ]);
-    const { rows: insertedVendors } = await pool.query(
-      `INSERT INTO "Vendor" ("email", "stallName", "logoUrl", "isOpen", "foodCourtId",
-         "ownerUserId", "pickupLocation", "description")
-       VALUES ${vendorPlaceholders.join(', ')} RETURNING "id", "stallName", "ownerUserId"`,
-      vendorValues,
-    );
-    console.log(`Inserted ${owners.length} vendor owner accounts.`);
-
-    // Insert each vendor's starter menu (batch)
-    const items = insertedVendors.flatMap((v) =>
-      (menuItems[v.stallName] || []).map((item) => ({ vendorId: v.id, ...item })),
-    );
-    if (items.length > 0) {
-      const itemPlaceholders = items.map(
-        (_, i) =>
-          `($${i * 6 + 1}, $${i * 6 + 2}, $${i * 6 + 3}, $${i * 6 + 4}, $${i * 6 + 5}, $${i * 6 + 6})`,
-      );
-      const itemValues = items.flatMap((m) => [
-        m.vendorId,
-        m.name,
-        m.description,
-        m.priceCents,
-        m.quantityLeft,
-        m.isSoldOut,
-      ]);
-      const { rows: menuRows } = await pool.query(
-        `INSERT INTO "MenuItem" ("vendorId", "name", "description", "priceCents", "quantityLeft", "isSoldOut") VALUES ${itemPlaceholders.join(', ')} RETURNING "id", "vendorId", "name", "priceCents"`,
-        itemValues,
-      );
-
-      // Sample orders for the dashboard: today around the current time, plus the last 6 days
-      let orderCount = 0;
-      for (const vendor of insertedVendors) {
-        const vendorMenu = menuRows.filter((m) => m.vendorId === vendor.id);
-        const orders = buildSampleOrders(vendorMenu, new Date());
-        for (const order of orders) {
-          await insertOrder(vendor, order);
-        }
-        orderCount += orders.length;
-      }
-      console.log(`Inserted ${orderCount} sample orders.`);
-    }
-    console.log(`Inserted ${items.length} menu items.`);
-  }
-  console.log(`Inserted ${vendors.length} vendors.`);
-
-  console.log('Seed data inserted successfully.');
 }
 
 // ── Sample orders ────────────────────────────────────────
@@ -561,10 +579,10 @@ function buildSampleOrders(menu, now) {
  * "bookedCount" counts the orders holding a place (cancelled orders give theirs back).
  */
 const pickupWindows = new Map();
-async function bookPickupWindow(vendorId, order) {
+async function bookPickupWindow(db, vendorId, order) {
   const key = `${vendorId}:${order.start.getTime()}`;
   if (!pickupWindows.has(key)) {
-    const { rows } = await pool.query(
+    const { rows } = await db.query(
       `INSERT INTO "PickupWindow" ("stallId", "startTime", "endTime", "maxOrders")
        VALUES ($1, $2, $3, $4) RETURNING "id"`,
       [vendorId, order.start, order.end, WINDOW_CAPACITY],
@@ -573,23 +591,42 @@ async function bookPickupWindow(vendorId, order) {
   }
   const windowId = pickupWindows.get(key);
   if (order.status !== 'CANCELLED') {
-    await pool.query(
-      'UPDATE "PickupWindow" SET "bookedCount" = "bookedCount" + 1 WHERE "id" = $1',
-      [windowId],
-    );
+    await db.query('UPDATE "PickupWindow" SET "bookedCount" = "bookedCount" + 1 WHERE "id" = $1', [
+      windowId,
+    ]);
   }
   return windowId;
 }
 
 const nextOrderNumber = {};
+
+/**
+ * Insert one sample order with its payment, collection record and items in a single
+ * transaction. The shared schema checks at COMMIT that a customer order has items adding
+ * up to its total ("makan_order_lines_deferred"), so they can't be separate statements.
+ */
 async function insertOrder(vendor, order) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await insertOrderRows(client, vendor, order);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+async function insertOrderRows(db, vendor, order) {
   const vendorId = vendor.id;
   nextOrderNumber[vendorId] = (nextOrderNumber[vendorId] || 1000) + 1;
   const orderNumber = nextOrderNumber[vendorId];
   const totalCents = order.lines.reduce((sum, l) => sum + l.item.priceCents * l.quantity, 0);
-  const windowId = order.customerId ? await bookPickupWindow(vendorId, order) : null;
+  const windowId = order.customerId ? await bookPickupWindow(db, vendorId, order) : null;
   const reference = order.customerId ? `ML-${vendorId}-${orderNumber}` : null;
-  const { rows } = await pool.query(
+  const { rows } = await db.query(
     `INSERT INTO "Order" ("vendorId", "orderNumber", "customerId", "pickupWindowId",
        "collectionReference", "customerName", "status",
        "pickupWindowStart", "pickupWindowEnd", "totalCents", "createdAt",
@@ -614,7 +651,7 @@ async function insertOrder(vendor, order) {
     ],
   );
   if (order.payment) {
-    await pool.query(
+    await db.query(
       `INSERT INTO payments (order_id, amount, payment_status, payment_method, paid_at, created_at)
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [
@@ -629,13 +666,13 @@ async function insertOrder(vendor, order) {
   }
   // The handover record the vendor dashboard writes when a checkout order is collected
   if (order.customerId && order.status === 'COLLECTED') {
-    await pool.query(
+    await db.query(
       'INSERT INTO collections (order_id, collected_by, collected_at) VALUES ($1, $2, $3)',
       [rows[0].id, vendor.ownerUserId, order.collectedAt],
     );
   }
   for (const line of order.lines) {
-    await pool.query(
+    await db.query(
       `INSERT INTO "OrderItem" ("orderId", "menuItemId", "name", "unitPriceCents", "quantity")
        VALUES ($1, $2, $3, $4, $5)`,
       [rows[0].id, line.item.id, line.item.name, line.item.priceCents, line.quantity],
