@@ -1,3 +1,7 @@
+-- MAKAN LIAO / CA2 - FRESH TEAM DATABASE + PAYMENT/ORDER/PICKUP SAFEGUARDS
+-- PostgreSQL 12+. Run ONLY in an EMPTY isolated database.
+-- Do not run in the existing prototype or any shared database with data.
+-- One transaction so an error rolls back the entire new schema.
 -- Makan Liao shared branch schema for PostgreSQL 12+.
 -- Run once in a fresh database. Existing branch data needs a separate migration.
 -- Person.id = the customer or vendor owner account ID. Vendor.id = the stall ID.
@@ -583,5 +587,552 @@ $$;
 
 CREATE TRIGGER order_items_legacy_insert INSTEAD OF INSERT ON order_items
 FOR EACH ROW EXECUTE FUNCTION insert_legacy_order_item();
+
+
+-- --- reviewed compatibility and prototype-feature extension ---
+DO $$
+BEGIN
+  IF to_regclass('public."Person"') IS NULL
+     OR to_regclass('public."PersonCredential"') IS NULL
+     OR to_regclass('public."Vendor"') IS NULL
+     OR to_regclass('public."MenuItem"') IS NULL
+     OR to_regclass('public."Order"') IS NULL
+     OR to_regclass('public."CartItem"') IS NULL THEN
+    RAISE EXCEPTION 'Expected MAIN Person/Vendor/Order schema is missing; do NOT apply this to the prototype database';
+  END IF;
+  IF (SELECT c.relkind FROM pg_class c WHERE c.oid = 'public.users'::regclass) <> 'v' THEN
+    RAISE EXCEPTION 'Expected users to be a VIEW in main; found another relation type. Stop and reconcile the databases';
+  END IF;
+END;
+$$;
+
+-- Store one identity: Person is canonical; no competing physical users table.
+-- Dates are real timestamptz values; ISO 8601 strings from Node/Postgres are accepted.
+CREATE TABLE IF NOT EXISTS sessions (
+  id BIGSERIAL PRIMARY KEY,
+  token_hash TEXT NOT NULL UNIQUE CHECK (char_length(token_hash) = 64),
+  user_id INTEGER NOT NULL REFERENCES "Person"("id") ON DELETE CASCADE,
+  csrf_token TEXT NOT NULL CHECK (char_length(csrf_token) >= 32),
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Fail rather than silently reuse a different prototype/earlier-experiment session shape.
+DO $$
+BEGIN
+ IF NOT EXISTS (
+   SELECT 1 FROM information_schema.columns
+   WHERE table_schema = 'public' AND table_name = 'sessions'
+     AND column_name = 'expires_at' AND data_type = 'timestamp with time zone'
+ ) OR NOT EXISTS (
+   SELECT 1 FROM information_schema.columns
+   WHERE table_schema = 'public' AND table_name = 'sessions'
+     AND column_name = 'user_id' AND data_type = 'integer'
+ ) THEN
+   RAISE EXCEPTION 'Existing sessions schema differs (expected TIMESTAMPTZ expires_at and INTEGER user_id); plan explicit migration';
+ END IF;
+END;
+$$;
+CREATE INDEX IF NOT EXISTS sessions_user_expires_idx ON sessions(user_id, expires_at);
+CREATE INDEX IF NOT EXISTS sessions_expires_idx ON sessions(expires_at);
+
+-- Optional food customisation, with confirmed options distinguished from demo options.
+CREATE TABLE IF NOT EXISTS menu_addons (
+  id BIGSERIAL PRIMARY KEY,
+  menu_item_id INTEGER NOT NULL REFERENCES "MenuItem"("id") ON DELETE CASCADE,
+  option_key TEXT NOT NULL CHECK (char_length(btrim(option_key)) BETWEEN 1 AND 80),
+  name TEXT NOT NULL CHECK (char_length(btrim(name)) BETWEEN 1 AND 100),
+  extra_cents INTEGER NOT NULL DEFAULT 0 CHECK (extra_cents BETWEEN 0 AND 99999),
+  is_confirmed INTEGER NOT NULL DEFAULT 0 CHECK (is_confirmed IN (0,1)),
+  is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0,1)),
+  display_order INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (menu_item_id, option_key)
+);
+CREATE INDEX IF NOT EXISTS menu_addons_item_order_idx ON menu_addons(menu_item_id, display_order);
+
+-- Prototype-facing display metadata: preserve physical source-of-truth entity IDs.
+ALTER TABLE "FoodCourt" ADD COLUMN IF NOT EXISTS "subtitle" TEXT;
+ALTER TABLE "FoodCourt" ADD COLUMN IF NOT EXISTS "description" TEXT;
+ALTER TABLE "FoodCourt" ADD COLUMN IF NOT EXISTS "openingTime" TIME;
+ALTER TABLE "FoodCourt" ADD COLUMN IF NOT EXISTS "closingTime" TIME;
+ALTER TABLE "FoodCourt" ADD COLUMN IF NOT EXISTS "imagePath" TEXT;
+ALTER TABLE "Vendor" ADD COLUMN IF NOT EXISTS "cuisine" TEXT;
+ALTER TABLE "Vendor" ADD COLUMN IF NOT EXISTS "accent" TEXT;
+ALTER TABLE "Vendor" ADD COLUMN IF NOT EXISTS "capacityPerSlot" INTEGER;
+ALTER TABLE "Vendor" ADD COLUMN IF NOT EXISTS "imagePath" TEXT;
+ALTER TABLE "MenuItem" ADD COLUMN IF NOT EXISTS "category" TEXT;
+ALTER TABLE "MenuItem" ADD COLUMN IF NOT EXISTS "imagePath" TEXT;
+ALTER TABLE "MenuItem" ADD COLUMN IF NOT EXISTS "isFeatured" BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "notes" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "OrderItem" ADD COLUMN IF NOT EXISTS "selections" JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+-- Variant lines require explicit checkout integration; do not double-count CartItem.quantity.
+CREATE TABLE IF NOT EXISTS "CartItemVariant" (
+  "cartId" INTEGER NOT NULL,
+  "menuItemId" INTEGER NOT NULL,
+  "variantKey" TEXT NOT NULL CHECK (char_length(btrim("variantKey")) BETWEEN 1 AND 100),
+  "selections" JSONB NOT NULL DEFAULT '{}'::jsonb,
+  "unitPriceCents" INTEGER NOT NULL CHECK ("unitPriceCents" >= 0),
+  "quantity" INTEGER NOT NULL CHECK ("quantity" BETWEEN 1 AND 99),
+  PRIMARY KEY ("cartId", "menuItemId", "variantKey"),
+  FOREIGN KEY ("cartId", "menuItemId") REFERENCES "CartItem"("cartId", "menuItemId") ON DELETE CASCADE
+);
+
+-- Checkout handover / QR scan: one code per order; app must verify scanner permissions.
+CREATE TABLE IF NOT EXISTS pickup_passes (
+  order_id INTEGER PRIMARY KEY REFERENCES "Order"("id") ON DELETE CASCADE,
+  code TEXT NOT NULL UNIQUE CHECK (char_length(code) BETWEEN 8 AND 200),
+  issued_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  scanned_at TIMESTAMPTZ,
+  scanned_by INTEGER REFERENCES "Person"("id") ON DELETE SET NULL,
+  CHECK (scanned_at IS NULL OR scanned_at >= issued_at)
+);
+
+-- Notifications are addressed to the specific customer, not a global banner.
+CREATE TABLE IF NOT EXISTS "CustomerNotification" (
+  "id" BIGSERIAL PRIMARY KEY,
+  "personId" INTEGER NOT NULL REFERENCES "Person"("id") ON DELETE CASCADE,
+  "orderId" INTEGER REFERENCES "Order"("id") ON DELETE CASCADE,
+  "type" TEXT NOT NULL CHECK ("type" IN ('ORDER_READY','ORDER_CANCELLED','SYSTEM')),
+  "message" TEXT NOT NULL CHECK (char_length(btrim("message")) BETWEEN 1 AND 240),
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+  "readAt" TIMESTAMPTZ,
+  UNIQUE ("personId", "orderId", "type")
+);
+CREATE INDEX IF NOT EXISTS customer_notification_unread_idx
+  ON "CustomerNotification" ("personId", "createdAt" DESC) WHERE "readAt" IS NULL;
+
+-- Minimal opt-in device delivery queue. Only a verified session may register its endpoint.
+CREATE TABLE IF NOT EXISTS pickup_devices (
+  endpoint TEXT PRIMARY KEY CHECK (char_length(endpoint) BETWEEN 12 AND 2048),
+  session_id BIGINT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS pickup_devices_session_idx ON pickup_devices(session_id);
+CREATE TABLE IF NOT EXISTS pickup_deliveries (
+  order_id INTEGER NOT NULL REFERENCES "Order"("id") ON DELETE CASCADE,
+  endpoint TEXT NOT NULL REFERENCES pickup_devices(endpoint) ON DELETE CASCADE,
+  due_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  PRIMARY KEY (order_id, endpoint)
+);
+
+-- Optional app metadata, NOT a user or authentication store.
+CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+
+-- Keep all existing columns in their original order so CREATE OR REPLACE VIEW succeeds.
+-- Appended fields match SCRUM-12's user lookups (not a second account store).
+CREATE OR REPLACE VIEW users AS
+SELECT p."id" AS user_id,
+       p."name" AS name,
+       p."email" AS email,
+       c."passwordHash" AS password_hash,
+       p."role" AS role,
+       c."createdAt" AS created_at,
+       p."id" AS id,
+       p."name" AS display_name,
+       p."phone" AS phone,
+       (SELECT v."id" FROM "Vendor" v WHERE v."ownerUserId" = p."id"
+         ORDER BY v."id" LIMIT 1) AS stall_id,
+       CASE WHEN p."isActive" THEN 1 ELSE 0 END AS is_active
+FROM "Person" p LEFT JOIN "PersonCredential" c ON c."personId" = p."id";
+
+-- Support the SCRUM-12 INSERT/UPDATE contracts through a protected compatibility view.
+-- IMPORTANT: The application must authorize profile edits/role changes. Never expose raw SQL.
+CREATE OR REPLACE FUNCTION app_users_write() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+DECLARE
+  v_user_id INTEGER;
+  v_name TEXT;
+  v_role TEXT;
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    v_name := btrim(coalesce(NEW.display_name, NEW.name, ''));
+    v_role := coalesce(NEW.role, 'customer');
+    IF char_length(v_name) NOT BETWEEN 1 AND 100 OR coalesce(btrim(NEW.email), '') = ''
+       OR coalesce(NEW.password_hash, '') = ''
+       OR v_role NOT IN ('customer','vendor','staff','admin')
+       OR coalesce(NEW.is_active,1) NOT IN (0,1) THEN
+      RAISE EXCEPTION 'Invalid account insert' USING ERRCODE = 'check_violation';
+    END IF;
+    INSERT INTO "Person" ("name", "email", "phone", "role", "isActive")
+    VALUES (v_name, lower(btrim(NEW.email)), NEW.phone, v_role, coalesce(NEW.is_active,1) = 1)
+    RETURNING "id" INTO v_user_id;
+    INSERT INTO "PersonCredential" ("personId", "passwordHash", "createdAt")
+    VALUES (v_user_id, NEW.password_hash, coalesce(NEW.created_at, now()));
+    IF NEW.stall_id IS NOT NULL THEN
+      IF v_role <> 'vendor' THEN
+        RAISE EXCEPTION 'Only vendor accounts may be assigned a stall' USING ERRCODE = 'check_violation';
+      END IF;
+      UPDATE "Vendor" SET "ownerUserId" = v_user_id
+      WHERE "id" = NEW.stall_id AND "ownerUserId" IS NULL;
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'Stall not found or already assigned' USING ERRCODE = 'check_violation';
+      END IF;
+    END IF;
+  ELSIF TG_OP = 'UPDATE' THEN
+    v_user_id := OLD.id;
+    IF NEW.id IS DISTINCT FROM OLD.id OR NEW.user_id IS DISTINCT FROM OLD.user_id
+       OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
+      RAISE EXCEPTION 'Cannot modify account identity or creation date' USING ERRCODE = 'check_violation';
+    END IF;
+    v_name := btrim(coalesce(NEW.display_name, NEW.name, ''));
+    IF char_length(v_name) NOT BETWEEN 1 AND 100 OR coalesce(btrim(NEW.email),'') = ''
+       OR NEW.role NOT IN ('customer','vendor','staff','admin')
+       OR NEW.is_active NOT IN (0,1) THEN
+      RAISE EXCEPTION 'Invalid account update' USING ERRCODE = 'check_violation';
+    END IF;
+    UPDATE "Person" SET "name" = v_name, "email" = lower(btrim(NEW.email)),
+      "phone" = NEW.phone, "role" = NEW.role, "isActive" = (NEW.is_active = 1)
+    WHERE "id" = v_user_id;
+    IF NEW.password_hash IS DISTINCT FROM OLD.password_hash THEN
+      IF coalesce(NEW.password_hash,'') = '' THEN
+        RAISE EXCEPTION 'Password hash cannot be empty' USING ERRCODE = 'check_violation';
+      END IF;
+      INSERT INTO "PersonCredential" ("personId", "passwordHash") VALUES (v_user_id, NEW.password_hash)
+      ON CONFLICT ("personId") DO UPDATE SET "passwordHash" = excluded."passwordHash";
+    END IF;
+    IF NEW.stall_id IS DISTINCT FROM OLD.stall_id THEN
+      IF NEW.stall_id IS NOT NULL AND NEW.role <> 'vendor' THEN
+        RAISE EXCEPTION 'Only vendor accounts may own stalls' USING ERRCODE = 'check_violation';
+      END IF;
+      UPDATE "Vendor" SET "ownerUserId" = NULL
+        WHERE "id" = OLD.stall_id AND "ownerUserId" = v_user_id;
+      IF NEW.stall_id IS NOT NULL THEN
+        UPDATE "Vendor" SET "ownerUserId" = v_user_id
+          WHERE "id" = NEW.stall_id AND "ownerUserId" IS NULL;
+        IF NOT FOUND THEN
+          RAISE EXCEPTION 'Stall not found or already assigned' USING ERRCODE = 'check_violation';
+        END IF;
+      END IF;
+    END IF;
+  ELSE
+    RAISE EXCEPTION 'Delete via users view is disabled; deactivate the account instead'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  SELECT * INTO NEW FROM users WHERE id = v_user_id;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS users_compat_write ON users;
+CREATE TRIGGER users_compat_write INSTEAD OF INSERT OR UPDATE ON users
+  FOR EACH ROW EXECUTE FUNCTION app_users_write();
+
+-- Keep the original five stall-view fields unchanged, and append authentication aliases.
+CREATE OR REPLACE VIEW stalls AS
+SELECT v."id" AS stall_id, v."ownerUserId" AS vendor_id,
+       v."stallName" AS stall_name, v."description" AS description,
+       (v."isActive" AND v."isOpen") AS is_active,
+       v."id" AS id, v."stallName" AS name,
+       v."foodCourtId" AS food_court_id, v."cuisine" AS cuisine,
+       v."accent" AS accent, v."capacityPerSlot" AS capacity_per_slot,
+       v."isOpen" AS is_open, v."imagePath" AS image_path
+FROM "Vendor" v;
+
+-- Prevent a direct OrderItem insert from referencing a menu item belonging to a different stall.
+CREATE OR REPLACE FUNCTION ensure_order_item_vendor() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+DECLARE v_order_vendor INTEGER; v_item_vendor INTEGER;
+BEGIN
+  IF NEW."menuItemId" IS NOT NULL THEN
+    SELECT "vendorId" INTO v_order_vendor FROM "Order" WHERE "id" = NEW."orderId";
+    SELECT "vendorId" INTO v_item_vendor FROM "MenuItem" WHERE "id" = NEW."menuItemId";
+    IF v_order_vendor IS DISTINCT FROM v_item_vendor THEN
+      RAISE EXCEPTION 'OrderItem menu item must belong to the same stall as the order'
+        USING ERRCODE = 'check_violation';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS order_item_vendor_check ON "OrderItem";
+CREATE TRIGGER order_item_vendor_check BEFORE INSERT OR UPDATE OF "menuItemId", "orderId" ON "OrderItem"
+FOR EACH ROW EXECUTE FUNCTION ensure_order_item_vendor();
+
+-- Personal bell notifications (not full-width banners). The app still owns dismissal/read APIs.
+CREATE OR REPLACE FUNCTION notify_customer_order_status() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+BEGIN
+  IF NEW."customerId" IS NOT NULL AND NEW."status" IS DISTINCT FROM OLD."status" THEN
+    IF NEW."status" = 'READY' THEN
+      INSERT INTO "CustomerNotification" ("personId", "orderId", "type", "message")
+      VALUES (NEW."customerId", NEW."id", 'ORDER_READY', 'Your order is ready for collection.')
+      ON CONFLICT ("personId", "orderId", "type") DO NOTHING;
+    ELSIF NEW."status" = 'CANCELLED' THEN
+      INSERT INTO "CustomerNotification" ("personId", "orderId", "type", "message")
+      VALUES (NEW."customerId", NEW."id", 'ORDER_CANCELLED', 'Your order was cancelled.')
+      ON CONFLICT ("personId", "orderId", "type") DO NOTHING;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS order_customer_notification ON "Order";
+CREATE TRIGGER order_customer_notification AFTER UPDATE OF "status" ON "Order"
+FOR EACH ROW EXECUTE FUNCTION notify_customer_order_status();
+
+-- Queue READY handovers to current opt-in pickup devices (for asynchronous delivery workers).
+CREATE OR REPLACE FUNCTION queue_customer_pickup() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+BEGIN
+  IF NEW."customerId" IS NOT NULL THEN
+    INSERT INTO pickup_deliveries(order_id, endpoint)
+    SELECT NEW."id", d.endpoint FROM pickup_devices d
+    JOIN sessions s ON s.id = d.session_id
+    WHERE s.user_id = NEW."customerId" AND s.expires_at > now()
+    ON CONFLICT DO NOTHING;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS "Order_queue_customer_pickup" ON "Order";
+DROP TRIGGER IF EXISTS order_queue_customer_pickup ON "Order";
+CREATE TRIGGER order_queue_customer_pickup AFTER UPDATE OF "status" ON "Order"
+FOR EACH ROW WHEN (NEW."status" = 'READY' AND NEW."status" IS DISTINCT FROM OLD."status")
+EXECUTE FUNCTION queue_customer_pickup();
+
+
+
+-- === ADDITIONAL TESTED-CHECK SAFEGUARDS: PAYMENTS, CHECKOUT, COLLECTION ===
+DO $$
+BEGIN
+  IF to_regclass('public."Order"') IS NULL OR
+     to_regclass('public."OrderItem"') IS NULL OR
+     to_regclass('public."Vendor"') IS NULL OR
+     to_regclass('public."Person"') IS NULL OR
+     to_regclass('public.payments') IS NULL OR
+     to_regclass('public.pickup_passes') IS NULL OR
+     to_regclass('public.collections') IS NULL THEN
+    RAISE EXCEPTION 'Unsupported database schema; expected reviewed Makan Liao tables';
+  END IF;
+END;
+$$;
+
+-- Protect existing data when adding new invariants. Never silently change order money.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM payments p JOIN "Order" o ON o."id" = p.order_id
+    WHERE p.amount * 100 <> o."totalCents"
+  ) THEN
+    RAISE EXCEPTION 'Existing payment/order totals differ; reconcile before applying safeguards';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM "Order" o
+    LEFT JOIN (
+      SELECT "orderId", count(*) AS n, coalesce(sum("subtotalCents"),0)::bigint AS cents
+      FROM "OrderItem" GROUP BY "orderId"
+    ) li ON li."orderId" = o."id"
+    WHERE o."customerId" IS NOT NULL AND
+      (coalesce(li.n,0) = 0 OR coalesce(li.cents,0) <> o."totalCents")
+  ) THEN
+    RAISE EXCEPTION 'Existing customer orders lack items or line totals disagree; reconcile before applying safeguards';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM pickup_passes pp
+    JOIN "Order" o ON o."id" = pp.order_id
+    JOIN "Vendor" v ON v."id" = o."vendorId"
+    LEFT JOIN "Person" p ON p."id" = pp.scanned_by
+    WHERE (pp.scanned_at IS NULL) <> (pp.scanned_by IS NULL)
+      OR (pp.scanned_by IS NOT NULL AND
+        (pp.scanned_by IS DISTINCT FROM v."ownerUserId" OR
+         p."role" IS DISTINCT FROM 'vendor' OR p."isActive" IS DISTINCT FROM TRUE))
+  ) THEN
+    RAISE EXCEPTION 'Existing pickup scan audit records lack a valid vendor owner; reconcile before applying safeguards';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM collections c
+    JOIN "Order" o ON o."id" = c.order_id
+    JOIN "Vendor" v ON v."id" = o."vendorId"
+    LEFT JOIN "Person" p ON p."id" = c.collected_by
+    WHERE c.collected_by IS DISTINCT FROM v."ownerUserId"
+       OR o."status" <> 'COLLECTED'
+       OR p."role" IS DISTINCT FROM 'vendor'
+       OR p."isActive" IS DISTINCT FROM TRUE
+  ) THEN
+    RAISE EXCEPTION 'Existing collection records lack a valid vendor owner/collected order; reconcile first';
+  END IF;
+END;
+$$;
+
+-- 1. Payment amount (decimal currency units) must equal integer order cents.
+-- Locking the order row serializes payment writes with order total changes.
+CREATE OR REPLACE FUNCTION public.makan_check_payment_total() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+DECLARE expected_cents integer;
+BEGIN
+  SELECT o."totalCents" INTO expected_cents
+  FROM "Order" o WHERE o."id" = NEW.order_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Payment requires an existing order'
+      USING ERRCODE = '23503';
+  END IF;
+  IF NEW.amount * 100 <> expected_cents THEN
+    RAISE EXCEPTION 'Payment amount % does not match order total % cents', NEW.amount, expected_cents
+      USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS makan_payment_total_guard ON public.payments;
+CREATE TRIGGER makan_payment_total_guard
+BEFORE INSERT OR UPDATE OF order_id, amount ON public.payments
+FOR EACH ROW EXECUTE FUNCTION public.makan_check_payment_total();
+
+-- Also block later changing an order total away from an existing payment.
+CREATE OR REPLACE FUNCTION public.makan_guard_order_total() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM payments p WHERE p.order_id = NEW."id" AND p.amount * 100 <> NEW."totalCents"
+  ) THEN
+    RAISE EXCEPTION 'Order total cannot differ from its recorded payment'
+      USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS makan_order_total_guard ON public."Order";
+CREATE TRIGGER makan_order_total_guard
+BEFORE UPDATE OF "totalCents" ON public."Order"
+FOR EACH ROW EXECUTE FUNCTION public.makan_guard_order_total();
+
+-- 2. Every customer checkout order requires >= 1 item and the exact sum of
+-- generated OrderItem.subtotalCents. Manual vendor-demo orders (customerId NULL)
+-- are deliberately exempt. Checks are deferred to transaction commit so legacy
+-- checkout can INSERT order first, then its lines, atomically.
+CREATE OR REPLACE FUNCTION public.makan_assert_customer_order_lines(p_order_id integer)
+RETURNS void LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+DECLARE
+  expected_cents integer;
+  customer_key integer;
+  item_count bigint;
+  item_cents bigint;
+BEGIN
+  IF p_order_id IS NULL THEN RETURN; END IF;
+  SELECT o."totalCents", o."customerId" INTO expected_cents, customer_key
+  FROM "Order" o WHERE o."id" = p_order_id FOR UPDATE;
+  IF NOT FOUND OR customer_key IS NULL THEN RETURN; END IF;
+  SELECT count(*), coalesce(sum(li."subtotalCents"),0)::bigint
+  INTO item_count, item_cents FROM "OrderItem" li WHERE li."orderId" = p_order_id;
+  IF item_count = 0 OR item_cents <> expected_cents THEN
+    RAISE EXCEPTION 'Customer order % requires items totalling % cents; found % items totalling % cents',
+      p_order_id, expected_cents, item_count, item_cents USING ERRCODE = '23514';
+  END IF;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.makan_check_order_lines_from_order() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+BEGIN
+  PERFORM makan_assert_customer_order_lines(NEW."id");
+  RETURN NULL;
+END;
+$$;
+DROP TRIGGER IF EXISTS makan_order_lines_deferred ON public."Order";
+CREATE CONSTRAINT TRIGGER makan_order_lines_deferred
+AFTER INSERT OR UPDATE ON public."Order"
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION public.makan_check_order_lines_from_order();
+
+CREATE OR REPLACE FUNCTION public.makan_check_order_lines_from_item() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    PERFORM makan_assert_customer_order_lines(NEW."orderId");
+  ELSIF TG_OP = 'DELETE' THEN
+    PERFORM makan_assert_customer_order_lines(OLD."orderId");
+  ELSE
+    PERFORM makan_assert_customer_order_lines(OLD."orderId");
+    IF NEW."orderId" IS DISTINCT FROM OLD."orderId" THEN
+      PERFORM makan_assert_customer_order_lines(NEW."orderId");
+    END IF;
+  END IF;
+  RETURN NULL;
+END;
+$$;
+DROP TRIGGER IF EXISTS makan_order_item_lines_deferred ON public."OrderItem";
+CREATE CONSTRAINT TRIGGER makan_order_item_lines_deferred
+AFTER INSERT OR UPDATE OR DELETE ON public."OrderItem"
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION public.makan_check_order_lines_from_item();
+
+-- 3. Only the active, designated vendor owner may scan a pickup pass.
+-- Staff and admin delegation require an explicit stall-assignment model and API
+-- checks; they are intentionally NOT inferred from a generic role value.
+CREATE OR REPLACE FUNCTION public.makan_authorize_pickup_scan() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+DECLARE
+  owner_id integer;
+  order_status text;
+  scanner_role text;
+  scanner_active boolean;
+BEGIN
+  IF (NEW.scanned_at IS NULL) <> (NEW.scanned_by IS NULL) THEN
+    RAISE EXCEPTION 'Pickup scan time and scanner identity must both be supplied'
+      USING ERRCODE = '23514';
+  END IF;
+  IF TG_OP = 'UPDATE' AND NEW.order_id IS DISTINCT FROM OLD.order_id THEN
+    RAISE EXCEPTION 'A pickup pass cannot be moved to another order'
+      USING ERRCODE = '23514';
+  END IF;
+  IF TG_OP = 'UPDATE' AND OLD.scanned_at IS NOT NULL AND
+      (OLD.scanned_at IS DISTINCT FROM NEW.scanned_at OR
+       OLD.scanned_by IS DISTINCT FROM NEW.scanned_by) THEN
+    RAISE EXCEPTION 'A pickup scan cannot be cleared or reassigned'
+      USING ERRCODE = '23514';
+  END IF;
+  IF NEW.scanned_at IS NOT NULL THEN
+    SELECT v."ownerUserId", o."status", p."role", p."isActive"
+      INTO owner_id, order_status, scanner_role, scanner_active
+    FROM "Order" o JOIN "Vendor" v ON v."id" = o."vendorId"
+    LEFT JOIN "Person" p ON p."id" = NEW.scanned_by
+    WHERE o."id" = NEW.order_id FOR UPDATE OF o;
+    IF NOT FOUND OR owner_id IS DISTINCT FROM NEW.scanned_by OR
+       scanner_role IS DISTINCT FROM 'vendor' OR scanner_active IS DISTINCT FROM TRUE THEN
+      RAISE EXCEPTION 'Pickup scanner is not the active owner of this stall'
+        USING ERRCODE = '23514';
+    END IF;
+    IF order_status NOT IN ('READY','COLLECTED') THEN
+      RAISE EXCEPTION 'Cannot scan an order that is not ready for collection'
+        USING ERRCODE = '23514';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS makan_pickup_scan_guard ON public.pickup_passes;
+CREATE TRIGGER makan_pickup_scan_guard
+BEFORE INSERT OR UPDATE OF scanned_at, scanned_by, order_id ON public.pickup_passes
+FOR EACH ROW EXECUTE FUNCTION public.makan_authorize_pickup_scan();
+
+-- Collection records are also protected, not merely the QR scan audit column.
+CREATE OR REPLACE FUNCTION public.makan_authorize_collection() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+DECLARE
+  owner_id integer;
+  order_status text;
+  collector_role text;
+  collector_active boolean;
+BEGIN
+  SELECT v."ownerUserId", o."status", p."role", p."isActive"
+  INTO owner_id, order_status, collector_role, collector_active
+  FROM "Order" o JOIN "Vendor" v ON v."id" = o."vendorId"
+  LEFT JOIN "Person" p ON p."id" = NEW.collected_by
+  WHERE o."id" = NEW.order_id FOR UPDATE OF o;
+  IF NOT FOUND OR owner_id IS DISTINCT FROM NEW.collected_by OR
+     collector_role IS DISTINCT FROM 'vendor' OR collector_active IS DISTINCT FROM TRUE THEN
+    RAISE EXCEPTION 'Collector is not the active owner of this stall'
+      USING ERRCODE = '23514';
+  END IF;
+  IF order_status <> 'COLLECTED' THEN
+    RAISE EXCEPTION 'Collection records require COLLECTED order status'
+      USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS makan_collection_guard ON public.collections;
+CREATE TRIGGER makan_collection_guard
+BEFORE INSERT OR UPDATE OF order_id, collected_by ON public.collections
+FOR EACH ROW EXECUTE FUNCTION public.makan_authorize_collection();
 
 COMMIT;

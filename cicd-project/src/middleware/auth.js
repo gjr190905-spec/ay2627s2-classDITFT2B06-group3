@@ -1,9 +1,12 @@
 const jwt = require('jsonwebtoken');
 const parseId = require('../utils/parseId');
+const { findActiveSession } = require('../models/Session.model');
 const { ERROR_CODES, mapError } = require('../utils/errors');
 
 const VALID_ROLES = ['customer', 'vendor', 'admin', 'staff'];
-const TOKEN_LIFETIME = '8h';
+const TOKEN_LIFETIME_SECONDS = 10 * 60;
+const ISSUER = 'makan-liao';
+const AUDIENCE = 'makan-liao-api';
 
 function getSecret() {
   const secret = process.env.JWT_SECRET;
@@ -13,60 +16,73 @@ function getSecret() {
   return secret;
 }
 
-function signToken({ id, role }) {
-  return jwt.sign({ role }, getSecret(), {
+function signToken({ id, role }, sessionTokenHash) {
+  const userId = parseId(String(id));
+  if (!userId || !VALID_ROLES.includes(role) || !/^[a-f0-9]{64}$/.test(sessionTokenHash || '')) {
+    throw new Error('A valid user and active server session are required to issue a JWT');
+  }
+  return jwt.sign({ role, sid: sessionTokenHash, typ: 'access' }, getSecret(), {
     algorithm: 'HS256',
-    subject: String(id),
-    expiresIn: TOKEN_LIFETIME,
+    subject: String(userId),
+    issuer: ISSUER,
+    audience: AUDIENCE,
+    expiresIn: TOKEN_LIFETIME_SECONDS,
   });
 }
 
-function authenticate(req, res, next) {
+function rejectUnauthenticated(next, message = 'Invalid or expired access token') {
+  return next(mapError(ERROR_CODES.UNAUTHENTICATED, message));
+}
+
+async function authenticate(req, res, next) {
+  req.user = null;
+  req.authMethod = null;
   const header = req.headers.authorization;
-  if (!header) {
-    return next(mapError(ERROR_CODES.UNAUTHENTICATED, 'Missing Authorization header'));
-  }
-
+  if (!header) return rejectUnauthenticated(next, 'Missing Authorization header');
   const match = /^Bearer\s+(\S+)$/i.exec(header);
-  if (!match) {
-    return next(
-      mapError(ERROR_CODES.UNAUTHENTICATED, 'Authorization header must be: Bearer <token>'),
-    );
-  }
+  if (!match) return rejectUnauthenticated(next, 'Authorization header must be: Bearer <token>');
 
-  let payload;
+  let claims;
   try {
-    payload = jwt.verify(match[1], getSecret(), { algorithms: ['HS256'] });
-  } catch (err) {
-    if (err instanceof jwt.JsonWebTokenError) {
-      return next(mapError(ERROR_CODES.UNAUTHENTICATED, 'Invalid or expired token'));
+    claims = jwt.verify(match[1], getSecret(), {
+      algorithms: ['HS256'],
+      issuer: ISSUER,
+      audience: AUDIENCE,
+    });
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError) return rejectUnauthenticated(next);
+    return next(error);
+  }
+
+  const userId = parseId(claims.sub);
+  if (
+    !userId ||
+    claims.typ !== 'access' ||
+    !VALID_ROLES.includes(claims.role) ||
+    !/^[a-f0-9]{64}$/.test(claims.sid || '')
+  ) return rejectUnauthenticated(next);
+
+  try {
+    const user = await findActiveSession(claims.sid);
+    if (!user || user.id !== userId || user.role !== claims.role) {
+      return rejectUnauthenticated(next);
     }
-    return next(err);
+    const { id, name, email, role, stallId, stallName } = user;
+    req.user = { id, name, email, role, stallId: stallId ?? null, stallName: stallName ?? null };
+    req.authMethod = 'bearer';
+    return next();
+  } catch (error) {
+    return next(error);
   }
-
-  const userId = parseId(payload.sub);
-  if (userId === null || !VALID_ROLES.includes(payload.role)) {
-    return next(mapError(ERROR_CODES.UNAUTHENTICATED, 'Invalid or expired token'));
-  }
-
-  req.user = { id: userId, role: payload.role };
-  return next();
 }
 
 function requireRole(...allowedRoles) {
   allowedRoles.forEach((role) => {
-    if (!VALID_ROLES.includes(role)) {
-      throw new Error(`Unknown role: ${role}`);
-    }
+    if (!VALID_ROLES.includes(role)) throw new Error(`Unknown role: ${role}`);
   });
-
   return function checkRole(req, res, next) {
-    if (!req.user) {
-      return next(mapError(ERROR_CODES.UNAUTHENTICATED));
-    }
-    if (!allowedRoles.includes(req.user.role)) {
-      return next(mapError(ERROR_CODES.FORBIDDEN));
-    }
+    if (!req.user) return next(mapError(ERROR_CODES.UNAUTHENTICATED));
+    if (!allowedRoles.includes(req.user.role)) return next(mapError(ERROR_CODES.FORBIDDEN));
     return next();
   };
 }

@@ -2,27 +2,26 @@ const express = require('express');
 const createError = require('http-errors');
 const path = require('path');
 const { toHttpError } = require('./utils/errors');
+const { toHttpError } = require('./utils/errors');
 
-// Import route handlers
+// Keep the team's existing routes and SCRUM-12 authentication routes.
 const somethingRouter = require('./routers/Something.router');
 const personRouter = require('./routers/Person.router');
 const stallRouter = require('./routers/Stall.router');
 const orderRouter = require('./routers/Customer.Order.router');
-
+const authRouter = require('./routers/Auth.router');
+const { loadSession } = require('./middleware/auth-session');
 
 const app = express();
-
-// Parse incoming JSON request bodies (e.g. from POST/PUT requests)
 app.use(express.json());
 
-// Serve static files (HTML, CSS, JS, images) from the 'public' folder.
-// e.g. src/public/index.html is accessible at http://localhost:<port>/
-app.use(express.static(path.join(__dirname, 'public')));
+// Resolve only server-side sessions; do not trust a client-supplied user role.
+app.use(loadSession);
 
-// Browsers automatically request /favicon.ico — return 204 (no content) to avoid 404 noise.
+app.use(express.static(path.join(__dirname, 'public')));
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
-
+app.use('/api/auth', authRouter);
 app.use('/somethings', somethingRouter);
 app.use('/persons', personRouter);
 app.use('/stalls', stallRouter);

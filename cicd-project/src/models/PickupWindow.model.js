@@ -4,7 +4,7 @@ const parseId = require('../utils/parseId');
 const MAX_WINDOWS_RETURNED = 100;
 const WINDOW_DURATION_MINUTES = 5;
 const WINDOW_MAX_ORDERS = 5;
-const GENERATE_HOURS_AHEAD = 24 * 7;
+const GENERATE_HOURS_AHEAD = 24 * 7; // one week of slots
 
 // ── Auto-generation ──────────────────────────────────────
 async function generateWindowsForStall(stallId) {
@@ -46,6 +46,7 @@ module.exports.getUpcomingWindowsByStallId = async function getUpcomingWindowsBy
   );
 
   // If no upcoming windows exist, generate them and fetch again.
+  // This means no one ever has to run migration:reset just to get slots.
   if (rows.length === 0) {
     await generateWindowsForStall(id);
 
