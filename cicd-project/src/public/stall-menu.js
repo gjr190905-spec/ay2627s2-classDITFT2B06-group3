@@ -37,7 +37,7 @@ let pendingItem = null;
 const rows = new Map();
 
 // ── API ──────────────────────────────────────────────────
-async function apiGet(path) {
+async function apiGet(path, requiresAuth = false) {
   const headers = {};
   const token = localStorage.getItem(TOKEN_KEY);
   if (token) {
@@ -78,6 +78,7 @@ function readCart() {
       return cart;
     }
   } catch {
+    return emptyCart();
   }
   return emptyCart();
 }
@@ -311,7 +312,7 @@ async function loadPage() {
     return;
   }
 
-  let menuItems = [];
+  let menuItems;
   try {
     [stall, menuItems] = await Promise.all([
       apiGet(`/stalls/${stallId}`),
