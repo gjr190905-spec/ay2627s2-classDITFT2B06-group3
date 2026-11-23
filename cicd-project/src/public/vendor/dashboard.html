@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dashboard · Makan Liao? for vendors</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/vendor-home.css" />
+    <link rel="stylesheet" href="../css/vendor-profile.css" />
+    <link rel="stylesheet" href="../css/vendor-dashboard.css" />
+  </head>
+  <body>
+    <!-- ── Header (same look as the home page) ─────────────── -->
+    <header class="vh-header">
+      <div class="vh-header__inner">
+        <div class="vh-brand">
+          <span class="vh-logo" id="vendorLogoWrap">
+            <img id="vendorLogo" class="vh-logo__img" alt="" hidden />
+            <span id="vendorLogoFallback" class="vh-logo__fallback" aria-hidden="true"></span>
+          </span>
+          <span class="vh-brand__text">
+            <span class="vh-brand__stall" id="vendorStallName">Loading…</span>
+          </span>
+        </div>
+        <a class="ml-btn vh-logout" href="./home.html" id="backLink">Back to home</a>
+      </div>
+    </header>
+
+    <main class="vh-main db-main" id="main">
+      <div id="dashboardPanel">
+        <div class="db-heading">
+          <div>
+            <h1 class="vp-title">Dashboard</h1>
+            <svg class="vp-underline" viewBox="0 0 180 12" aria-hidden="true" focusable="false">
+              <path d="M3 8.5C38 4.2 92 2.6 177 4.8" />
+            </svg>
+            <p class="db-date" id="todayLabel"></p>
+          </div>
+          <p class="db-updated" id="updatedLabel" aria-live="polite"></p>
+        </div>
+
+        <!-- ── Stat tiles ────────────────────────────────── -->
+        <section class="db-tiles" aria-label="Today at a glance" id="tiles">
+          <div class="db-tile">
+            <p class="db-tile__label">Orders today</p>
+            <p class="db-tile__value" id="tileOrders">–</p>
+            <p class="db-tile__note" id="tileOrdersNote"></p>
+          </div>
+          <div class="db-tile">
+            <p class="db-tile__label">To prepare</p>
+            <p class="db-tile__value" id="tilePrepare">–</p>
+            <p class="db-tile__note" id="tilePrepareNote"></p>
+          </div>
+          <div class="db-tile">
+            <p class="db-tile__label">Ready for pickup</p>
+            <p class="db-tile__value" id="tileReady">–</p>
+            <p class="db-tile__note" id="tileReadyNote"></p>
+          </div>
+          <div class="db-tile">
+            <p class="db-tile__label">Collected</p>
+            <p class="db-tile__value" id="tileCollected">–</p>
+            <p class="db-tile__note" id="tileCollectedNote"></p>
+          </div>
+        </section>
+
+        <!-- ── Charts ────────────────────────────────────── -->
+        <section class="db-charts" aria-label="Charts" id="charts">
+          <article class="db-card db-card--wide" aria-labelledby="windowsChartTitle">
+            <header class="db-card__head">
+              <h2 class="db-card__title" id="windowsChartTitle">Orders by pickup window</h2>
+              <p class="db-card__sub">Today, earliest window first</p>
+            </header>
+            <div class="db-chart" id="windowsChart"></div>
+          </article>
+
+          <article class="db-card db-card--wide" aria-labelledby="salesChartTitle">
+            <header class="db-card__head">
+              <h2 class="db-card__title" id="salesChartTitle">Sales, last 7 days</h2>
+              <p class="db-card__sub">Money taken for collected orders</p>
+            </header>
+            <div class="db-chart" id="salesChart"></div>
+          </article>
+
+          <article class="db-card" aria-labelledby="statusChartTitle">
+            <header class="db-card__head">
+              <h2 class="db-card__title" id="statusChartTitle">Order status</h2>
+              <p class="db-card__sub">Today's orders by where they are</p>
+            </header>
+            <div id="statusChart"></div>
+          </article>
+
+          <article class="db-card" aria-labelledby="onTimeTitle">
+            <header class="db-card__head">
+              <h2 class="db-card__title" id="onTimeTitle">Ready on time</h2>
+              <p class="db-card__sub">Ready by the end of the booked window</p>
+            </header>
+            <div id="onTimeChart"></div>
+          </article>
+
+          <article class="db-card" aria-labelledby="topItemsTitle">
+            <header class="db-card__head">
+              <h2 class="db-card__title" id="topItemsTitle">Top items today</h2>
+              <p class="db-card__sub">Portions ordered</p>
+            </header>
+            <div id="topItemsChart"></div>
+          </article>
+        </section>
+
+        <!-- ── Preparation board ─────────────────────────── -->
+        <section class="db-board" aria-labelledby="boardTitle">
+          <div class="db-board__top">
+            <div>
+              <h2 class="db-board__title" id="boardTitle">Preparation</h2>
+              <p class="db-card__sub">
+                Orders grouped by pickup window. Start preparing, mark ready, then hand over.
+              </p>
+            </div>
+
+            <form class="db-find" id="findForm" role="search" novalidate>
+              <label for="findInput" class="db-find__label">Find an order</label>
+              <div class="db-find__row">
+                <span class="db-find__hash" aria-hidden="true">#</span>
+                <input
+                  id="findInput"
+                  class="vp-input db-find__input"
+                  type="text"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  placeholder="1042"
+                  maxlength="6"
+                />
+                <button type="submit" class="ml-btn ml-btn--primary">Find</button>
+              </div>
+              <p class="db-find__error" id="findError" role="alert"></p>
+            </form>
+          </div>
+
+          <div class="db-filters" role="group" aria-label="Show orders">
+            <button type="button" class="db-filter" data-filter="active" aria-pressed="true">
+              Active <span class="db-filter__count" data-count="active"></span>
+            </button>
+            <button type="button" class="db-filter" data-filter="ready" aria-pressed="false">
+              Ready <span class="db-filter__count" data-count="ready"></span>
+            </button>
+            <button type="button" class="db-filter" data-filter="collected" aria-pressed="false">
+              Collected <span class="db-filter__count" data-count="collected"></span>
+            </button>
+            <button type="button" class="db-filter" data-filter="all" aria-pressed="false">
+              All <span class="db-filter__count" data-count="all"></span>
+            </button>
+          </div>
+
+          <div id="windowList" class="db-windows"></div>
+          <p class="db-empty" id="boardEmpty" hidden></p>
+        </section>
+      </div>
+
+      <section class="vh-signed-out" id="signedOutPanel" hidden>
+        <img
+          class="vh-signed-out__logo"
+          src="../images/brand/makan-liao-logo.png"
+          alt="Makan Liao?"
+          width="186"
+          height="70"
+        />
+        <h1>You're signed out</h1>
+        <p>Log in with your stall account to see your dashboard.</p>
+        <a class="ml-btn ml-btn--primary" href="/">Go to log in</a>
+      </section>
+    </main>
+
+    <!-- ── Handover (open a ready order and mark it collected) ── -->
+    <dialog class="vh-dialog db-handover" id="handoverDialog" aria-labelledby="handoverHeading">
+      <div class="db-handover__top">
+        <h2 class="vh-dialog__heading" id="handoverHeading">Order</h2>
+        <span class="db-status" id="handoverStatus"></span>
+      </div>
+      <p class="vh-dialog__hint" id="handoverMeta"></p>
+
+      <h3 class="db-handover__label">Items to hand over</h3>
+      <ul class="db-handover__items" id="handoverItems"></ul>
+
+      <div class="db-handover__amount">
+        <span id="handoverAmountLabel">Amount to collect</span>
+        <strong id="handoverAmount"></strong>
+      </div>
+
+      <p class="db-handover__state" id="handoverState" hidden></p>
+
+      <form id="collectForm" novalidate hidden>
+        <label for="collectNumber" class="vp-label">Order number on the student's screen</label>
+        <div class="db-find__row">
+          <span class="db-find__hash" aria-hidden="true">#</span>
+          <input
+            id="collectNumber"
+            class="vp-input db-find__input"
+            type="text"
+            inputmode="numeric"
+            autocomplete="off"
+            maxlength="6"
+          />
+        </div>
+        <label class="db-check">
+          <input type="checkbox" id="collectPaid" />
+          <span id="collectPaidLabel">I've taken payment</span>
+        </label>
+        <label class="db-check">
+          <input type="checkbox" id="collectHanded" />
+          <span>I've handed over the food</span>
+        </label>
+        <p class="vh-dialog__error" id="collectError" role="alert"></p>
+        <div class="vh-dialog__actions">
+          <button type="button" class="ml-btn" data-close>Cancel</button>
+          <button type="submit" class="ml-btn ml-btn--primary" id="collectButton">
+            Mark collected
+          </button>
+        </div>
+      </form>
+
+      <div class="vh-dialog__actions" id="handoverCloseRow" hidden>
+        <button type="button" class="ml-btn" data-close>Close</button>
+      </div>
+    </dialog>
+
+    <div class="db-tooltip" id="chartTooltip" role="tooltip" hidden></div>
+    <div class="vh-toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="../js/vendor-dashboard.js" type="text/javascript"></script>
+  </body>
+</html>

@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Settings · Makan Liao? for vendors</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/vendor-home.css" />
+    <link rel="stylesheet" href="../css/vendor-profile.css" />
+    <link rel="stylesheet" href="../css/vendor-settings.css" />
+  </head>
+  <body>
+    <!-- ── Header (same look as the home page) ─────────────── -->
+    <header class="vh-header">
+      <div class="vh-header__inner">
+        <div class="vh-brand">
+          <span class="vh-logo" id="vendorLogoWrap">
+            <img id="vendorLogo" class="vh-logo__img" alt="" hidden />
+            <span id="vendorLogoFallback" class="vh-logo__fallback" aria-hidden="true"></span>
+          </span>
+          <span class="vh-brand__text">
+            <span class="vh-brand__stall" id="vendorStallName">Loading…</span>
+          </span>
+        </div>
+        <a class="ml-btn vh-logout" href="./home.html" id="backLink">Back to home</a>
+      </div>
+    </header>
+
+    <main class="vh-main vs-main" id="main">
+      <div id="settingsPanel">
+        <h1 class="vp-title">Settings</h1>
+        <svg class="vp-underline" viewBox="0 0 180 12" aria-hidden="true" focusable="false">
+          <path d="M3 8.5C38 4.2 92 2.6 177 4.8" />
+        </svg>
+        <p class="vp-intro">
+          Choose how many orders you take on at once and what you're told about.
+        </p>
+
+        <form id="settingsForm" novalidate>
+          <!-- ── Order limit ──────────────────────────────── -->
+          <section class="vp-card" aria-labelledby="limitHeading">
+            <h2 class="vp-card__heading" id="limitHeading">Orders at once</h2>
+            <p class="vp-card__hint">
+              Counts orders that are Confirmed or Preparing. When you reach your limit, students
+              can't place new orders until you mark some as Ready.
+            </p>
+
+            <div class="vs-row">
+              <div>
+                <label for="limitMode" class="vp-label">Limit</label>
+                <select id="limitMode" class="vp-input vs-select">
+                  <option value="none">No limit</option>
+                  <option value="limit">Set a limit</option>
+                </select>
+              </div>
+              <div id="limitField" hidden>
+                <label for="maxActiveOrders" class="vp-label">Maximum orders</label>
+                <input
+                  type="number"
+                  id="maxActiveOrders"
+                  class="vp-input"
+                  min="1"
+                  max="200"
+                  step="1"
+                  inputmode="numeric"
+                  placeholder="e.g. 10"
+                />
+              </div>
+            </div>
+            <p class="vs-load" id="loadNote" aria-live="polite"></p>
+          </section>
+
+          <!-- ── Notification choices ─────────────────────── -->
+          <section class="vp-card" aria-labelledby="notifyHeading" id="notifications">
+            <h2 class="vp-card__heading" id="notifyHeading">Notifications</h2>
+            <p class="vp-card__hint">
+              Pick what you want to hear about. They appear below and on your home page.
+            </p>
+
+            <ul class="vs-switches">
+              <li>
+                <label class="vs-switch">
+                  <input type="checkbox" role="switch" id="notifyNewOrder" />
+                  <span class="vs-switch__track" aria-hidden="true"><span></span></span>
+                  <span class="vs-switch__text">
+                    <span class="vs-switch__name">New orders</span>
+                    <span class="vs-switch__desc">When a student places an order</span>
+                  </span>
+                </label>
+              </li>
+              <li>
+                <label class="vs-switch">
+                  <input type="checkbox" role="switch" id="notifySoldOut" />
+                  <span class="vs-switch__track" aria-hidden="true"><span></span></span>
+                  <span class="vs-switch__text">
+                    <span class="vs-switch__name">Sold out</span>
+                    <span class="vs-switch__desc">When an order takes the last of an item</span>
+                  </span>
+                </label>
+              </li>
+              <li>
+                <label class="vs-switch">
+                  <input type="checkbox" role="switch" id="notifyLowStock" />
+                  <span class="vs-switch__track" aria-hidden="true"><span></span></span>
+                  <span class="vs-switch__text">
+                    <span class="vs-switch__name">Low stock</span>
+                    <span class="vs-switch__desc">When an item you're counting runs low</span>
+                  </span>
+                </label>
+                <div class="vs-threshold" id="thresholdField">
+                  <label for="lowStockThreshold" class="vp-label"
+                    >Tell me when this many or fewer are left</label
+                  >
+                  <input
+                    type="number"
+                    id="lowStockThreshold"
+                    class="vp-input"
+                    min="1"
+                    max="50"
+                    step="1"
+                    inputmode="numeric"
+                  />
+                </div>
+              </li>
+            </ul>
+          </section>
+
+          <div class="vs-save">
+            <p class="vp-error" id="settingsError" role="alert"></p>
+            <p class="vs-save__state" id="saveState" aria-live="polite"></p>
+            <button type="submit" class="ml-btn ml-btn--primary" id="saveButton">
+              Save settings
+            </button>
+          </div>
+        </form>
+
+        <!-- ── Notification list ────────────────────────── -->
+        <section class="vp-card" aria-labelledby="inboxHeading">
+          <div class="vs-inbox__top">
+            <div>
+              <h2 class="vp-card__heading" id="inboxHeading">Recent notifications</h2>
+              <p class="vp-card__hint" id="unreadNote" aria-live="polite"></p>
+            </div>
+            <div class="vs-inbox__actions">
+              <button type="button" class="ml-btn vs-btn--small" id="markReadButton">
+                Mark all as read
+              </button>
+              <button type="button" class="ml-btn vs-btn--small vs-btn--quiet" id="clearButton">
+                Clear all
+              </button>
+            </div>
+          </div>
+          <ul class="vs-inbox" id="inbox" aria-labelledby="inboxHeading"></ul>
+          <p class="vs-empty" id="inboxEmpty" hidden>No notifications yet.</p>
+        </section>
+      </div>
+
+      <section class="vh-signed-out" id="signedOutPanel" hidden>
+        <img
+          class="vh-signed-out__logo"
+          src="../images/brand/makan-liao-logo.png"
+          alt="Makan Liao?"
+          width="186"
+          height="70"
+        />
+        <h1>You're signed out</h1>
+        <p>Log in with your stall account to change your settings.</p>
+        <a class="ml-btn ml-btn--primary" href="/">Go to log in</a>
+      </section>
+    </main>
+
+    <!-- ── Clear all confirmation ─────────────────────────── -->
+    <dialog class="vh-dialog" id="clearDialog" aria-labelledby="clearHeading">
+      <h2 class="vh-dialog__heading" id="clearHeading">Clear all notifications?</h2>
+      <p class="vh-dialog__hint">They'll be deleted for good. Your settings stay as they are.</p>
+      <div class="vh-dialog__actions">
+        <button type="button" class="ml-btn" id="cancelClear">Cancel</button>
+        <button type="button" class="ml-btn ml-btn--primary" id="confirmClear">Clear all</button>
+      </div>
+    </dialog>
+
+    <div class="vh-toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="../js/vendor-settings.js" type="text/javascript"></script>
+  </body>
+</html>

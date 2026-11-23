@@ -1,6 +1,7 @@
 const request = require('supertest');
 const app = require('../../src/app');
 const pool = require('../../src/models/db');
+const { deleteAllPersons } = require('../helpers/cleanup');
 
 // ── DB Setup / Teardown ──────────────────────────────────
 // Tables are created via the Jest globalSetup (configs/jest-integration-setup.js)
@@ -9,12 +10,12 @@ const pool = require('../../src/models/db');
 beforeEach(async () => {
   // Clean slate for every test
   await pool.query('DELETE FROM "Something"');
-  await pool.query('DELETE FROM "Person"');
+  await deleteAllPersons(pool);
 });
 
 afterAll(async () => {
   await pool.query('DELETE FROM "Something"');
-  await pool.query('DELETE FROM "Person"');
+  await deleteAllPersons(pool);
   await pool.end();
 });
 

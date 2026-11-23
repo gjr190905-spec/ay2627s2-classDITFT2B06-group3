@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Menu · Makan Liao? for vendors</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/vendor-home.css" />
+    <link rel="stylesheet" href="../css/vendor-profile.css" />
+    <link rel="stylesheet" href="../css/vendor-menu.css" />
+  </head>
+  <body>
+    <!-- ── Header (same look as the home page) ─────────────── -->
+    <header class="vh-header">
+      <div class="vh-header__inner">
+        <div class="vh-brand">
+          <span class="vh-logo" id="vendorLogoWrap">
+            <img id="vendorLogo" class="vh-logo__img" alt="" hidden />
+            <span id="vendorLogoFallback" class="vh-logo__fallback" aria-hidden="true"></span>
+          </span>
+          <span class="vh-brand__text">
+            <span class="vh-brand__stall" id="vendorStallName">Loading…</span>
+          </span>
+        </div>
+        <a class="ml-btn vh-logout" href="./home.html" id="backLink">Back to home</a>
+      </div>
+    </header>
+
+    <main class="vh-main vm-main" id="main">
+      <div id="menuPanel">
+        <div class="vm-heading">
+          <div>
+            <h1 class="vp-title">Your menu</h1>
+            <svg class="vp-underline" viewBox="0 0 180 12" aria-hidden="true" focusable="false">
+              <path d="M3 8.5C38 4.2 92 2.6 177 4.8" />
+            </svg>
+            <p class="vp-intro vm-intro">
+              Changes show up for students straight away, and sold-out items can't be checked out.
+            </p>
+          </div>
+          <a
+            class="ml-btn"
+            id="customerViewLink"
+            href="../stall.html"
+            target="_blank"
+            rel="noopener"
+            >View as customer</a
+          >
+        </div>
+
+        <!-- ── Banner ─────────────────────────────────────── -->
+        <section class="vp-card" aria-labelledby="bannerHeading">
+          <h2 class="vp-card__heading" id="bannerHeading">Menu banner</h2>
+          <p class="vp-card__hint">Only one banner allowed hor........</p>
+
+          <div class="vm-banner" id="bannerFrame">
+            <img id="bannerImg" class="vm-banner__img" alt="Your menu banner" hidden />
+            <p id="bannerEmpty" class="vm-banner__empty">No banner yet</p>
+          </div>
+
+          <input
+            type="file"
+            id="bannerInput"
+            class="ml-visually-hidden"
+            accept="image/png,image/jpeg,image/webp"
+          />
+          <div class="vp-actions vm-banner__actions">
+            <label for="bannerInput" class="ml-btn" id="chooseBannerButton" tabindex="0"
+              >Choose banner</label
+            >
+            <button type="button" class="ml-btn ml-btn--primary" id="saveBannerButton" hidden>
+              Save banner
+            </button>
+            <button type="button" class="ml-btn" id="discardBannerButton" hidden>Discard</button>
+            <button type="button" class="ml-btn vm-btn--quiet" id="removeBannerButton" hidden>
+              Remove banner
+            </button>
+          </div>
+          <p class="vp-note">PNG, JPEG or WebP. Wide pictures work best; it is cropped to 3 : 1.</p>
+          <p class="vp-error" id="bannerError" role="alert"></p>
+        </section>
+
+        <!-- ── Items ──────────────────────────────────────── -->
+        <section class="vp-card" aria-labelledby="itemsHeading">
+          <div class="vm-items__top">
+            <div>
+              <h2 class="vp-card__heading" id="itemsHeading">Items</h2>
+              <p class="vp-card__hint vm-summary" id="menuSummary" aria-live="polite"></p>
+            </div>
+            <button type="button" class="ml-btn ml-btn--primary" id="addItemButton">
+              Add item
+            </button>
+          </div>
+
+          <ul class="vm-list" id="itemList" aria-labelledby="itemsHeading"></ul>
+          <p class="vm-empty" id="emptyMenu" hidden>
+            Your menu is empty. Add your first dish so students can order.
+          </p>
+        </section>
+      </div>
+
+      <section class="vh-signed-out" id="signedOutPanel" hidden>
+        <img
+          class="vh-signed-out__logo"
+          src="../images/brand/makan-liao-logo.png"
+          alt="Makan Liao?"
+          width="186"
+          height="70"
+        />
+        <h1>You're signed out</h1>
+        <p>Log in with your stall account to manage your menu.</p>
+        <a class="ml-btn ml-btn--primary" href="/">Go to log in</a>
+      </section>
+    </main>
+
+    <!-- ── Add / edit item ────────────────────────────────── -->
+    <dialog class="vh-dialog vm-dialog" id="itemDialog" aria-labelledby="itemDialogHeading">
+      <form id="itemForm" novalidate>
+        <h2 class="vh-dialog__heading" id="itemDialogHeading">Add item</h2>
+        <p class="vh-dialog__hint" id="itemDialogHint">Students see this on your menu.</p>
+
+        <div class="vm-photo">
+          <div class="vm-photo__frame">
+            <img id="photoImg" class="vm-photo__img" alt="Item photo" hidden />
+            <span id="photoEmpty" class="vm-photo__empty" aria-hidden="true">No photo</span>
+          </div>
+          <div class="vm-photo__controls">
+            <input
+              type="file"
+              id="photoInput"
+              class="ml-visually-hidden"
+              accept="image/png,image/jpeg,image/webp"
+            />
+            <div class="vp-actions">
+              <label for="photoInput" class="ml-btn" id="choosePhotoButton" tabindex="0"
+                >Choose photo</label
+              >
+              <button type="button" class="ml-btn vm-btn--quiet" id="removePhotoButton" hidden>
+                Remove photo
+              </button>
+            </div>
+            <p class="vp-note">One photo per item. Cropped to a square.</p>
+          </div>
+        </div>
+
+        <label for="itemName" class="vp-label">Name</label>
+        <input
+          type="text"
+          id="itemName"
+          class="vp-input"
+          name="name"
+          maxlength="60"
+          autocomplete="off"
+          required
+        />
+
+        <label for="itemDescription" class="vp-label vm-label--spaced"
+          >Description <span class="vm-optional">(optional)</span></label
+        >
+        <textarea
+          id="itemDescription"
+          class="vp-input vm-textarea"
+          name="description"
+          rows="2"
+          maxlength="200"
+          placeholder="e.g. Comes with chilli and ginger"
+        ></textarea>
+
+        <div class="vm-row">
+          <div>
+            <label for="itemPrice" class="vp-label vm-label--spaced">Price</label>
+            <div class="vm-money">
+              <span class="vm-money__sign" aria-hidden="true">$</span>
+              <input
+                type="text"
+                id="itemPrice"
+                class="vp-input"
+                name="price"
+                inputmode="decimal"
+                autocomplete="off"
+                placeholder="4.50"
+                required
+              />
+            </div>
+          </div>
+          <div>
+            <label for="itemStock" class="vp-label vm-label--spaced">Stock</label>
+            <select id="itemStock" class="vp-input vm-select" name="stock">
+              <option value="unlimited">No limit</option>
+              <option value="limited">Set quantity left</option>
+            </select>
+          </div>
+          <div class="vm-quantity-field" id="quantityField" hidden>
+            <label for="itemQuantity" class="vp-label vm-label--spaced">Quantity left</label>
+            <input
+              type="number"
+              id="itemQuantity"
+              class="vp-input"
+              name="quantityLeft"
+              min="0"
+              max="9999"
+              step="1"
+              inputmode="numeric"
+              placeholder="e.g. 20"
+            />
+          </div>
+        </div>
+        <p class="vp-note" id="stockNote">
+          No limit: the item stays available until you mark it sold out. You can switch this any
+          time.
+        </p>
+
+        <p class="vh-dialog__error" id="itemError" role="alert"></p>
+
+        <div class="vh-dialog__actions">
+          <button type="button" class="ml-btn" id="cancelItem">Cancel</button>
+          <button type="submit" class="ml-btn ml-btn--primary" id="saveItem">Add item</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- ── Delete item ────────────────────────────────────── -->
+    <dialog class="vh-dialog" id="deleteDialog" aria-labelledby="deleteDialogHeading">
+      <h2 class="vh-dialog__heading" id="deleteDialogHeading">Delete this item?</h2>
+      <p class="vh-dialog__hint">Students won't see it on your menu any more.</p>
+      <p class="vh-dialog__error" id="deleteError" role="alert"></p>
+      <div class="vh-dialog__actions">
+        <button type="button" class="ml-btn" id="cancelDelete">Cancel</button>
+        <button type="button" class="ml-btn ml-btn--primary" id="confirmDelete">Delete</button>
+      </div>
+    </dialog>
+
+    <div class="vh-toast" id="toast" role="status" aria-live="polite"></div>
+
+    <!-- One row of the item list -->
+    <template id="itemTemplate">
+      <li class="vm-item">
+        <div class="vm-item__photo">
+          <img class="vm-item__img" alt="" hidden />
+          <span class="vm-item__initial" aria-hidden="true"></span>
+        </div>
+        <div class="vm-item__info">
+          <h3 class="vm-item__name"></h3>
+          <p class="vm-item__desc"></p>
+          <p class="vm-item__price"></p>
+        </div>
+        <div class="vm-item__stock">
+          <div class="vm-qty" data-role="qty">
+            <button type="button" class="vm-qty__btn" data-action="decrease">−</button>
+            <span class="vm-qty__value" data-role="qtyValue"></span>
+            <button type="button" class="vm-qty__btn" data-action="increase">+</button>
+          </div>
+          <span class="vm-qty__off" data-role="qtyOff">No limit</span>
+          <button type="button" class="vm-switch" role="switch" data-action="toggle">
+            <span class="vm-switch__track" aria-hidden="true"
+              ><span class="vm-switch__dot"></span
+            ></span>
+            <span class="vm-switch__label"></span>
+          </button>
+        </div>
+        <div class="vm-item__actions">
+          <button type="button" class="ml-btn vm-btn--small" data-action="edit">Edit</button>
+          <button type="button" class="ml-btn vm-btn--small vm-btn--quiet" data-action="delete">
+            Delete
+          </button>
+        </div>
+      </li>
+    </template>
+
+    <script src="../js/vendor-menu.js" type="text/javascript"></script>
+  </body>
+</html>

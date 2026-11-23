@@ -1,0 +1,435 @@
+/* ─────────────────────────────────────────────────────────
+   Vendor menu page
+   Depends on theme.css (colours, fonts, buttons), vendor-home.css
+   (header, dialog, toast, signed-out panel) and vendor-profile.css
+   (title, cards, fields, notes).
+   ───────────────────────────────────────────────────────── */
+
+.vm-main {
+  max-width: 920px;
+}
+
+.vm-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+  flex-wrap: wrap;
+}
+
+.vm-intro {
+  max-width: 34rem;
+}
+
+.vm-heading > .ml-btn {
+  margin-bottom: 1.75rem;
+}
+
+/* Quiet secondary action (Remove, Delete): grey until hovered */
+.vm-btn--quiet {
+  color: var(--ml-ink-soft);
+  border-color: var(--ml-line);
+}
+
+.vm-btn--quiet:hover {
+  color: var(--ml-red);
+  border-color: var(--ml-red);
+}
+
+.vm-btn--small {
+  min-height: 36px;
+  padding: 0.35rem 0.95rem;
+  font-size: 0.84rem;
+}
+
+/* ── Banner ─────────────────────────────────────────────── */
+.vm-banner {
+  position: relative;
+  aspect-ratio: 3 / 1;
+  overflow: hidden;
+  border-radius: var(--ml-radius);
+  background:
+    repeating-linear-gradient(-45deg, transparent 0 14px, rgb(186 8 13 / 0.04) 14px 28px), #fff3ea;
+  box-shadow: inset 0 0 0 1px var(--ml-line);
+}
+
+.vm-banner__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vm-banner__empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  font-family: var(--ml-font-display);
+  font-size: clamp(1.4rem, 4vw, 2.1rem);
+  color: #c9a491;
+}
+
+.vm-banner__actions {
+  margin-top: 1rem;
+}
+
+/* ── Items ──────────────────────────────────────────────── */
+.vm-items__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.vm-summary {
+  margin-bottom: 1rem;
+}
+
+.vm-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vm-empty {
+  margin: 0.5rem 0 0;
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--ml-ink-soft);
+  border: 1px dashed var(--ml-line);
+  border-radius: var(--ml-radius);
+}
+
+.vm-item {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 1rem 1.25rem;
+  padding: 1rem 0;
+  border-top: 1px solid var(--ml-line);
+}
+
+.vm-item:first-child {
+  border-top: 0;
+}
+
+.vm-item[aria-busy='true'] {
+  cursor: progress;
+}
+
+.vm-item__photo {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #fff0e7;
+  box-shadow: inset 0 0 0 1px var(--ml-line);
+}
+
+.vm-item__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vm-item__initial {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 900 1.4rem/1 var(--ml-font-ui);
+  letter-spacing: -0.04em;
+  color: var(--ml-red);
+}
+
+.vm-item__name {
+  font-size: 1.08rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  overflow-wrap: anywhere;
+}
+
+.vm-item__desc {
+  margin: 0.15rem 0 0;
+  font-size: 0.86rem;
+  color: var(--ml-ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.vm-item__price {
+  margin: 0.3rem 0 0;
+  font-weight: 800;
+  color: var(--ml-red);
+}
+
+/* Sold-out rows fade back so available items stand out */
+.vm-item.is-sold-out .vm-item__photo,
+.vm-item.is-sold-out .vm-item__info {
+  opacity: 0.5;
+}
+
+.vm-item.is-sold-out .vm-item__photo {
+  filter: grayscale(1);
+}
+
+.vm-item__stock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.vm-item__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+/* Quantity stepper */
+.vm-qty {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--ml-line);
+  border-radius: 999px;
+  background: #fff;
+}
+
+.vm-qty__btn {
+  width: 34px;
+  height: 34px;
+  font: 800 1.1rem/1 var(--ml-font-ui);
+  color: var(--ml-ink);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.vm-qty__btn:hover:not([disabled]) {
+  color: var(--ml-red);
+  background: var(--ml-red-soft);
+}
+
+.vm-qty__btn[disabled] {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.vm-qty__value {
+  min-width: 4.6rem;
+  text-align: center;
+  font-size: 0.86rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.vm-qty__off {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--ml-ink-soft);
+}
+
+/* Available / Sold out switch */
+.vm-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 36px;
+  padding: 0.25rem 0.9rem 0.25rem 0.35rem;
+  font: 800 0.84rem/1 var(--ml-font-ui);
+  color: var(--ml-green);
+  background: var(--ml-green-tint);
+  border: 1px solid #cde9d8;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.vm-switch__track {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--ml-green);
+  transition: background-color 150ms ease;
+}
+
+.vm-switch__dot {
+  position: absolute;
+  top: 3px;
+  left: 19px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
+  transition: left 150ms ease;
+}
+
+.vm-switch[aria-checked='false'] {
+  color: var(--ml-red);
+  background: var(--ml-red-tint);
+  border-color: #f4cfc9;
+}
+
+.vm-switch[aria-checked='false'] .vm-switch__track {
+  background: #c9b9b3;
+}
+
+.vm-switch[aria-checked='false'] .vm-switch__dot {
+  left: 3px;
+}
+
+.vm-switch[aria-disabled='true'] {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* ── Add / edit dialog ──────────────────────────────────── */
+.vm-dialog {
+  width: min(34rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+}
+
+.vm-photo {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  margin-bottom: 1.25rem;
+}
+
+.vm-photo__frame {
+  position: relative;
+  flex: none;
+  width: 96px;
+  height: 96px;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #fff0e7;
+  box-shadow: inset 0 0 0 1px var(--ml-line);
+}
+
+.vm-photo__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vm-photo__empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #b49787;
+}
+
+.vm-photo__controls .vp-note {
+  margin-top: 0.5rem;
+}
+
+.vm-label--spaced {
+  margin-top: 1rem;
+}
+
+.vm-optional {
+  font-weight: 500;
+  color: var(--ml-ink-soft);
+}
+
+.vm-textarea {
+  min-height: 0;
+  resize: vertical;
+}
+
+.vm-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 1rem;
+}
+
+/* Stock: "No limit" or "Set quantity left" */
+.vm-select {
+  appearance: none;
+  padding-right: 2.5rem;
+  cursor: pointer;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ml-ink-soft) 50%),
+    linear-gradient(135deg, var(--ml-ink-soft) 50%, transparent 50%);
+  background-position:
+    calc(100% - 1.15rem) 50%,
+    calc(100% - 0.8rem) 50%;
+  background-size: 0.35rem 0.35rem;
+  background-repeat: no-repeat;
+}
+
+/* The quantity box sits under the Stock select */
+.vm-quantity-field {
+  grid-column: 2;
+}
+
+.vm-quantity-field[hidden] {
+  display: none;
+}
+
+.vm-money {
+  position: relative;
+}
+
+.vm-money__sign {
+  position: absolute;
+  top: 50%;
+  left: 0.95rem;
+  transform: translateY(-50%);
+  font-weight: 800;
+  color: var(--ml-ink-soft);
+}
+
+.vm-money .vp-input {
+  padding-left: 1.8rem;
+}
+
+.vm-dialog .vp-input[aria-invalid='true'] {
+  border-color: var(--ml-red);
+  background: var(--ml-red-tint);
+}
+
+/* ── Small screens ──────────────────────────────────────── */
+@media (max-width: 640px) {
+  .vm-heading > .ml-btn {
+    margin-bottom: 1.25rem;
+  }
+
+  .vm-item {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .vm-item__photo {
+    width: 64px;
+    height: 64px;
+  }
+
+  .vm-item__stock,
+  .vm-item__actions {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+  }
+
+  .vm-items__top {
+    flex-direction: column;
+  }
+
+  .vm-row {
+    grid-template-columns: 1fr;
+  }
+
+  .vm-quantity-field {
+    grid-column: auto;
+  }
+}
