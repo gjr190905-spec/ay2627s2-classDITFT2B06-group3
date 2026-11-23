@@ -8,6 +8,10 @@ const somethingRouter = require('./routers/Something.router');
 const personRouter = require('./routers/Person.router');
 const stallRouter = require('./routers/Stall.router');
 const authRouter = require('./routers/Auth.router');
+const ordersRouter = require('./routers/ordersRouter');
+const paymentRouter = require('./routers/paymentRouter');
+const pickupWindowRouter = require('./routers/pickupWindowRouter');
+const vendorOrderRouter = require('./routers/vendorOrderRouter');
 const { loadSession } = require('./middleware/auth-session');
 
 const app = express();
@@ -24,6 +28,12 @@ app.use('/somethings', somethingRouter);
 app.use('/persons', personRouter);
 app.use('/stalls', stallRouter);
 
+// Integrated order-management routes (mounted before the 404 handler)
+app.use('/orders', ordersRouter);
+app.use('/orders', vendorOrderRouter);
+app.use('/payments', paymentRouter);
+app.use('/pickup-windows', pickupWindowRouter);
+
 // Unknown routes are handled after ALL feature routers.
 app.use((req, res, next) => {
   next(createError(404, `Unknown resource ${req.method} ${req.originalUrl}`));
@@ -32,6 +42,12 @@ app.use((req, res, next) => {
 // Preserve the team's error conversion for customer browsing responses.
 // eslint-disable-next-line no-unused-vars
 app.use((error, req, res, next) => {
+  // Preserve status codes/messages produced by merged order/payment models.
+  const statusCode = error && (error.status || error.statusCode);
+  if (statusCode && statusCode >= 400 && statusCode < 500 && error.message) {
+    return res.status(statusCode).json({ error: error.message });
+  }
+
   const httpError = toHttpError(error);
   if (httpError.status >= 500) {
     console.error(error);
