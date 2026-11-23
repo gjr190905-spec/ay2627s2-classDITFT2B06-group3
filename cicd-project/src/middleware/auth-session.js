@@ -67,6 +67,8 @@ async function startSession(res, account) {
   const csrfToken = crypto.randomBytes(32).toString('hex');
   const expiry = new Date(Date.now() + SESSION_SECONDS * 1000);
   await createSession(account.id, hashToken(token), expiry, csrfToken);
+  // Keep the session digest server-side so short-lived JWTs can be revoked on logout.
+  if (res.locals) res.locals.newSessionTokenHash = hashToken(token);
   res.set('Set-Cookie', sessionCookie(token));
   return csrfToken;
 }

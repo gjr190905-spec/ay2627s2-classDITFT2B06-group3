@@ -3,6 +3,7 @@ const { authenticateAccount } = require('../services/login-service');
 const { registerCustomerAccount } = require('../services/registration-service');
 const { revokeSession } = require('../models/Session.model');
 const { requireAuthentication } = require('../middleware/access-control');
+const { signToken } = require('../middleware/auth');
 const {
   startSession,
   clearSession,
@@ -36,6 +37,15 @@ function toPublicUser(account) {
   };
 }
 
+// Cookie login remains functional without JWT configuration. The optional access
+// token is issued only when JWT_SECRET is configured. Never send the signing secret.
+function jwtAfterLogin(res, account) {
+  if (!process.env.JWT_SECRET) return {};
+  const sessionHash = res.locals?.newSessionTokenHash;
+  if (!sessionHash) throw new Error('Could not bind JWT to a persistent session.');
+  return { accessToken: signToken(account, sessionHash), tokenType: 'Bearer', expiresIn: 600 };
+}
+
 router.post('/signup', requireSameOrigin, requireJson, async (req, res, next) => {
   try {
     const result = await registerCustomerAccount(req.body);
@@ -44,9 +54,11 @@ router.post('/signup', requireSameOrigin, requireJson, async (req, res, next) =>
       return res.status(status).json({ errors: result.errors });
     }
     const csrfToken = await startSession(res, result.account);
+    const access = jwtAfterLogin(res, result.account);
     return res.status(201).json({
       user: toPublicUser(result.account),
       csrfToken,
+      ...access,
       message: 'Your account has been created.',
     });
   } catch (error) {
@@ -62,7 +74,23 @@ router.post('/login', requireSameOrigin, requireJson, async (req, res, next) => 
       return res.status(invalidInput ? 400 : 401).json({ errors: result.errors });
     }
     const csrfToken = await startSession(res, result.account);
-    return res.json({ user: toPublicUser(result.account), csrfToken });
+    const access = jwtAfterLogin(res, result.account);
+    return res.json({ user: toPublicUser(result.account), csrfToken, ...access });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// Existing browser sessions can request a fresh short-lived Bearer JWT
+// without asking for the password again. Same-origin + CSRF protect minting.
+router.post('/token', requireSameOrigin, requireAuthentication, requireCsrf, (req, res, next) => {
+  try {
+    if (!req.sessionTokenHash) return res.status(401).json({ error: 'Session required.' });
+    return res.json({
+      accessToken: signToken(req.user, req.sessionTokenHash),
+      tokenType: 'Bearer',
+      expiresIn: 600,
+    });
   } catch (error) {
     return next(error);
   }
