@@ -11,38 +11,41 @@ async function selectOrders(db, customerId, orderId) {
   }
 
   const { rows } = await db.query(
-    `SELECT o."id",
-            o."orderNumber",
-            o."status",
-            o."totalCents",
-            o."createdAt",
-            o."preparingAt",
-            o."readyAt",
-            o."collectedAt",
-            o."cancelledAt",
-            v."id"                AS "stallId",
-            v."stallName"         AS "stallName",
-            v."pickupLocation"    AS "pickupLocation",
-            o."pickupWindowStart" AS "pickupStart",
-            o."pickupWindowEnd"   AS "pickupEnd",
-            COALESCE(
-              json_agg(
-                json_build_object(
-                  'id', oi."id",
-                  'menuItemId', oi."menuItemId",
-                  'name', oi."name",
-                  'quantity', oi."quantity",
-                  'priceCents', oi."unitPriceCents"
-                ) ORDER BY oi."id"
-              ) FILTER (WHERE oi."id" IS NOT NULL),
-              '[]'::json
-            ) AS "items"
-       FROM "Order" o
-       JOIN "Vendor" v ON v."id" = o."vendorId"
-       LEFT JOIN "OrderItem" oi ON oi."orderId" = o."id"
-      WHERE o."customerId" = $1${extraFilter}
-      GROUP BY o."id", v."id"
-      ORDER BY o."createdAt" DESC, o."id" DESC`,
+        `SELECT o."id",
+        o."orderNumber",
+        o."collectionReference",
+        o."status",
+        o."totalCents",
+        o."createdAt",
+        o."preparingAt",
+        o."readyAt",
+        o."collectedAt",
+        o."cancelledAt",
+        v."id"                AS "stallId",
+        v."stallName"         AS "stallName",
+        v."pickupLocation"    AS "pickupLocation",
+        f."name"              AS "foodCourtName",
+        o."pickupWindowStart" AS "pickupStart",
+        o."pickupWindowEnd"   AS "pickupEnd",
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'id', oi."id",
+              'menuItemId', oi."menuItemId",
+              'name', oi."name",
+              'quantity', oi."quantity",
+              'priceCents', oi."unitPriceCents"
+            ) ORDER BY oi."id"
+          ) FILTER (WHERE oi."id" IS NOT NULL),
+          '[]'::json
+        ) AS "items"
+    FROM "Order" o
+    JOIN "Vendor" v     ON v."id" = o."vendorId"
+    JOIN "FoodCourt" f  ON f."id" = v."foodCourtId"
+    LEFT JOIN "OrderItem" oi ON oi."orderId" = o."id"
+  WHERE o."customerId" = $1${extraFilter}
+  GROUP BY o."id", v."id", f."id"
+  ORDER BY o."createdAt" DESC, o."id" DESC`,
     params,
   );
   return rows;
@@ -135,13 +138,18 @@ module.exports.createOrder = async function createOrder({ customerId, stallId, p
       (sum, line) => sum + line.quantity * menuById.get(line.menuItemId).priceCents,
       0,
     );
-    const inserted = await client.query(
-      `INSERT INTO "Order" ("vendorId", "orderNumber", "customerId", "pickupWindowId", "customerName",
-                            "pickupWindowStart", "pickupWindowEnd", "totalCents")
-       VALUES ($1, $2, $3, $4, left($5, 60), $6, $7, $8)
-       RETURNING "id"`,
-      [stallId, orderNumber, customerId, pickupWindowId, customer.rows[0].name, slot.startTime, slot.endTime, totalCents],
-    );
+
+  const collectionReference = 'ML-' + Math.random().toString(36).slice(2, 10).toUpperCase();
+
+  const inserted = await client.query(
+    `INSERT INTO "Order" ("vendorId", "orderNumber", "customerId", "pickupWindowId",
+                          "customerName", "collectionReference",
+                          "pickupWindowStart", "pickupWindowEnd", "totalCents")
+    VALUES ($1, $2, $3, $4, left($5, 60), $6, $7, $8, $9)
+    RETURNING "id"`,
+    [stallId, orderNumber, customerId, pickupWindowId, customer.rows[0].name,
+    collectionReference, slot.startTime, slot.endTime, totalCents],
+  );
     orderId = inserted.rows[0].id;
 
     const orderItemParams = [orderId];
