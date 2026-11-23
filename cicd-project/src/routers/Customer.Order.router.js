@@ -1,5 +1,5 @@
 const express = require('express');
-const Order = require('../models/Order.model');
+const Order = require('../models/Customer.Order.model');
 const parseCheckout = require('../utils/parseCheckout');
 const parseId = require('../utils/parseId');
 const { authenticate, requireRole } = require('../middleware/auth');
