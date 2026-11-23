@@ -1,51 +1,58 @@
 const express = require('express');
 const createError = require('http-errors');
 const path = require('path');
+const { toHttpError } = require('./utils/errors');
 
-// Import route handlers
+// Keep the team's existing routes, SCRUM-12 authentication routes and the vendor routes.
 const somethingRouter = require('./routers/Something.router');
 const personRouter = require('./routers/Person.router');
+const stallRouter = require('./routers/Stall.router');
+const authRouter = require('./routers/Auth.router');
 const vendorRouter = require('./routers/Vendor.router');
 const menuRouter = require('./routers/Menu.router');
 const orderRouter = require('./routers/Order.router');
 const { settingsRouter, notificationsRouter } = require('./routers/Settings.router');
+const { loadSession } = require('./middleware/auth-session');
 
 const app = express();
 
-// Parse incoming JSON request bodies (e.g. from POST/PUT requests).
-// 1 MB so the profile page can send a (shrunken) picture as a base64 data URL.
+// 1 MB so the vendor pages can send a (shrunken) logo, banner or menu photo as a base64 data URL.
 app.use(express.json({ limit: '1mb' }));
 
-// Serve static files (HTML, CSS, JS, images) from the 'public' folder.
-// e.g. src/public/index.html is accessible at http://localhost:<port>/
-app.use(express.static(path.join(__dirname, 'public')));
+// Resolve only server-side sessions; do not trust a client-supplied user role.
+app.use(loadSession);
 
-// Browsers automatically request /favicon.ico — return 204 (no content) to avoid 404 noise.
+app.use(express.static(path.join(__dirname, 'public')));
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
+app.use('/api/auth', authRouter);
 app.use('/somethings', somethingRouter);
 app.use('/persons', personRouter);
+app.use('/stalls', stallRouter);
+
+// Vendor routes: the nested /vendors/:vendorId/... routers go before the /vendors router.
 app.use('/vendors/:vendorId/menu', menuRouter);
 app.use('/vendors/:vendorId/orders', orderRouter);
 app.use('/vendors/:vendorId/settings', settingsRouter);
 app.use('/vendors/:vendorId/notifications', notificationsRouter);
 app.use('/vendors', vendorRouter);
 
-// 404 handler — if no route above matched the request,
-// create a 404 error and pass it to the error handler below.
+// Unknown routes are handled after ALL feature routers.
 app.use((req, res, next) => {
   next(createError(404, `Unknown resource ${req.method} ${req.originalUrl}`));
 });
 
-// Global error handler — catches all errors thrown or passed via next(err).
-// Sends a consistent JSON response instead of Express's default HTML error page.
-// NOTE: Express requires exactly 4 parameters (error, req, res, next) to recognize
-// this as an error handler. 'next' is not used here, so we disable the ESLint rule.
+// Preserve the team's error conversion for customer browsing responses.
+// Errors already made with http-errors (e.g. the vendor controllers' 400/404/409) keep
+// their status and message.
 // eslint-disable-next-line no-unused-vars
 app.use((error, req, res, next) => {
-  console.error(error);
-  const status = error.status || 500;
-  res.status(status).json({ error: error.message });
+  const httpError = createError.isHttpError(error) ? error : toHttpError(error);
+  if (httpError.status >= 500) {
+    console.error(error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+  return res.status(httpError.status).json({ error: httpError.message });
 });
 
 module.exports = app;
