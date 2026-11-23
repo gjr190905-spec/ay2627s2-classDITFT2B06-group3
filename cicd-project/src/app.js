@@ -2,6 +2,7 @@ const express = require('express');
 const createError = require('http-errors');
 const path = require('path');
 const { toHttpError } = require('./utils/errors');
+const { toHttpError } = require('./utils/errors');
 
 // Keep the team's existing routes, SCRUM-12 authentication routes and the vendor routes.
 const somethingRouter = require('./routers/Something.router');
@@ -22,9 +23,13 @@ app.use(express.json({ limit: '1mb' }));
 // Resolve only server-side sessions; do not trust a client-supplied user role.
 app.use(loadSession);
 
+// Resolve only server-side sessions; do not trust a client-supplied user role.
+app.use(loadSession);
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
+app.use('/api/auth', authRouter);
 app.use('/api/auth', authRouter);
 app.use('/somethings', somethingRouter);
 app.use('/persons', personRouter);
