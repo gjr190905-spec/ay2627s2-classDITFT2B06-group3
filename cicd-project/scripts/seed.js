@@ -168,7 +168,7 @@ async function seed() {
       ((SELECT "id" FROM "Stall" WHERE "name" = 'Western Food'), 'Chicken Cutlet Rice',       480, true),
       ((SELECT "id" FROM "Stall" WHERE "name" = 'Western Food'), 'Beef Steak Rice',           580, true),
       ((SELECT "id" FROM "Stall" WHERE "name" = 'Western Food'), 'Chicken Sausage Rice',      480, true),
-      ((SELECT "id" FROM "Stall" WHERE "name" = 'Western Food'), 'Chicken & Popcorn Rice',    480, true),
+      ((SELECT "id" FROM "Stall" WHERE "name" = 'Western Food'), 'Popcorn chicken & Rice',    480, true),
       ((SELECT "id" FROM "Stall" WHERE "name" = 'Western Food'), 'Chicken Nugget Rice',       480, true),
       ((SELECT "id" FROM "Stall" WHERE "name" = 'Western Food'), 'Chicken Chop Spaghetti',    480, true),
       ((SELECT "id" FROM "Stall" WHERE "name" = 'Western Food'), 'Fish Fillet Spaghetti',     480, true),
