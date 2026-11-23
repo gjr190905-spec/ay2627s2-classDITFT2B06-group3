@@ -6,10 +6,14 @@ const {
   getOrderById
 } = require('../models/ordersModel');
 
+const {
+  generatePickupQR
+} = require('../models/pickupModel');
+
 const router = express.Router();
 
 // Create an order
-router.post('/', (req, res, next) => {
+router.post('/', async (req, res, next) => {
   const { customerId, stallId, items } = req.body;
 
   // Check required fields
@@ -52,9 +56,32 @@ router.post('/', (req, res, next) => {
     }
   }
 
-  createOrder(req.body)
-    .then((order) => res.status(201).json(order))
-    .catch(next);
+  try {
+    const order = await createOrder(req.body);
+
+    // Generate a QR code for the new order's collection reference
+    let qrCode = null;
+    let collectionReference = order.collection_reference;
+    let qrCodeError = null;
+
+    try {
+      const pickup = await generatePickupQR(order.order_id, order.customer_id);
+      qrCode = pickup.qrCode;
+      collectionReference = pickup.collectionReference;
+    } catch (qrError) {
+      console.error('QR code generation failed:', qrError.message);
+      qrCodeError = qrError.message;
+    }
+
+    res.status(201).json({
+      ...order,
+      collection_reference: collectionReference,
+      qrCode: qrCode,
+      qrCodeError: qrCodeError
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 // Get customer's orders

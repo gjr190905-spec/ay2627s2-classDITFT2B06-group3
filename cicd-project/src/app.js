@@ -25,6 +25,18 @@ app.get('/favicon.ico', (req, res) => res.status(204).end());
 app.use('/somethings', somethingRouter);
 app.use('/persons', personRouter);
 
+// Customer Order Routes
+app.use('/orders', ordersRouter);
+
+// Payment Routes
+app.use('/payments', paymentRouter);
+
+// Pickup Window Routes
+app.use('/pickup-windows', pickupWindowRouter);
+
+// Pickup Routes
+app.use('/pickup', pickupRouter);
+
 // 404 handler — if no route above matched the request,
 // create a 404 error and pass it to the error handler below.
 app.use((req, res, next) => {
@@ -38,21 +50,8 @@ app.use((req, res, next) => {
 // eslint-disable-next-line no-unused-vars
 app.use((error, req, res, next) => {
   console.error(error);
-  const status = error.status || 500;
+  const status = error.status || error.statusCode || 500;
   res.status(status).json({ error: error.message });
 });
-
-
-// Customer Order Routes
-app.use('/orders', ordersRouter);
-
-// Payment Routes
-app.use('/payments', paymentRouter);
-
-// Pickup Window Routes
-app.use('/pickup-windows', pickupWindowRouter);
-
-// Pickup Routes
-app.use('/pickup', pickupRouter);
 
 module.exports = app;

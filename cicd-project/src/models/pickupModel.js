@@ -1,6 +1,7 @@
 
+const crypto = require('crypto');
 const pool = require('./db');
-const QRCode = require('qrcode');
+const { generateQrCode } = require('../utils/qrGenerator');
 
 // Generate collection reference for an order
 module.exports.generatePickupQR = async function generatePickupQR(orderId, customerId) {
@@ -30,7 +31,7 @@ module.exports.generatePickupQR = async function generatePickupQR(orderId, custo
 
   // Generate reference if one does not exist
   if (!collectionReference) {
-    collectionReference = `PICKUP-${orderId}-${Date.now()}`;
+    collectionReference = `PICKUP-${crypto.randomBytes(16).toString('hex')}`;
 
     await pool.query(
       `UPDATE orders
@@ -51,8 +52,8 @@ module.exports.generatePickupQR = async function generatePickupQR(orderId, custo
     collectionReference = updatedRows[0].collection_reference;
   }
 
-  // Generate QR code
-  const qrCode = await QRCode.toDataURL(collectionReference);
+  // Generate QR code using the reusable QR generator
+  const qrCode = await generateQrCode(collectionReference);
 
   return {
     orderId: order.order_id,
