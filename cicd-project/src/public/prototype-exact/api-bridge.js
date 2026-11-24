@@ -6,7 +6,7 @@
   'use strict';
   // Only features available in the active Express app should be treated as live.
   // Independent teammate branches are not automatically merged into this branch.
-  const FEATURES = Object.freeze({auth:true,stallReads:true,cartBrowserOnly:true,checkout:false,vendorWrites:false,adminWrites:false,pickup:false,reviews:false,profiles:false});
+  const FEATURES = Object.freeze({auth:true,stallReads:true,cartBrowserOnly:true,checkout:false,vendorWrites:false,adminWrites:false,pickup:false,reviews:false,profiles:true});
   const FIXTURES = root.__ML_EXACT_FIXTURES__ || null;
   let previewCatalog = false;
   let catalogIssue = '';
@@ -327,7 +327,13 @@
     }
     const vendorUpdate=path.match(/^\/api\/vendor\/orders\/(\d+)\/status$/);
     if(vendorUpdate&&method==='PATCH')return vendorStatus(vendorUpdate[1],body);
-    if(path==='/api/profile'&&method==='PATCH'){if(!FEATURES.profiles)unsupported('Profile editing');return http('/api/profile',{method,body,auth:true});}
+    if(path==='/api/profile' && ['GET','PATCH'].includes(method)){
+      if(!FEATURES.profiles)unsupported('Profile management');
+      if(!me)fail('Please sign in to continue.',401,'UNAUTHENTICATED');
+      const result=await http('/api/profile',{method,body});
+      if(result.user)me=publicUser(result.user);
+      return {...result,user:me};
+    }
     if(path==='/api/vendor/stall'&&method==='PATCH'){
       if(!FEATURES.vendorWrites)unsupported('Vendor stall settings');
       if(!me?.stallId)unsupported('Vendor stall settings');

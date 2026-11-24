@@ -9,6 +9,7 @@ const personRouter = require('./routers/Person.router');
 const CustomerStallRouter = require('./routers/customer/Customer.Stall.router.js');
 const CustomerOrderRouter = require('./routers/customer/Customer.Order.router.js');
 const authRouter = require('./routers/Auth.router');
+const profileRouter = require('./routers/Profile.router');
 const vendorRouter = require('./routers/Vendor.router');
 const vendorMenuRouter = require('./routers/Vendor.Menu.router.js');
 const vendorOrderRouter = require('./routers/Vendor.Order.router');
@@ -31,6 +32,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 app.use('/api/auth', authRouter);
+app.use('/api/profile', profileRouter);
 app.use('/somethings', somethingRouter);
 app.use('/persons', personRouter);
 app.use('/stalls', CustomerStallRouter);

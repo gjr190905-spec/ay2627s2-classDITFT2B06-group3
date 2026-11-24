@@ -378,7 +378,11 @@ async function render() {
     else if(state.page==='info')html=infoPage();
     else if(state.page==='signup')html=signupPage();
     else if(state.page==='login')html=loginPage();
-    else if(state.page==='profile')html=profilePage();
+    else if(state.page==='profile'){
+      const profile=await request('/api/profile');
+      state.user=profile.user;
+      html=profilePage();
+    }
     else if(state.page==='stall'){html=stallPage(await request(`/api/stalls/${state.stallId}`));}
     else if(state.page==='cart'){
       const cart=await request('/api/cart');
