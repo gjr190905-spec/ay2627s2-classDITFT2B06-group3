@@ -6,17 +6,17 @@ const { toHttpError } = require('./utils/errors');
 // Keep the team's existing routes, SCRUM-12 authentication routes and the vendor routes.
 const somethingRouter = require('./routers/Something.router');
 const personRouter = require('./routers/Person.router');
-const stallRouter = require('./routers/Stall.router');
-const orderRouter = require('./routers/Customer.Order.router');
+const CustomerStallRouter = require('./routers/customer/Customer.Stall.router.js');
+const CustomerOrderRouter = require('./routers/customer/Customer.Order.router.js');
 const authRouter = require('./routers/Auth.router');
 const vendorRouter = require('./routers/Vendor.router');
-const menuRouter = require('./routers/Menu.router');
-const orderRouter = require('./routers/Order.router');
-const { settingsRouter, notificationsRouter } = require('./routers/Settings.router');
+const vendorMenuRouter = require('./routers/Vendor.Menu.router.js');
+const vendorOrderRouter = require('./routers/Vendor.Order.router');
+const { settingsRouter, notificationsRouter } = require('./routers/Vendor.Settings.router.js');
 const ordersRouter = require('./routers/ordersRouter');
-const paymentRouter = require('./routers/paymentRouter');
+const paymentRouter = require('./routers/PaymentRouter.js');
 const pickupWindowRouter = require('./routers/pickupWindowRouter');
-const vendorOrderRouter = require('./routers/vendorOrderRouter');
+const vendorOrderStatusRouter = require('./routers/VendorOrdersStatusRouter.js');
 const { loadSession } = require('./middleware/auth-session');
 
 const app = express();
@@ -33,8 +33,8 @@ app.get('/favicon.ico', (req, res) => res.status(204).end());
 app.use('/api/auth', authRouter);
 app.use('/somethings', somethingRouter);
 app.use('/persons', personRouter);
-app.use('/stalls', stallRouter);
-app.use('/orders', orderRouter);
+app.use('/stalls', CustomerStallRouter);
+app.use('/customer-orders', CustomerOrderRouter);
 
 
 // Integrated order-management routes (mounted before the 404 handler)
@@ -43,15 +43,15 @@ app.use('/payments', paymentRouter);
 app.use('/pickup-windows', pickupWindowRouter);
 
 // Vendor routes: the nested /vendors/:vendorId/... routers go before the /vendors router.
-app.use('/vendors/:vendorId/menu', menuRouter);
-app.use('/vendors/:vendorId/orders', orderRouter);
+app.use('/vendors/:vendorId/menu', vendorMenuRouter);
+app.use('/vendors/:vendorId/orders', vendorOrderStatusRouter);
 app.use('/vendors/:vendorId/settings', settingsRouter);
 app.use('/vendors/:vendorId/notifications', notificationsRouter);
 app.use('/vendors', vendorRouter);
 
 // Integrated order-management routes (mounted before the 404 handler)
 app.use('/orders', ordersRouter);
-app.use('/orders', vendorOrderRouter);
+app.use('/vendor-orders', vendorOrderRouter);
 app.use('/payments', paymentRouter);
 app.use('/pickup-windows', pickupWindowRouter);
 app.use((req, res, next) => {

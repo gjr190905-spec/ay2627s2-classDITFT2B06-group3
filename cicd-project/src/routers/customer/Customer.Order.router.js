@@ -1,8 +1,8 @@
 const express = require('express');
-const Order = require('../models/Customer.Order.model');
-const parseCheckout = require('../utils/parseCheckout');
-const parseId = require('../utils/parseId');
-const { authenticate, requireRole } = require('../middleware/auth');
+const Order = require('../../models/Customer/Customer.Order.model');
+const parseCheckout = require('../../utils/parseCheckout');
+const parseId = require('../../utils/parseId');
+const { authenticate, requireRole } = require('../../middleware/auth');
 const router = express.Router();
 
 router.use(authenticate, requireRole('customer'));

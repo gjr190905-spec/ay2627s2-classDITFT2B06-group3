@@ -14,7 +14,6 @@ const FALLBACK_DETAILS = {
     blurb: 'Handmade noodles, soups and braised dishes.',
   },
 };
-// Add this near the top with your other constants
 const STALL_IMAGES = {
   'Our Sweet Toast':        'https://images.unsplash.com/photo-1484723091739-30a097e8f929?w=400&h=240&fit=crop',
   'Canopy Greens':          'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=240&fit=crop',

@@ -1,5 +1,5 @@
-const pool = require('./db');
-const { mapError, toHttpError, ERROR_CODES } = require('../utils/errors');
+const pool = require('../db');
+const { mapError, toHttpError, ERROR_CODES } = require('../../utils/errors');
 
 // ── Reading orders ───────────────────────────────────────
 async function selectOrders(db, customerId, orderId) {

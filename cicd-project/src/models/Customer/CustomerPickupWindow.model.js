@@ -1,5 +1,5 @@
-const pool = require('./db');
-const parseId = require('../utils/parseId');
+const pool = require('../db');
+const parseId = require('../../utils/parseId');
 
 const MAX_WINDOWS_RETURNED = 100;
 const WINDOW_DURATION_MINUTES = 5;

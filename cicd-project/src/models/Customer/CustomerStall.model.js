@@ -1,5 +1,5 @@
-const pool = require('./db');
-const parseId = require('../utils/parseId');
+const pool = require('../db');
+const parseId = require('../../utils/parseId');
 
 module.exports.getAllStalls = async function getAllStalls() {
   const { rows } = await pool.query(

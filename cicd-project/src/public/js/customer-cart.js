@@ -439,7 +439,7 @@ async function placeOrder() {
 
   try {
     // Prices are not sent. The server looks them up so the total cannot be faked.
-    const order = await apiRequest('/orders', {
+    const order = await apiRequest('/customer-orders', {
       method: 'POST',
       requiresAuth: true,
       body: {

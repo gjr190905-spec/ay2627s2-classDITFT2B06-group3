@@ -268,7 +268,7 @@ function renderDetail(order) {
 
 async function loadDetail(id, isRefresh) {
   try {
-    const order = await apiGet(`/orders/${id}`);
+    const order = await apiGet(`/customer-orders/${id}`);
 
     const signature = JSON.stringify(order);
     if (signature === lastSignature) {
