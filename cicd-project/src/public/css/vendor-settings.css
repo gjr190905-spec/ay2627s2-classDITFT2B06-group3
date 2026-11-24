@@ -1,0 +1,289 @@
+/* ─────────────────────────────────────────────────────────
+   Vendor settings page
+   Depends on theme.css (colours, fonts, buttons), vendor-home.css
+   (header, dialog, toast, signed-out panel) and vendor-profile.css
+   (title, cards, fields, notes).
+   ───────────────────────────────────────────────────────── */
+
+.vs-main {
+  max-width: 760px;
+}
+
+.vs-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 1rem;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.vs-select {
+  appearance: none;
+  padding-right: 2.5rem;
+  cursor: pointer;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ml-ink-soft) 50%),
+    linear-gradient(135deg, var(--ml-ink-soft) 50%, transparent 50%);
+  background-position:
+    calc(100% - 1.15rem) 50%,
+    calc(100% - 0.8rem) 50%;
+  background-size: 0.35rem 0.35rem;
+  background-repeat: no-repeat;
+}
+
+.vs-load {
+  margin: 1rem 0 0;
+  padding: 0.7rem 0.9rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  background: var(--ml-surface);
+  border-radius: var(--ml-radius-sm);
+}
+
+.vs-load.is-full {
+  color: var(--ml-red);
+  background: var(--ml-red-tint);
+}
+
+.vs-main .vp-input[aria-invalid='true'] {
+  border-color: var(--ml-red);
+  background: var(--ml-red-tint);
+}
+
+/* ── Switches (real checkboxes, styled) ─────────────────── */
+.vs-switches {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vs-switches > li {
+  padding: 0.85rem 0;
+  border-top: 1px solid var(--ml-line);
+}
+
+.vs-switches > li:first-child {
+  border-top: 0;
+  padding-top: 0.25rem;
+}
+
+.vs-switch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  cursor: pointer;
+}
+
+.vs-switch input {
+  position: absolute;
+  z-index: 1; /* on top of the drawn track, so it gets the click */
+  width: 44px;
+  height: 26px;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.vs-switch__track {
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  background: #c9b9b3;
+  transition: background-color 150ms ease;
+}
+
+.vs-switch__track span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
+  transition: left 150ms ease;
+}
+
+.vs-switch input:checked + .vs-switch__track {
+  background: var(--ml-green);
+}
+
+.vs-switch input:checked + .vs-switch__track span {
+  left: 21px;
+}
+
+.vs-switch input:focus-visible + .vs-switch__track {
+  outline: 3px solid var(--ml-focus, #1a73e8);
+  outline-offset: 2px;
+}
+
+.vs-switch__text {
+  display: grid;
+}
+
+.vs-switch__name {
+  font-weight: 800;
+}
+
+.vs-switch__desc {
+  font-size: 0.86rem;
+  color: var(--ml-ink-soft);
+}
+
+.vs-threshold {
+  max-width: 22rem;
+  margin: 0.85rem 0 0 calc(44px + 0.9rem);
+}
+
+/* ── Save bar ───────────────────────────────────────────── */
+.vs-save {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: -0.25rem 0 1.5rem;
+}
+
+.vs-save .vp-error {
+  flex: 1 1 100%;
+  margin: 0;
+  text-align: right;
+}
+
+.vs-save .vp-error:empty {
+  display: none;
+}
+
+.vs-save__state {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--ml-ink-soft);
+}
+
+/* ── Notification list ──────────────────────────────────── */
+.vs-inbox__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.vs-inbox__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.vs-btn--small {
+  min-height: 36px;
+  padding: 0.35rem 0.95rem;
+  font-size: 0.84rem;
+}
+
+.vs-btn--quiet {
+  color: var(--ml-ink-soft);
+  border-color: var(--ml-line);
+}
+
+.vs-btn--quiet:hover:not([disabled]) {
+  color: var(--ml-red);
+  border-color: var(--ml-red);
+}
+
+.vs-inbox__actions .ml-btn[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.vs-inbox {
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vs-note {
+  position: relative;
+  padding: 0.8rem 0 0.8rem 1rem;
+  border-top: 1px solid var(--ml-line);
+}
+
+.vs-note:first-child {
+  border-top: 0;
+}
+
+/* Unread: a bar on the left plus a "New" label (never colour alone) */
+.vs-note.is-unread::before {
+  content: '';
+  position: absolute;
+  top: 0.9rem;
+  bottom: 0.9rem;
+  left: 0;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--ml-red);
+}
+
+.vs-note__top {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.vs-note__type {
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ml-ink-soft);
+}
+
+.vs-note__new {
+  padding: 0.05rem 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #fff;
+  background: var(--ml-red);
+  border-radius: 999px;
+}
+
+.vs-note__when {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--ml-ink-soft);
+}
+
+.vs-note__message {
+  margin: 0.2rem 0 0;
+}
+
+.vs-note:not(.is-unread) .vs-note__message {
+  color: var(--ml-ink-soft);
+}
+
+.vs-empty {
+  margin: 0.5rem 0 0;
+  padding: 1.25rem;
+  text-align: center;
+  color: var(--ml-ink-soft);
+  border: 1px dashed var(--ml-line);
+  border-radius: var(--ml-radius);
+}
+
+@media (max-width: 560px) {
+  .vs-row {
+    grid-template-columns: 1fr;
+  }
+
+  .vs-threshold {
+    margin-left: 0;
+  }
+}

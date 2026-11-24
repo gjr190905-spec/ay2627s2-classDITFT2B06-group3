@@ -136,7 +136,7 @@ try {
 // ── 3. Unit + Integration Tests ──────────────────────────
 run(
   '3. UNIT + INTEGRATION TESTS (jest --coverage)',
-  'npx dotenv -e .env.test -- npx jest --testPathPatterns=__tests__/unit --silent && dotenv -e .env.test -- jest --testPathPatterns=__tests__/integration --globalSetup=./configs/jest-integration-setup.js --silent --coverage --coverageReporters=text --coverageReporters=html --coverageReporters=lcov',
+  'npx dotenv -e .env.test -- npx jest --testPathPatterns=__tests__/unit --silent && dotenv -e .env.test -- jest --testPathPatterns=__tests__/integration --runInBand --globalSetup=./configs/jest-integration-setup.js --silent --coverage --coverageReporters=text --coverageReporters=html --coverageReporters=lcov',
 );
 
 // ── 4. Playwright E2E ────────────────────────────────────

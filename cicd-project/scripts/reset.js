@@ -8,9 +8,14 @@ const pool = new Pool({
 });
 
 async function reset() {
-  // Read and execute schema.sql (single source of truth for DB structure)
+  // schema.sql is the shared branch schema from the Gitmaster, kept unchanged.
+  // It is written for a fresh database (no DROP statements), so start from an empty
+  // "public" schema every time.
   const schemaSql = fs.readFileSync(path.join(__dirname, '..', 'schema.sql'), 'utf8');
   console.log('Resetting database schema...');
+  await pool.query('SET client_min_messages = warning');
+  await pool.query('DROP SCHEMA IF EXISTS public CASCADE');
+  await pool.query('CREATE SCHEMA public');
   await pool.query(schemaSql);
   console.log('Schema applied.');
 
