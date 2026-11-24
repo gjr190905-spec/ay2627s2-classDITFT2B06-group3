@@ -8,6 +8,7 @@
   // Independent teammate branches are not automatically merged into this branch.
   const FEATURES = Object.freeze({auth:true,stallReads:true,cartBrowserOnly:true,checkout:false,vendorWrites:false,adminWrites:false,pickup:false,reviews:false,profiles:false});
   const FIXTURES = root.__ML_EXACT_FIXTURES__ || null;
+  const MENU_REFERENCE = root.MakanMenuReference || null;
   let previewCatalog = false;
   let catalogIssue = '';
   const cookieKey = 'makan-live-cart-v1:';
@@ -103,11 +104,16 @@
     stallsCache.set(stall.id,stall);return stall;
   }
   function normalizeMenuItem(m,stallId) {
+    const matchedStall=stallsCache.get(id(m.stallId || m.stall_id || m.vendorId || stallId));
+    const stallName=clean(m.stallName || m.stall_name, matchedStall?.name || '');
+    const originalPath=clean(m.imagePath || m.image_path || m.image_url);
     const item={
-      id:id(m.id), stall_id:id(m.stallId||m.vendorId||stallId), name:clean(m.name,'Unnamed item'),
+      id:id(m.id), stall_id:id(m.stallId||m.stall_id||m.vendorId||stallId), name:clean(m.name,'Unnamed item'),
       description:clean(m.description),category:clean(m.category,'Menu'),
       price_cents:num(m.priceCents ?? m.price_cents), is_available:m.isAvailable !== false && m.is_available !== false,
-      image_path:clean(m.image_path), is_featured:!!(m.isFeatured ?? m.is_featured),
+      image_path:MENU_REFERENCE?.imageFor({...m,image_path:originalPath},stallName) || originalPath,
+      stall_name:stallName,
+      is_featured:!!(m.isFeatured ?? m.is_featured),
     };
     menuCache.set(item.id,item);return item;
   }
@@ -157,9 +163,17 @@
       }
     }
     if (!item) fail('This menu item is not available.',404,'NOT_FOUND');
-    // No fabricated vendor-specific customisation/price; defaults are explicitly unpriced.
-    return {item,details:{sizes:[{id:'regular',label:'Regular',extraCents:0,scale:1}],addons:[],
-      nutrition:{calories:0,proteinG:0,carbsG:0,fatG:0},allergens:['Not provided by stall'],prepMinutes:0},recommendations:[]};
+    // The reference data is visual/demo-only. Base menu prices still come from the API.
+    // No unverified extra charges are sent to the server.
+    const details=MENU_REFERENCE?.detailsFor(item,item.stall_name) || {
+      sizes:[{id:'regular',label:'Regular',extraCents:0,scale:1}],addons:[],nutrition:null,
+      allergens:['Ask the vendor about ingredients and allergens'],prepMinutes:0,nutritionIsEstimate:false,
+    };
+    const recommendations=[...menuCache.values()]
+      .filter(other=>other.stall_id===item.stall_id && other.id!==item.id && other.is_available)
+      .sort((a,b)=>Number(b.is_featured)-Number(a.is_featured))
+      .slice(0,3);
+    return {item,details,recommendations};
   }
   async function cartView() {
     const cart=readCart();
@@ -183,7 +197,13 @@
     if(cart.stallId && cart.stallId!==item.stall_id) fail('Your basket contains items from another stall. Clear it first to switch stalls.',409,'CART_STALL_CONFLICT');
     cart.stallId=item.stall_id;
     const existing=cart.items.find(x=>x.id===item.id);
-    if(existing){ if(existing.quantity+qty>20) fail('Maximum 20 of an item per order.',400);existing.quantity+=qty;}
+    if(existing){
+      if(existing.quantity+qty>20) fail('Maximum 20 of an item per order.',400);
+      existing.quantity+=qty;
+      // The browser cart has one line per menu item; the most recent preferences
+      // become that line's preferences. These are not billed as verified add-ons.
+      if(selections)existing.selections=selections;
+    }
     else cart.items.push({id:item.id,quantity:qty,selections});
     writeCart(cart);return cartView();
   }
