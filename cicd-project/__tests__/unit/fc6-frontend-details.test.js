@@ -62,10 +62,39 @@ test('illustrative nutrition is defined for all 121 FC6 dishes and cannot be mis
     expect(meta.nutritionIsEstimate).toBe(true);
     expect(meta.nutrition.calories).toBeGreaterThan(0);
     nutrition.add(JSON.stringify(meta.nutrition));
-    expect(meta.sizes).toHaveLength(1);
+    const eligible=/^(?:rice|noodles|pasta|salad|burger|set meal|sandwich|soup)$/i.test(dish.category);
+    expect(meta.sizes).toHaveLength(eligible ? 3 : 1);
+    expect(meta.sizes[0].id).toBe('regular');
     expect(meta.sizes[0].extraCents).toBe(0);
+    if(eligible) {
+      expect(Array.from(meta.sizes, v => v.id)).toEqual(['regular','large','sharing']);
+      expect(Array.from(meta.sizes, v => v.extraCents)).toEqual([0,180,380]);
+      expect(meta.sizes.slice(1).every(v => v.isDemo)).toBe(true);
+    }
   }
   expect(nutrition.size).toBe(121);
+});
+
+test('original size options are restored on main meals only, with demo pricing kept out of checkout', () => {
+  const meals=[
+    {stall_name:'Japanese Food',name:'Chicken Katsu Don Rice',category:'Rice'},
+    {stall_name:'Canopy Greens',name:'Signature Bowl',category:'Salad'},
+  ];
+  for(const dish of meals){
+    const sizes=reference.detailsFor(dish,dish.stall_name).sizes;
+    expect(Array.from(sizes,v=>v.label)).toEqual(['Regular','Large','Sharing']);
+    expect(Array.from(sizes,v=>v.extraCents)).toEqual([0,180,380]);
+  }
+  for(const category of ['Sides','Drinks','Dessert','Add-on']){
+    const dish=fixtures.menus.find(m=>m.court_name==='Food Court 6' && m.category===category);
+    const sizes=reference.detailsFor(dish,dish.stall_name).sizes;
+    expect(sizes).toHaveLength(1);
+  }
+  const app=fs.readFileSync(path.join(front,'app.js'),'utf8');
+  const adapter=fs.readFileSync(path.join(front,'api-bridge.js'),'utf8');
+  expect(app).toContain('disabled aria-disabled');
+  expect(app).toContain('if(selectedSize?.isDemo)');
+  expect(adapter).toContain('UNVERIFIED_SIZE');
 });
 
 test('98 eligible dishes each have exactly three unpriced reference add-on suggestions', () => {
