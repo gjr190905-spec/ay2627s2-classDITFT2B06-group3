@@ -1,6 +1,4 @@
-const TOKEN_KEY = 'token';
-const CART_KEY = 'cart'; 
-const LOGIN_PAGE = 'index.html';
+const CART_KEY = 'cart';
 const PLACEHOLDER_IMAGE = 'images/stalls/placeholder.png';
 
 const FALLBACK_DETAILS = {
@@ -36,7 +34,6 @@ const searchForm = document.getElementById('search-form');
 const searchInput = document.getElementById('stall-search');
 const cardTemplate = document.getElementById('stall-card-template');
 const cartBadge = document.getElementById('cart-count');
-const signOutButton = document.getElementById('sign-out');
 
 let allStalls = [];
 let selectedCourt = null;
@@ -247,11 +244,6 @@ searchForm.addEventListener('submit', (event) => {
   event.preventDefault();
   searchText = searchInput.value.trim().toLowerCase();
   renderStalls();
-});
-
-signOutButton.addEventListener('click', () => {
-  localStorage.removeItem(TOKEN_KEY);
-  window.location.href = LOGIN_PAGE;
 });
 
 // ── Start ────────────────────────────────────────────────

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#BA080D" />
+    <meta name="description" content="Sign in to Makan Liao to discover campus meals and manage your account." />
+    <title>Sign In — Makan Liao?</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,800;0,900;1,800;1,900&family=DM+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles/auth-pages.css" />
+    <script src="/auth-pages.js" defer></script>
+  </head>
+  <body data-auth-page="login">
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <div class="topbar">MADE FOR SP STUDENTS &amp; STAFF <span aria-hidden="true">|</span> ORDER TOGETHER, SAVE MORE <span aria-hidden="true">|</span> COLLECT AT YOUR CAMPUS CANTEEN</div>
+    <header class="site-header">
+      <div class="header-inner container">
+        <a class="brand" href="/home.html" aria-label="Makan Liao homepage"><img src="/images/makan-liao-logo.png" alt="Makan Liao?" /></a>
+        <nav class="nav-links" id="site-navigation" aria-label="Main navigation">
+          <a class="nav-link" href="/home.html">Home</a>
+          <a class="nav-link" href="/menu.html">Food Stalls</a>
+          <button class="nav-link" type="button" data-future="How It Works">How It Works</button>
+          <button class="nav-link" type="button" data-future="Orders">Orders</button>
+        </nav>
+        <div class="header-actions">
+          <a class="icon-btn header-search" href="/menu.html" aria-label="Browse and search food stalls" title="Search food stalls"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m15.5 15.5 5.2 5.2"/></svg></a>
+          <a class="btn btn-outline btn-small" href="/login.html" data-nav-auth="login">Sign In</a>
+          <a class="btn btn-small" href="/signup.html" data-nav-auth="signup">Sign Up</a>
+          <button class="icon-btn mobile-menu" id="mobile-menu" aria-label="Toggle navigation menu" aria-controls="site-navigation" aria-expanded="false" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+        </div>
+      </div>
+    </header>
+    <main id="main" class="container main">
+      <section class="auth-wrap" aria-labelledby="auth-heading">
+        <div class="auth-art">
+          <div>
+            <img class="auth-logo" src="/images/makan-liao-logo.png" alt="Makan Liao?" />
+            <div class="overline">CAMPUS FOOD, SORTED.</div>
+            <h1>Your next break <span>starts here.</span></h1>
+            <p>Sign in to pre-order your favourites, manage pickup times or access your participating food stall.</p>
+          </div>
+          <p class="quote">Designed for Singapore Polytechnic students, staff and participating vendors.</p>
+        </div>
+        <div class="auth-form">
+          <div class="overline">WELCOME BACK</div>
+          <h2 id="auth-heading">Sign in to Makan Liao.</h2>
+          <p>Sign in with your Makan Liao account to order ahead and manage your pickups.</p>
+          <div id="form-status" class="form-status" role="status" aria-live="polite" hidden></div>
+          <form id="auth-form" novalidate>
+            <div class="form-field">
+              <label for="email">Email address</label>
+              <input id="email" name="email" type="email" autocomplete="username" inputmode="email" placeholder="you@example.com" maxlength="254" required aria-describedby="error-email" />
+              <span class="field-error" id="error-email" aria-live="polite"></span>
+            </div>
+            <div class="form-field">
+              <label for="password">Password</label>
+              <div class="password-field">
+                <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required aria-describedby="error-password" />
+                <button class="reveal-button" type="button" data-reveal="password" aria-pressed="false">Show</button>
+              </div>
+              <span class="field-error" id="error-password" aria-live="polite"></span>
+            </div>
+            <button id="submit-button" class="btn btn-wide" type="submit">Sign in <span aria-hidden="true">→</span></button>
+          </form>
+          <p class="auth-switch">New to Makan Liao? <a href="/signup.html">Create a customer account <span aria-hidden="true">→</span></a></p>
+          <p class="help-note">This is a student project, not Singapore Polytechnic Single Sign-On. Do not use your SP password.</p>
+          <section id="signed-in" class="signed-in" aria-live="polite" hidden>
+            <div class="overline">ACCOUNT CONNECTED</div>
+            <h3>You are signed in.</h3>
+            <p id="signed-in-name"></p>
+            <p id="signed-in-role"></p>
+            <div class="signed-in-actions">
+              <a class="btn" href="/menu.html">Browse food stalls <span aria-hidden="true">→</span></a>
+              <button class="btn btn-outline" id="logout-button" type="button">Sign out</button>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <a class="footer-brand" href="/home.html" aria-label="Makan Liao home"><img src="/images/makan-liao-logo.png" alt="Makan Liao?" /></a>
+        <p class="footer-brief">A campus food ordering platform for Singapore Polytechnic students and staff.</p>
+        <nav class="footer-links" aria-label="Footer navigation">
+          <button type="button" data-future="About">About</button>
+          <button type="button" data-future="Help &amp; Support">Help &amp; Support</button>
+          <button type="button" data-future="Terms">Terms</button>
+          <button type="button" data-future="Privacy">Privacy</button>
+        </nav>
+      </div>
+      <p class="container footer-disclaimer">Independent student project. Not an official Singapore Polytechnic login or payment service.</p>
+    </footer>
+    <div class="ui-notice" id="ui-notice" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>

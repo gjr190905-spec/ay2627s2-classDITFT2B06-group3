@@ -26,6 +26,9 @@ app.use(express.json({ limit: '1mb' }));
 // Resolve only server-side sessions; do not trust a client-supplied user role.
 app.use(loadSession);
 
+// Day 8: open the Makan Liao landing page without replacing the team's CI/CD scaffold.
+app.get('/', (req, res) => res.redirect(302, '/home.html'));
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 

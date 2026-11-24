@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#BA080D" />
+    <meta name="description" content="Makan Liao — browse Singapore Polytechnic campus food stalls and order ahead." />
+    <title>Makan Liao? — Less queue. More makan.</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,800;0,900;1,800;1,900&family=DM+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles/auth-pages.css" />
+    <link rel="stylesheet" href="/styles/home-day8.css" />
+    <script src="/auth-shell.js" defer></script>
+  </head>
+  <body data-auth-page="home">
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <div class="topbar">MADE FOR SP STUDENTS &amp; STAFF <span aria-hidden="true">|</span> ORDER TOGETHER, SAVE MORE <span aria-hidden="true">|</span> COLLECT AT YOUR CAMPUS CANTEEN</div>
+    <header class="site-header">
+      <div class="header-inner container">
+        <a class="brand" href="/home.html" aria-label="Makan Liao homepage"><img src="/images/makan-liao-logo.png" alt="Makan Liao?" /></a>
+        <nav class="nav-links" aria-label="Main navigation" id="site-navigation">
+          <a class="nav-link active" aria-current="page" href="/home.html">Home</a>
+          <a class="nav-link" href="/menu.html">Food Stalls</a>
+          <a class="nav-link" href="#how-it-works">How It Works</a>
+          <a class="nav-link" href="/menu.html">Browse Menu</a>
+        </nav>
+        <div class="header-actions">
+          <a class="icon-btn header-search" href="/menu.html" aria-label="Browse food stalls" title="Search food stalls"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m15.5 15.5 5.2 5.2"/></svg></a>
+          <a data-session-guest class="btn btn-outline btn-small" href="/login.html">Sign In</a>
+          <a data-session-guest class="btn btn-small" href="/signup.html">Sign Up</a>
+          <span data-session-user data-session-name class="account-greeting" hidden></span>
+          <button data-session-user data-session-logout class="btn btn-outline btn-small" type="button" hidden>Sign Out</button>
+          <button class="icon-btn mobile-menu" id="mobile-menu" aria-label="Toggle navigation menu" aria-controls="site-navigation" aria-expanded="false" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+        </div>
+      </div>
+    </header>
+    <main id="main" class="container homepage">
+      <p data-session-error class="home-error" role="alert" hidden></p>
+      <section class="home-hero" aria-labelledby="home-title">
+        <div class="home-copy">
+          <div class="home-kicker">MADE FOR YOUR NEXT BREAK</div>
+          <h1 id="home-title">LESS QUEUE.<br /><em>MORE MAKAN.</em></h1>
+          <p>Your campus favourites, all in one place. Discover stalls, plan your next meal and spend less time waiting.</p>
+          <div class="home-actions">
+            <a class="btn home-primary" href="/menu.html">Explore food stalls <span aria-hidden="true">→</span></a>
+            <a class="btn home-secondary" data-session-guest href="/signup.html">Create an account</a>
+          </div>
+          <p data-guest-message class="home-status">Sign in to add dishes to your cart.</p>
+          <p data-session-user class="home-status" hidden>Welcome back, <strong data-session-name></strong>. You're signed in and ready to explore!</p>
+        </div>
+        <div class="home-hero-media"><img src="/images/hero-food.webp" alt="Campus food ready to enjoy" /></div>
+      </section>
+      <section id="how-it-works" class="home-steps" aria-labelledby="steps-heading">
+        <div class="home-section-header"><p class="overline">HOW IT WORKS</p><h2 id="steps-heading">Good food, made easier.</h2></div>
+        <div class="home-step-grid">
+          <article><span>01</span><h3>Explore food stalls</h3><p>Browse the food courts and discover the dishes available on campus.</p></article>
+          <article><span>02</span><h3>Choose your favourites</h3><p>Sign in to add items to your cart while planning your meal.</p></article>
+          <article><span>03</span><h3>Collect on campus</h3><p>More ordering and collection features are being integrated in upcoming development days.</p></article>
+        </div>
+      </section>
+    </main>
+    <footer class="site-footer"><div class="container footer-inner">
+      <a class="footer-brand" href="/home.html" aria-label="Makan Liao home"><img src="/images/makan-liao-logo.png" alt="Makan Liao?" /></a>
+      <p class="footer-brief">A campus food ordering platform for Singapore Polytechnic students and staff.</p>
+      <nav class="footer-links" aria-label="Footer navigation"><a href="/home.html#how-it-works">How It Works</a><a href="/menu.html">Food Stalls</a><a href="/login.html">Sign In</a></nav>
+    </div><p class="container footer-disclaimer">Independent student project. Not an official Singapore Polytechnic login or payment service.</p></footer>
+    <script src="/home-day8.js" defer></script>
+  </body>
+</html>
