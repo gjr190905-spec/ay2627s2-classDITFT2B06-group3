@@ -14,6 +14,15 @@ const FALLBACK_DETAILS = {
     blurb: 'Handmade noodles, soups and braised dishes.',
   },
 };
+// Add this near the top with your other constants
+const STALL_IMAGES = {
+  'Our Sweet Toast':        'https://images.unsplash.com/photo-1484723091739-30a097e8f929?w=400&h=240&fit=crop',
+  'Canopy Greens':          'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=240&fit=crop',
+  'Foodgonomy':             'https://images.unsplash.com/photo-1603362548634-f26e6ce7237a?w=400&h=240&fit=crop',
+  'Japanese Food':          'https://images.unsplash.com/photo-1569050467447-ce54b3bbc37d?w=400&h=240&fit=crop',
+  'Western Food':           'https://images.unsplash.com/photo-1432139509613-5c4255815697?w=400&h=240&fit=crop',
+  'Hello Handmade Noodles': 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400&h=240&fit=crop',
+};
 
 const CUISINE_LABELS = {
   breakfast: 'Breakfast',
@@ -91,6 +100,7 @@ function normaliseStall(raw) {
     itemCount = parsedCount;
   }
 
+  console.log(raw.name, STALL_IMAGES[raw.name]);
   return {
     id: raw.id,
     name: raw.name,
@@ -100,7 +110,7 @@ function normaliseStall(raw) {
     cuisine,
     cuisineLabel: CUISINE_LABELS[cuisine] || 'Other',
     blurb: raw.description || fallback.blurb || '',
-    imagePath: raw.imagePath || PLACEHOLDER_IMAGE,
+    imagePath: raw.imagePath || STALL_IMAGES[raw.name] || PLACEHOLDER_IMAGE,
   };
 }
 
