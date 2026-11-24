@@ -42,9 +42,18 @@
     const addons=(record?.addons || []).map((label,index)=>({
       id:`demo-${index+1}`,label,extraCents:0,calories:0,allergens:[],isDemo:true
     }));
-    // No invented size upcharges or vendor prices are exposed.
+    // Three size cards match the original Chicken Katsu Don reference design.
+    // The sample upgrade amounts are UI PREVIEWS only, not confirmed vendor prices.
+    // The order/cart adapter deliberately prevents unverified upgrades from being charged.
+    // Only matched main dishes offer size choices; drinks, sides and desserts remain regular-only.
+    const mainMeal=!!record && /^(?:rice|noodles|pasta|salad|burger|set meal|sandwich|soup)$/i.test(category.trim());
+    const regular={id:'regular',label:'Regular',extraCents:0,scale:1,isDemo:false};
+    const sizes=mainMeal ? [regular,
+      {id:'large',label:'Large',extraCents:180,scale:1.35,isDemo:true},
+      {id:'sharing',label:'Sharing',extraCents:380,scale:1.8,isDemo:true},
+    ] : [regular];
     return {
-      sizes:[{id:'regular',label:'Regular',extraCents:0,scale:1}],
+      sizes,
       addons,
       nutrition,
       allergens:['Please confirm ingredients and allergens with the vendor'],

@@ -6,7 +6,7 @@
   'use strict';
   // Only features available in the active Express app should be treated as live.
   // Independent teammate branches are not automatically merged into this branch.
-  const FEATURES = Object.freeze({auth:true,stallReads:true,cartBrowserOnly:true,checkout:false,vendorWrites:false,adminWrites:false,pickup:false,reviews:false,profiles:false});
+  const FEATURES = Object.freeze({auth:true,stallReads:true,cartBrowserOnly:true,checkout:false,vendorWrites:false,adminWrites:false,pickup:false,reviews:false,profiles:true});
   const FIXTURES = root.__ML_EXACT_FIXTURES__ || null;
   const MENU_REFERENCE = root.MakanMenuReference || null;
   let previewCatalog = false;
@@ -188,6 +188,8 @@
       totalCents:lines.reduce((n,x)=>n+x.price_cents*x.quantity,0),items:lines};
   }
   async function addCartItem(itemId, quantity=1, selections=null) {
+    // The server bills the base menu price; reject demo upgrades to prevent checkout mismatches.
+    if(selections?.size && selections.size!=='regular') fail('Size upgrades are not available for checkout until vendor pricing is enabled.',409,'UNVERIFIED_SIZE');
     if(!me || me.role!=='customer') fail('Sign in as a customer to add meals.',401,'UNAUTHENTICATED');
     let item=menuCache.get(Number(itemId));
     if(!item) {await itemDetails(itemId);item=menuCache.get(Number(itemId));}
@@ -347,7 +349,14 @@
     }
     const vendorUpdate=path.match(/^\/api\/vendor\/orders\/(\d+)\/status$/);
     if(vendorUpdate&&method==='PATCH')return vendorStatus(vendorUpdate[1],body);
-    if(path==='/api/profile'&&method==='PATCH'){if(!FEATURES.profiles)unsupported('Profile editing');return http('/api/profile',{method,body,auth:true});}
+    if(path==='/api/profile'&&['GET','PATCH'].includes(method)){
+      if(!FEATURES.profiles)unsupported('Profile editing');
+      return http('/api/profile',{method,body,auth:false});
+    }
+    if(path==='/api/vendor/weekly-stats'&&method==='GET'){
+      if(!me||me.role!=='vendor')fail('Vendor account required.',403);
+      return http('/api/vendor/weekly-stats',{auth:false});
+    }
     if(path==='/api/vendor/stall'&&method==='PATCH'){
       if(!FEATURES.vendorWrites)unsupported('Vendor stall settings');
       if(!me?.stallId)unsupported('Vendor stall settings');

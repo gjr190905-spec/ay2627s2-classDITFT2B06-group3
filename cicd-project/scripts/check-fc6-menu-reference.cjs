@@ -27,7 +27,9 @@ for(const dish of fixtures.menus){
   assert(fs.existsSync(image),`Missing image asset: ${item.image_path}`);
   actualPhotos.add(item.image_path);
   assert(meta.nutrition && meta.nutrition.calories>0,`Missing nutrition estimate: ${item.name}`);
-  assert(meta.sizes.length===1 && meta.sizes[0].extraCents===0);
+  const mainMeal=/^(?:rice|noodles|pasta|salad|burger|set meal|sandwich|soup)$/i.test(item.category);
+  assert(meta.sizes.length===(mainMeal?3:1) && meta.sizes[0].extraCents===0);
+  if(mainMeal)assert.deepEqual(Array.from(meta.sizes,x=>x.extraCents),[0,180,380]);
   nutritionCombos.add(JSON.stringify(meta.nutrition));
   if(meta.addons.length){
     optionDishes++;
@@ -52,4 +54,4 @@ const html=fs.readFileSync(path.join(front,'index.html'),'utf8');
 assert(html.indexOf('menu-reference-data.js')>=0 && html.indexOf('menu-reference-data.js')<html.indexOf('api-bridge.js'));
 const app=fs.readFileSync(path.join(front,'app.js'),'utf8');
 assert(app.includes('function openDish(')&&app.includes('dish-closing')&&app.includes('renderDish()'));
-console.log('PASS: 121 distinct FC6 image references and files; 121 distinct illustrative nutrition sets; 98 sets of three zero-charge demo add-ons; four screenshot dishes mapped; detail modal source present.');
+console.log('PASS: FC6 photos, illustrative nutrition, add-on sets and three demo size choices for eligible main meals.');

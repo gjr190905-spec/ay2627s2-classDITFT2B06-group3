@@ -399,3 +399,16 @@ img,video,canvas { max-inline-size:100%; }
 .menu-food-photo img{transition:transform .25s ease-out}
 .menu-card:hover .menu-food-photo img{transform:scale(1.035)}
 @media(prefers-reduced-motion:reduce){.dish-scrim.dish-closing,.dish-scrim.dish-closing .dish-panel{animation:none!important}.menu-food-photo img{transition:none!important}}
+
+/* SCRUM-24 follow-up: distinguish unverified size previews from orderable options. */
+.dish-size-note{font-size:11px;line-height:1.5;color:#866b64;margin:11px 0 0}
+.dish-cart-cta:disabled{opacity:.65;cursor:not-allowed;background:#806d69;border-color:#806d69}
+.dish-size span{line-height:1.35}
+
+/* Role-based profile and weekly vendor statistics: reuses existing design tokens and typography. */
+.weekly-sales-chart{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px;align-items:end;margin-top:24px;min-height:190px}
+.weekly-sales-day{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0}
+.weekly-sales-track{width:100%;height:122px;background:rgba(140,90,65,.07);border-radius:8px;display:flex;align-items:end;overflow:hidden}
+.weekly-sales-bar{background:#cc0202;width:100%;border-radius:8px 8px 0 0;min-height:2px}
+.weekly-sales-day strong{font-variant-numeric:tabular-nums;white-space:nowrap;font-size:11px}
+@media(max-width:600px){.weekly-sales-chart{gap:4px}.weekly-sales-day strong{font-size:9px}}
