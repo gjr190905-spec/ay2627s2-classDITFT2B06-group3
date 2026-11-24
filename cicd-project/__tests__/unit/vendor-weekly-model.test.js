@@ -14,6 +14,12 @@ test('queries only assigned stall and computes 7 zero-filled day totals', async 
   expect(stats.completedOrders).toBe(2);expect(stats.averageCents).toBe(825);
   expect(pool.query.mock.calls[0][1][0]).toBe(17);
   expect(pool.query.mock.calls[0][0]).toContain('FROM vendor_weekly_order_facts');
+  // created_at can be TEXT in the existing DB, so both timezone conversion and
+  // range filtering must cast it to a real timestamp before PostgreSQL evaluates it.
+  const sql = pool.query.mock.calls[0][0];
+  expect(sql).toContain("created_at::timestamptz AT TIME ZONE 'Asia/Singapore'");
+  expect(sql).toContain('created_at::timestamptz >= $2::timestamptz');
+  expect(sql).toContain('created_at::timestamptz < $3::timestamptz');
 });
 test('rejects invalid IDs before SQL', async()=>{
   await expect(getWeeklyStatsForAssignedStall('17 OR TRUE')).rejects.toThrow();

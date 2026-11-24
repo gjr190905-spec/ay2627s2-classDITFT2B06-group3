@@ -17,12 +17,12 @@ async function getWeeklyStatsForAssignedStall(stallId, now = new Date()) {
   const paidStatuses = ['COLLECTED', 'COMPLETED'];
   // No user-supplied stallId. Rows come only from the logged-in vendor's assigned stall.
   const { rows } = await pool.query(
-    `SELECT (created_at AT TIME ZONE 'Asia/Singapore')::date::text AS day,
+    `SELECT (created_at::timestamptz AT TIME ZONE 'Asia/Singapore')::date::text AS day,
             COUNT(*)::integer AS all_orders,
             COUNT(*) FILTER (WHERE UPPER(order_status) = ANY($4::text[]))::integer AS completed_orders,
             COALESCE(SUM(CASE WHEN UPPER(order_status) = ANY($4::text[]) THEN total_amount ELSE 0 END), 0) AS completed_value
        FROM vendor_weekly_order_facts
-      WHERE stall_id = $1 AND created_at >= $2 AND created_at < $3
+      WHERE stall_id = $1 AND created_at::timestamptz >= $2::timestamptz AND created_at::timestamptz < $3::timestamptz
       GROUP BY 1 ORDER BY 1`,
     [stallId, start.toISOString(), end.toISOString(), paidStatuses],
   );
