@@ -4,8 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Stall menu | Makan Liao</title>
-    <link rel="stylesheet" href="styles/menu.css" />
-    <link rel="stylesheet" href="styles/stall-menu.css" />
+    <link rel="stylesheet" href="../customer-styles/menu.css" />
+    <link rel="stylesheet" href="../customer-styles/stall-menu.css" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -14,7 +14,7 @@
 
     <header class="site-header">
       <a class="brand" href="menu.html">
-        <img class="brand__logo" src="images/logo.webp" alt="Makan Liao" width="120" height="48" />
+        <img class="brand__logo" src="../images/brand/makan-liao-logo.png" alt="Makan Liao" width="120" height="48" />
       </a>
 
       <nav class="site-nav" aria-label="Main">
@@ -60,6 +60,9 @@
           <section class="menu" aria-labelledby="menu-title">
             <h2 id="menu-title">The menu</h2>
             <p class="section-hint">Prices are in SGD. Availability can change.</p>
+            <p style="font-size: 0.6rem; color: var(--muted); margin-top: 0.1 rem;">
+              *Images shown are for illustrative purposes only and may not represent the actual product.
+            </p>
             <p class="message" id="menu-empty" hidden>This stall has no menu items yet.</p>
             <ul class="menu-list" id="menu-list"></ul>
           </section>
@@ -121,7 +124,7 @@
       </li>
     </template>
 
-    <script src="stall-menu.js" defer></script>
+    <script src="../js/customer-stall-menu.js" defer></script>
   </body>
 </html>
   

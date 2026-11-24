@@ -7,7 +7,7 @@ const {
   advanceOrder,
   collectOrder,
   getOrderStats,
-} = require('../models/Order.model');
+} = require('../models/Vendor.order.model');
 const { parseVendorId: parseId } = require('./Vendor.controller');
 const { validateCheckoutPayload } = require('./Menu.controller');
 

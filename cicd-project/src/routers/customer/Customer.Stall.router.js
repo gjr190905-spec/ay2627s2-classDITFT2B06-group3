@@ -1,9 +1,10 @@
 const express = require('express');
-const { getAllStalls, getStallById } = require('../models/Stall.model');
-const { getMenuItemsByStallId } = require('../models/MenuItem.model');
-const { getUpcomingWindowsByStallId } = require('../models/PickupWindow.model');
-const { ERROR_CODES, mapError } = require('../utils/errors');
-const parseId = require('../utils/parseId');
+const { getAllStalls, getStallById } = require('../../models/Customer/CustomerStall.model');
+const { getMenuItemsByStallId } = require('../../models/Customer/Customer.MenuItem.model');
+const { getUpcomingWindowsByStallId } = require('../../models/Customer/CustomerPickupWindow.model');
+const { authenticate, requireRole } = require('../../middleware/auth');
+const { ERROR_CODES, mapError } = require('../../utils/errors');
+const parseId = require('../../utils/parseId');
 
 const router = express.Router();
 router.get('/:id/menu', async (req, res, next) => {
@@ -23,7 +24,7 @@ router.get('/:id/menu', async (req, res, next) => {
   }
 });
 
-router.get('/:id/windows', async (req, res, next) => {
+router.get('/:id/windows',authenticate, requireRole('customer', 'vendor', 'admin', 'staff'), async (req, res, next) => {
   try {
     const stallId = parseId(req.params.id);
     if (stallId === null) {

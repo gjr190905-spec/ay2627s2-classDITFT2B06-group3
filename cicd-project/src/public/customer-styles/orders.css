@@ -1,0 +1,366 @@
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.orders-eyebrow {
+  margin-bottom: 0.5rem;
+  color: var(--red);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* ── Page head ────────────────────────────────────────── */
+.orders-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+}
+
+.message--success {
+  background: var(--open-bg);
+  border: 1px solid #b9e0c8;
+  color: var(--open-ink);
+  font-weight: 600;
+}
+
+.message--success a {
+  margin-left: 0.5rem;
+  font-weight: 800;
+}
+
+/* ── Status pill ──────────────────────────────────────── */
+.order-status {
+  display: inline-block;
+  padding: 0.2rem 0.7rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.order-status--confirmed {
+  background: var(--tag-bg);
+  color: var(--tag-ink);
+}
+
+.order-status--preparing {
+  background: #fff1cc;
+  color: #7a5200;
+}
+
+.order-status--ready {
+  background: var(--open-bg);
+  color: var(--open-ink);
+}
+
+.order-status--collected {
+  background: var(--closed-bg);
+  color: var(--closed-ink);
+}
+
+.order-status--cancelled {
+  background: var(--red-tint);
+  color: var(--red-dark);
+}
+
+/* ── Order list ───────────────────────────────────────── */
+.order-list {
+  display: grid;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.order-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+  padding: 1.25rem 1.5rem;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+}
+
+.order-card__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.order-card__ref {
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.order-card__stall {
+  margin-top: 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.order-card__meta {
+  margin-top: 0.15rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.order-card__side {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.order-card__total {
+  font-weight: 800;
+}
+
+.order-card__link {
+  text-decoration: none;
+}
+
+.order-card__link::after {
+  content: '\00a0\2192';
+}
+
+/* ── Empty state ──────────────────────────────────────── */
+.orders-empty {
+  margin-top: 2rem;
+  padding: 2.5rem 1.5rem;
+  background: var(--white);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-card);
+  text-align: center;
+}
+
+.orders-empty p {
+  margin-top: 0.5rem;
+  color: var(--muted);
+}
+
+.orders-empty .button {
+  margin-top: 1.25rem;
+}
+
+/* ── Single order ─────────────────────────────────────── */
+.back-link {
+  margin-bottom: 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.back-link a {
+  color: var(--red);
+  text-decoration: none;
+}
+
+.back-link a::before {
+  content: '\2190\00a0';
+}
+
+.back-link a:hover {
+  text-decoration: underline;
+}
+
+.card {
+  padding: 1.75rem;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+}
+
+.detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+}
+
+.order-detail h1 {
+  font-size: clamp(1.75rem, 4.5vw, 2.25rem);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.detail-stall {
+  margin-top: 0.25rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.order-detail h2 {
+  margin-top: 2rem;
+  font-size: 1.1rem;
+}
+
+/* Progress tracker */
+.tracker {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  margin: 1.75rem 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.tracker__step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: center;
+  counter-increment: step;
+}
+
+.tracker__step::before {
+  content: counter(step);
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  background: var(--closed-bg);
+  border-radius: 50%;
+  color: var(--muted);
+}
+
+.tracker__step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 0.95rem;
+  left: calc(50% + 1.25rem);
+  width: calc(100% + 0.5rem - 2.5rem);
+  height: 2px;
+  background: var(--line);
+}
+
+.tracker__step--done::before {
+  content: '\2713';
+  background: var(--red);
+  color: var(--white);
+}
+
+.tracker__step--done:not(:last-child)::after {
+  background: var(--red);
+}
+
+.tracker__step--current {
+  color: var(--ink);
+}
+
+.tracker__step--current::before {
+  box-shadow: 0 0 0 4px var(--red-tint);
+}
+
+.order-detail .message {
+  margin-top: 1.5rem;
+}
+
+/* Facts */
+.detail-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 1rem 1.5rem;
+  margin: 2rem 0 0;
+  padding: 1.25rem 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.detail-facts dt {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.detail-facts dd {
+  margin: 0.2rem 0 0;
+  font-weight: 700;
+}
+
+/* Items */
+.detail-items {
+  margin-top: 0.75rem;
+}
+
+.detail-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.detail-item:first-child {
+  border-top: 0;
+}
+
+.detail-item__price {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.detail-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+  font-weight: 800;
+}
+
+.detail-total strong {
+  font-size: 1.5rem;
+  letter-spacing: -0.01em;
+}
+
+.pay-note {
+  margin-top: 1.5rem;
+  padding: 0.9rem 1rem;
+  background: #fff6e5;
+  border: 1px solid #f1dfb8;
+  border-radius: 12px;
+  color: #5b4a1f;
+  font-size: 0.85rem;
+}
+
+/* ── Small screens ────────────────────────────────────── */
+@media (max-width: 600px) {
+  .card {
+    padding: 1.25rem;
+  }
+
+  .order-card {
+    padding: 1.1rem;
+  }
+
+  .order-card__side {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .tracker__step {
+    font-size: 0.72rem;
+  }
+}

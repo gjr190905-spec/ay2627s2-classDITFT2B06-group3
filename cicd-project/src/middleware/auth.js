@@ -1,8 +1,3 @@
-/**
- * SCRUM integration JWT bridge: Bearer tokens are bound to a live server session.
- * JWT_SECRET must be a random 32+ character secret configured in the environment.
- * Checkout APIs accept an Authorization: Bearer <JWT> header.
- */
 const jwt = require('jsonwebtoken');
 const parseId = require('../utils/parseId');
 const { findActiveSession } = require('../models/Session.model');
@@ -40,7 +35,6 @@ function rejectUnauthenticated(next, message = 'Invalid or expired access token'
 }
 
 async function authenticate(req, res, next) {
-  // The bearer header is mandatory for JWT-only APIs. A cookie never bypasses it.
   req.user = null;
   req.authMethod = null;
   const header = req.headers.authorization;
@@ -69,8 +63,6 @@ async function authenticate(req, res, next) {
   ) return rejectUnauthenticated(next);
 
   try {
-    // A valid signature alone is insufficient: check active account and session
-    // against PostgreSQL. Logout revokes JWTs by removing the linked session.
     const user = await findActiveSession(claims.sid);
     if (!user || user.id !== userId || user.role !== claims.role) {
       return rejectUnauthenticated(next);

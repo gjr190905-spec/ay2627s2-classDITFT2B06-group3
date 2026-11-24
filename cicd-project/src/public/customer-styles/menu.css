@@ -147,7 +147,7 @@ a {
 
 .brand__logo {
   width: auto;
-  height: 44px;
+  height: 100px;
 }
 
 .site-nav__list {
@@ -438,14 +438,17 @@ main h2 {
 }
 
 .stall-card__image {
+.stall-card__image {
   width: 100%;
   aspect-ratio: 5 / 3;
   background-color: var(--image-bg);
+  /* DELETE THIS LINE ↓ */
+  /* content: url('https://placehold.co/500x300/efe2d6/6f625c?text=Stall+Photo'); */
   background-image: url('https://placehold.co/500x300/efe2d6/6f625c?text=Stall+Photo');
   background-position: center;
   background-size: cover;
-  content: url('https://placehold.co/500x300/efe2d6/6f625c?text=Stall+Photo');
   object-fit: cover;
+}
 }
 
 .stall-card__body {

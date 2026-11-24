@@ -1,4 +1,5 @@
 const pool = require('./db');
+const parseId = require('../utils/parseId');
 
 module.exports.createSomething = async function createSomething(name) {
   const { rows } = await pool.query('INSERT INTO "Something" ("name") VALUES ($1) RETURNING *', [

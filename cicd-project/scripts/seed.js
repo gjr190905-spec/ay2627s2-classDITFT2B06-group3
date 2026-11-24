@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const { hashPassword } = require('../src/services/password-security');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -175,6 +176,24 @@ async function seed() {
     customers.push(...rows);
   }
   console.log(`Inserted ${persons.length} persons.`);
+    // ── Persons with credentials ──────────────────────────
+  const passwordHash = await hashPassword('Password123!');
+
+  await pool.query(`
+    INSERT INTO "Person" ("email", "name", "role", "isActive") VALUES
+      ('odxny@example.com', 'Odxny', 'customer', true),
+      ('elimf@example.com', 'Test Vendor', 'vendor', true)
+    ON CONFLICT ("email") DO NOTHING;
+  `);
+
+  await pool.query(`
+    INSERT INTO "PersonCredential" ("personId", "passwordHash")
+    SELECT "id", $1 FROM "Person" 
+    WHERE "email" IN ('odxny@example.com', 'elimf@example.com')
+    ON CONFLICT DO NOTHING;
+  `, [passwordHash]);
+
+  console.log('Inserted persons with credentials.');
 
   // Insert somethings (batch)
   if (somethings.length > 0) {
@@ -398,7 +417,7 @@ async function seedFoodCourt6() {
       ((SELECT "id" FROM "Stall" WHERE "name" = 'Western Food'), 'Chicken Cutlet Rice',       480, true),
       ((SELECT "id" FROM "Stall" WHERE "name" = 'Western Food'), 'Beef Steak Rice',           580, true),
       ((SELECT "id" FROM "Stall" WHERE "name" = 'Western Food'), 'Chicken Sausage Rice',      480, true),
-      ((SELECT "id" FROM "Stall" WHERE "name" = 'Western Food'), 'Chicken & Popcorn Rice',    480, true),
+      ((SELECT "id" FROM "Stall" WHERE "name" = 'Western Food'), 'Popcorn chicken & Rice',    480, true),
       ((SELECT "id" FROM "Stall" WHERE "name" = 'Western Food'), 'Chicken Nugget Rice',       480, true),
       ((SELECT "id" FROM "Stall" WHERE "name" = 'Western Food'), 'Chicken Chop Spaghetti',    480, true),
       ((SELECT "id" FROM "Stall" WHERE "name" = 'Western Food'), 'Fish Fillet Spaghetti',     480, true),

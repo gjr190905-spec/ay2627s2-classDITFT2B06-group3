@@ -30,6 +30,16 @@ const cartBadge = document.getElementById('cart-count');
 const itemTemplate = document.getElementById('menu-item-template');
 const replaceDialog = document.getElementById('replace-dialog');
 const replaceText = document.getElementById('replace-text');
+const ITEM_IMAGES = {
+  'Just Yogurt Petite':              'https://images.unsplash.com/photo-1786912029812-f1516e62b8f4?q=80&w=880&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?w=400&h=300&fit=crop',
+  'Just Yogurt Regular':             'https://images.unsplash.com/photo-1786386370191-6c427763c0a3?q=80&w=627&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?w=400&h=300&fit=crop',
+  'Just Yogurt Grande':              'https://images.unsplash.com/photo-1786386370191-6c427763c0a3?q=80&w=627&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?w=400&h=300&fit=crop',
+  'Petite Yogurt with 1 Topping':    'https://images.unsplash.com/photo-1669127045641-0ae683639570?q=80&w=688&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?w=400&h=300&fit=crop',
+  'Regular Yogurt with 2 Toppings':  'https://images.unsplash.com/photo-1670843838196-0c1c15e85d5e?q=80&w=1169&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?w=400&h=300&fit=crop',
+  'Grande Yogurt with 3 Toppings':   'https://images.unsplash.com/photo-1593450298197-e6031f033a44?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?w=400&h=300&fit=crop',
+  'Parfait with 5 Toppings':         'https://images.unsplash.com/photo-1615522894493-2f3e3fda615c?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?w=400&h=300&fit=crop',
+  'Extra Topping':                   'https://images.unsplash.com/photo-1601493701002-3223e7e1ebaf?q=80&w=1074&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?w=400&h=300&fit=crop',
+};
 
 // ── Page state ───────────────────────────────────────────
 let stall = null;
@@ -40,15 +50,15 @@ const rows = new Map();
 async function apiGet(path, requiresAuth = false) {
   const headers = {};
   const token = localStorage.getItem(TOKEN_KEY);
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
+  if (token) headers.Authorization = `Bearer ${token}`;
 
-    const response = await fetch(path, { headers });
-    if (response.status === 401 && requiresAuth) {
+  const response = await fetch(path, { headers });
+  if (response.status === 401 && requiresAuth) {
     window.location.href = LOGIN_PAGE;
-    throw new Error('Not signed in');
-    }
+    const error = new Error('Not signed in');
+    error.redirecting = true;
+    throw error;
+  }
   if (!response.ok) {
     const error = new Error(`Request failed with status ${response.status}`);
     error.status = response.status;
@@ -78,7 +88,6 @@ function readCart() {
       return cart;
     }
   } catch {
-    return emptyCart();
   }
   return emptyCart();
 }
@@ -188,6 +197,12 @@ function changeQuantity(item, change) {
 
 function buildRow(item) {
   const fragment = itemTemplate.content.cloneNode(true);
+  const imageUrl = ITEM_IMAGES[item.name];
+      if (imageUrl) {
+        fragment.querySelector('.menu-item__image').style.backgroundImage = `url('${imageUrl}')`;
+        fragment.querySelector('.menu-item__image').style.backgroundSize = 'cover';
+        fragment.querySelector('.menu-item__image').style.backgroundPosition = 'center';
+      }
   const row = {
     addButton: fragment.querySelector('.add-button'),
     stepper: fragment.querySelector('.stepper'),
@@ -292,7 +307,11 @@ async function loadWindows(stallId) {
     renderWindows(await apiGet(`/stalls/${stallId}/windows`));
   } catch (error) {
     console.error(error);
-    windowsMessage.textContent = 'We could not load pickup times. Refresh the page to try again.';
+     if (error.status === 401) {
+      windowsMessage.textContent = 'Sign in to see available pickup times.';
+    } else {
+      windowsMessage.textContent = 'We could not load pickup times. Refresh the page to try again.';
+    }
     windowsMessage.hidden = false;
   }
 }
@@ -312,7 +331,7 @@ async function loadPage() {
     return;
   }
 
-  let menuItems;
+  let menuItems = [];
   try {
     [stall, menuItems] = await Promise.all([
       apiGet(`/stalls/${stallId}`),
@@ -337,6 +356,24 @@ async function loadPage() {
     court.textContent = stall.foodCourtName;
     court.hidden = false;
   }
+
+  // In loadPage(), after you get the stall data back:
+const heroArt = document.querySelector('.stall-hero__art');
+const STALL_IMAGES = {
+  'Foodgonomy':            'https://images.unsplash.com/photo-1603362548634-f26e6ce7237a?q=80&w=1074&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?w=600&h=400&fit=crop',
+  'Our Sweet Toast':       'https://images.unsplash.com/photo-1484723091739-30a097e8f929?w=600&h=400&fit=crop',
+  'Canopy Greens':         'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&h=400&fit=crop',
+  'Japanese Food':         'https://images.unsplash.com/photo-1569050467447-ce54b3bbc37d?w=600&h=400&fit=crop',
+  'Western Food':          'https://images.unsplash.com/photo-1432139509613-5c4255815697?w=600&h=400&fit=crop',
+  'Hello Handmade Noodles':'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=600&h=400&fit=crop',
+};
+
+if (STALL_IMAGES[stall.name]) {
+  heroArt.style.backgroundImage = `url('${STALL_IMAGES[stall.name]}')`;
+  heroArt.style.backgroundSize = 'cover';
+  heroArt.style.backgroundPosition = 'center';
+  heroArt.style.borderRadius = '0'; // remove the circle
+}
 
   menuList.replaceChildren();
   menuItems.forEach(buildRow);

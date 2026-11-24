@@ -6,16 +6,17 @@ const { toHttpError } = require('./utils/errors');
 // Keep the team's existing routes, SCRUM-12 authentication routes and the vendor routes.
 const somethingRouter = require('./routers/Something.router');
 const personRouter = require('./routers/Person.router');
-const stallRouter = require('./routers/Stall.router');
+const CustomerStallRouter = require('./routers/customer/Customer.Stall.router.js');
+const CustomerOrderRouter = require('./routers/customer/Customer.Order.router.js');
 const authRouter = require('./routers/Auth.router');
 const vendorRouter = require('./routers/Vendor.router');
-const menuRouter = require('./routers/Menu.router');
-const orderRouter = require('./routers/Order.router');
-const { settingsRouter, notificationsRouter } = require('./routers/Settings.router');
+const vendorMenuRouter = require('./routers/Vendor.Menu.router.js');
+const vendorOrderRouter = require('./routers/Vendor.Order.router');
+const { settingsRouter, notificationsRouter } = require('./routers/Vendor.Settings.router.js');
 const ordersRouter = require('./routers/ordersRouter');
-const paymentRouter = require('./routers/paymentRouter');
+const paymentRouter = require('./routers/PaymentRouter.js');
 const pickupWindowRouter = require('./routers/pickupWindowRouter');
-const vendorOrderRouter = require('./routers/vendorOrderRouter');
+const vendorOrderStatusRouter = require('./routers/VendorOrdersStatusRouter.js');
 const { loadSession } = require('./middleware/auth-session');
 
 const app = express();
@@ -32,29 +33,32 @@ app.get('/favicon.ico', (req, res) => res.status(204).end());
 app.use('/api/auth', authRouter);
 app.use('/somethings', somethingRouter);
 app.use('/persons', personRouter);
-app.use('/stalls', stallRouter);
+app.use('/stalls', CustomerStallRouter);
+app.use('/customer-orders', CustomerOrderRouter);
+
 
 // Integrated order-management routes (mounted before the 404 handler)
-app.use('/orders', ordersRouter);
-app.use('/orders', vendorOrderRouter);
+app.use('/VendorOrders', vendorOrderRouter);
 app.use('/payments', paymentRouter);
 app.use('/pickup-windows', pickupWindowRouter);
 
 // Vendor routes: the nested /vendors/:vendorId/... routers go before the /vendors router.
-app.use('/vendors/:vendorId/menu', menuRouter);
-app.use('/vendors/:vendorId/orders', orderRouter);
+app.use('/vendors/:vendorId/menu', vendorMenuRouter);
+app.use('/vendors/:vendorId/orders', vendorOrderStatusRouter);
 app.use('/vendors/:vendorId/settings', settingsRouter);
 app.use('/vendors/:vendorId/notifications', notificationsRouter);
 app.use('/vendors', vendorRouter);
 
-// Unknown routes are handled after ALL feature routers.
+// Integrated order-management routes (mounted before the 404 handler)
+app.use('/orders', ordersRouter);
+app.use('/vendor-orders', vendorOrderRouter);
+app.use('/payments', paymentRouter);
+app.use('/pickup-windows', pickupWindowRouter);
 app.use((req, res, next) => {
   next(createError(404, `Unknown resource ${req.method} ${req.originalUrl}`));
 });
 
-// Preserve the team's error conversion for customer browsing responses.
-// Errors already made with http-errors (e.g. the vendor controllers' 400/404/409) keep
-// their status and message.
+// Global error handler — MUST be last, needs all 4 params
 // eslint-disable-next-line no-unused-vars
 app.use((error, req, res, next) => {
   // Preserve status codes/messages produced by merged order/payment models.

@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Your basket | Makan Liao</title>
+    <link rel="stylesheet" href="../customer-styles/menu.css" />
+    <link rel="stylesheet" href="../customer-styles/cart.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+
+    <p class="promo-bar">Order before your break. Pay at the stall when you collect.</p>
+
+    <header class="site-header">
+      <a class="brand" href="menu.html">
+        <img class="brand__logo" src="../images/brand/makan-liao-logo.png" alt="Makan Liao" width="120" height="48" />
+      </a>
+
+      <nav class="site-nav" aria-label="Main">
+        <ul class="site-nav__list">
+          <li><a href="menu.html">Food stalls</a></li>
+          <li><a href="orders.html">My orders</a></li>
+          <li>
+            <a href="cart.html" aria-current="page">
+              Cart
+              <span class="cart-badge" id="cart-count" aria-live="polite">0</span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+
+      <div class="site-user">
+        <button type="button" class="button button--outline" id="sign-out">Sign out</button>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="page-intro" aria-labelledby="page-title">
+        <p class="cart-intro__eyebrow">Your basket</p>
+        <h1 id="page-title">Ready when you are.</h1>
+        <p>Review your items and pick a collection slot. Payment happens at the stall.</p>
+      </section>
+
+      <ol class="steps" aria-label="Checkout steps">
+        <li class="steps__item steps__item--active"><span class="steps__num">1</span> Review order</li>
+        <li class="steps__item steps__item--active"><span class="steps__num">2</span> Pickup time</li>
+        <li class="steps__item"><span class="steps__num">3</span> Confirmation</li>
+      </ol>
+
+      <section class="cart-empty" id="cart-empty" aria-labelledby="empty-title" hidden>
+        <h2 id="empty-title">Your basket is empty</h2>
+        <p>Pick a stall and add something you like.</p>
+        <a class="button button--primary" href="menu.html">Browse food stalls</a>
+      </section>
+
+      <div class="cart-layout" id="cart-content" hidden>
+        <div class="cart-main">
+          <p class="message" id="cart-notice" role="status" hidden></p>
+
+          <section class="card" aria-labelledby="cart-stall-name">
+            <div class="card__head">
+              <div>
+                <h2 id="cart-stall-name" tabindex="-1"></h2>
+                <p class="card__hint" id="cart-count-text" role="status"></p>
+              </div>
+              <button type="button" class="button button--outline" id="clear-cart">Clear basket</button>
+            </div>
+            <ul class="cart-lines" id="cart-lines"></ul>
+          </section>
+
+          <section class="card" aria-labelledby="pickup-title">
+            <h2 id="pickup-title">Pickup details</h2>
+            <p class="card__hint">Choose when you will collect your order. Slots are in Singapore time.</p>
+            <p class="message" id="windows-message" role="status">Loading pickup times...</p>
+            <fieldset class="slots" id="slots" hidden>
+              <legend class="visually-hidden">Pickup time</legend>
+              <ul class="slot-list" id="slot-list"></ul>
+            </fieldset>
+          </section>
+        </div>
+
+        <aside class="cart-side" aria-label="Order summary">
+          <section class="card order-summary" aria-labelledby="summary-title">
+            <h2 id="summary-title">Order summary</h2>
+
+            <dl class="summary-rows">
+              <div>
+                <dt id="summary-items-label">Items</dt>
+                <dd id="summary-items"></dd>
+              </div>
+            </dl>
+
+            <p class="summary-total">
+              <span>Total</span>
+              <strong id="summary-total"></strong>
+            </p>
+
+            <p class="pay-note">
+              <strong>Pay at pickup.</strong> No online payment is needed. Confirm your order now and pay when you
+              collect it at the stall.
+            </p>
+
+            <p class="message message--error" id="checkout-message" role="alert" hidden></p>
+
+            <button type="button" class="button button--primary place-order" id="place-order" disabled>
+              Place order
+            </button>
+            <p class="card__hint" id="checkout-hint" role="status"></p>
+            <p class="card__hint">Your pickup time is reserved when your order is placed.</p>
+          </section>
+        </aside>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <p>A campus food ordering platform for students and staff.</p>
+      <p class="site-footer__note">
+        Independent class project prototype. Locations, menus and accounts are fictional. Pay at pickup only. There is no
+        online payment.
+      </p>
+    </footer>
+
+    <dialog id="clear-dialog" aria-labelledby="clear-title">
+      <h2 id="clear-title">Clear your basket?</h2>
+      <p>This removes every item from your basket.</p>
+      <div class="dialog-actions">
+        <button type="button" class="button button--outline" id="clear-cancel">Keep my basket</button>
+        <button type="button" class="button button--primary" id="clear-confirm">Clear basket</button>
+      </div>
+    </dialog>
+
+    <!-- Used by cart.js. The image area is pure CSS, same placeholder as the menu cards. -->
+    <template id="cart-line-template">
+      <li class="cart-line">
+        <div class="cart-line__image" aria-hidden="true"></div>
+        <div class="cart-line__info">
+          <h3 class="cart-line__name"></h3>
+          <p class="cart-line__each"></p>
+          <p class="status status--closed cart-line__status" hidden>Sold out. Remove it to continue.</p>
+          <div class="cart-line__controls">
+            <div class="stepper">
+              <button type="button" class="stepper__minus">&minus;</button>
+              <span class="stepper__qty">1</span>
+              <button type="button" class="stepper__plus">+</button>
+            </div>
+            <button type="button" class="link-button cart-line__remove">Remove</button>
+          </div>
+        </div>
+        <p class="cart-line__total"></p>
+      </li>
+    </template>
+
+    <script src="../js/customer-cart.js" defer></script>
+  </body>
+</html>
