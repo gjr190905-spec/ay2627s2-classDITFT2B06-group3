@@ -1,4 +1,6 @@
+const TOKEN_KEY = 'token';
 const CART_KEY = 'cart';
+const LOGIN_PAGE = 'index.html';
 const MAX_QUANTITY = 20;
 
 const money = new Intl.NumberFormat('en-SG', { style: 'currency', currency: 'SGD' });
@@ -31,16 +33,22 @@ const replaceText = document.getElementById('replace-text');
 
 // ── Page state ───────────────────────────────────────────
 let stall = null;
-let pendingItem = null;
+let pendingItem = null; 
 const rows = new Map();
 
 // ── API ──────────────────────────────────────────────────
 async function apiGet(path, requiresAuth = false) {
-  const response = await fetch(path, { credentials: 'same-origin' });
-  if (response.status === 401 && requiresAuth) {
-    await window.MakanAuth.requireUser();
-    throw new Error('Not signed in');
+  const headers = {};
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
   }
+
+    const response = await fetch(path, { headers });
+    if (response.status === 401 && requiresAuth) {
+    window.location.href = LOGIN_PAGE;
+    throw new Error('Not signed in');
+    }
   if (!response.ok) {
     const error = new Error(`Request failed with status ${response.status}`);
     error.status = response.status;
@@ -50,8 +58,13 @@ async function apiGet(path, requiresAuth = false) {
 }
 
 // ── Cart (kept in localStorage) ──────────────────────────
-async function requireAuth() {
-  return window.MakanAuth.requireUser();
+function requireAuth() {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) {
+    window.location.href = LOGIN_PAGE;
+    return false;
+  }
+  return true;
 }
 
 function emptyCart() {
@@ -149,8 +162,8 @@ function updateRow(item) {
   row.plus.disabled = quantity >= MAX_QUANTITY || !item.isAvailable;
 }
 
-async function changeQuantity(item, change) {
-  if (!(await requireAuth())) return;
+function changeQuantity(item, change) {
+  if (!requireAuth()) return;
   const cart = readCart();
   const cartIsForAnotherStall = cart.items.length > 0 && cart.stallId !== stall.id;
 
@@ -334,5 +347,10 @@ async function loadPage() {
   renderCartSummary();
   loadWindows(stall.id);
 }
+
+document.getElementById('sign-out').addEventListener('click', () => {
+  localStorage.removeItem(TOKEN_KEY);
+  window.location.href = LOGIN_PAGE;
+});
 
 loadPage();
