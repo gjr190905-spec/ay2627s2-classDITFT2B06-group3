@@ -2,7 +2,6 @@ const express = require('express');
 const createError = require('http-errors');
 const path = require('path');
 const { toHttpError } = require('./utils/errors');
-const { toHttpError } = require('./utils/errors');
 
 // Keep the team's existing routes and SCRUM-12 authentication routes.
 const somethingRouter = require('./routers/Something.router');
