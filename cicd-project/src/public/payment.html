@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Payment</title>
+  <link rel="stylesheet" href="./payment.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>Payment</h1>
+
+    <div id="loading">Loading order details...</div>
+
+    <div id="error-state" class="hidden">
+      <p id="error-message"></p>
+      <button id="reload-button">Try Again</button>
+    </div>
+
+    <div id="payment-state" class="hidden">
+      <p>Order ID: <strong id="order-id">-</strong></p>
+      <p>Total Amount: <strong id="total-amount">-</strong></p>
+
+      <p>Payment Method:</p>
+      <label><input type="radio" name="paymentMethod" value="CARD" checked /> Card</label>
+      <label><input type="radio" name="paymentMethod" value="CASH" /> Cash</label>
+
+      <br />
+      <button id="pay-button">Pay Now</button>
+
+      <div class="test-toggle">
+        <input type="checkbox" id="simulate-fail" />
+        <label for="simulate-fail">Simulate failure (testing)</label>
+      </div>
+    </div>
+
+    <div id="processing-state" class="hidden">
+      <p>Processing payment...</p>
+    </div>
+
+    <div id="result-state" class="hidden">
+      <p id="result-message"></p>
+      <p id="result-detail" class="muted"></p>
+      <button id="receipt-button" class="hidden">View Digital Receipt</button>
+      <button id="retry-button" class="hidden secondary">Retry Payment</button>
+    </div>
+  </div>
+
+  <script src="./payment.js"></script>
+</body>
+</html>

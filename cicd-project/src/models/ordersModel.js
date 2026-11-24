@@ -199,7 +199,7 @@ module.exports.getCustomerOrders = async function getCustomerOrders(customerId) 
   return rows;
 };
 
-// Retrieve individual customer order
+// Retrieve individual customer order (with its items)
 module.exports.getOrderById = async function getOrderById(orderId, customerId) {
   const { rows } = await pool.query(
     `SELECT * FROM orders
@@ -207,7 +207,23 @@ module.exports.getOrderById = async function getOrderById(orderId, customerId) {
     [orderId, customerId]
   );
 
-  return rows[0];
+  if (rows.length === 0) {
+    return rows[0];
+  }
+
+  const order = rows[0];
+
+  // Attach order items so the frontend can show an order summary
+  const { rows: itemRows } = await pool.query(
+    `SELECT item_name, unit_price, quantity, subtotal
+     FROM order_items
+     WHERE order_id = $1`,
+    [orderId]
+  );
+
+  order.items = itemRows;
+
+  return order;
 };
 
 // Retrieve orders for a vendor's stall

@@ -13,7 +13,7 @@ module.exports.generateQrCode = async function generateQrCode(collectionReferenc
   try {
     const qrCodeDataUrl = await QRCode.toDataURL(collectionReference);
     return qrCodeDataUrl;
-  } catch (error) {
+  } catch {
     const qrError = new Error('Failed to generate QR code');
     qrError.statusCode = 500;
     throw qrError;
