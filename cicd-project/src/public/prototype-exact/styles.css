@@ -412,3 +412,21 @@ img,video,canvas { max-inline-size:100%; }
 .weekly-sales-bar{background:#cc0202;width:100%;border-radius:8px 8px 0 0;min-height:2px}
 .weekly-sales-day strong{font-variant-numeric:tabular-nums;white-space:nowrap;font-size:11px}
 @media(max-width:600px){.weekly-sales-chart{gap:4px}.weekly-sales-day strong{font-size:9px}}
+
+/* Account photo editing: reuse existing theme variables and typefaces. */
+.profile-avatar{overflow:hidden}
+.profile-avatar img,.avatar img{width:100%;height:100%;object-fit:cover;display:block}
+.avatar{overflow:hidden}
+.profile-avatar-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 9px}
+.profile-avatar-input{position:absolute;width:1px;height:1px;padding:0;opacity:0;pointer-events:none}
+@media(max-width:480px){.profile-avatar-actions{align-items:stretch}.profile-avatar-actions .btn{white-space:normal}}
+
+/* SCRUM-25: compact, responsive permissions notice; all existing fonts/colours are inherited. */
+.profile-permission-note{display:flex;align-items:flex-start;gap:12px;padding:13px 15px;border-radius:14px;max-width:100%;margin-bottom:18px}
+.profile-permission-icon{width:38px;height:38px;flex:0 0 38px;display:grid;place-items:center;position:relative;border-radius:12px;background:linear-gradient(145deg,#fff9ed,#f3e7d2);border:1px solid rgba(112,91,54,.16);color:#79613b;box-shadow:0 2px 8px rgba(112,91,54,.07)}
+.profile-permission-icon svg{width:21px;height:21px;max-width:21px;max-height:21px;display:block;flex:none}
+.profile-permission-icon::after{content:"";position:absolute;right:5px;top:5px;width:4px;height:4px;border-radius:50%;background:#c7a46d;opacity:.85}
+.profile-permission-text{flex:1;min-width:0;overflow-wrap:break-word}
+.profile-permission-text strong{display:block;font-size:12px;font-weight:800;line-height:1.35;margin-bottom:3px}
+.profile-permission-text p{margin:0;font-size:11px;line-height:1.55}
+@media(max-width:520px){.profile-permission-note{padding:12px;gap:10px}.profile-permission-icon{width:36px;height:36px;flex-basis:36px}}

@@ -11,7 +11,7 @@ beforeEach(() => jest.resetAllMocks());
 test('loads a real PostgreSQL users row by authenticated ID', async () => {
   pool.query.mockResolvedValueOnce({ rows: [row] });
   const profile = await findProfileById(9);
-  expect(profile).toEqual({ id: 9, email: row.email, displayName: row.displayName, phone: '', role: 'customer', stallId: null, stallName: null, active: true });
+  expect(profile).toEqual({ id: 9, email: row.email, displayName: row.displayName, phone: '', role: 'customer', stallId: null, stallName: null, active: true, avatarUrl: null });
   expect(pool.query).toHaveBeenCalledWith(expect.stringContaining('WHERE u.id = $1'), [9]);
 });
 

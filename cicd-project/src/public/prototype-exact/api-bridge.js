@@ -70,6 +70,7 @@
     id:num(u.id), email:clean(u.email), displayName:clean(u.displayName || u.name, 'Customer'),
     role:clean(u.role,'customer').toLowerCase(), phone:clean(u.phone),
     stallId:id(u.stallId || u.vendorId), stallName:clean(u.stallName), active:u.active!==false,
+    avatarUrl: typeof u.avatarUrl === 'string' && u.avatarUrl.startsWith('/api/profile/avatar?v=') ? u.avatarUrl : null,
   } : null; }
   async function obtainToken() {
     if (token && Date.now() + 12000 < tokenExpiry) return token;
@@ -352,6 +353,10 @@
     if(path==='/api/profile'&&['GET','PATCH'].includes(method)){
       if(!FEATURES.profiles)unsupported('Profile editing');
       return http('/api/profile',{method,body,auth:false});
+    }
+    if(path==='/api/profile/avatar'&&['POST','DELETE'].includes(method)){
+      if(!FEATURES.profiles)unsupported('Profile photo editing');
+      return http('/api/profile/avatar',{method,body,auth:false});
     }
     if(path==='/api/vendor/weekly-stats'&&method==='GET'){
       if(!me||me.role!=='vendor')fail('Vendor account required.',403);

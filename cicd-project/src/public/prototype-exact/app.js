@@ -75,7 +75,49 @@ async function request(endpoint, {method='GET', body}={}) {
 }
 
 function errorReport(error){toast(error?.message||'Something went wrong. Please try again.',true);}
-async function refreshMe(){const d=await request('/api/auth/me');state.user=d.user;state.csrf=d.csrfToken;}
+async function refreshProfileFromServer(){
+  if (!state.user) return;
+  try {
+    const result = await request('/api/profile');
+    if (result.user) state.user = result.user;
+  } catch { /* A temporarily unavailable profile API must not block sign-in. */ }
+}
+async function refreshMe(){const d=await request('/api/auth/me');state.user=d.user;state.csrf=d.csrfToken;await refreshProfileFromServer();}
+async function prepareAvatar(file) {
+  if (!file || !['image/jpeg','image/png','image/webp'].includes(file.type)) throw new Error('Choose a JPEG, PNG or WebP photo.');
+  if (file.size > 8 * 1024 * 1024) throw new Error('Choose a photo smaller than 8 MB.');
+  const url = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    await new Promise((resolve,reject) => {image.onload = resolve;image.onerror = () => reject(new Error('This photo could not be opened.'));image.src = url;});
+    const size = Math.min(image.naturalWidth, image.naturalHeight);
+    if (!size) throw new Error('This photo has invalid dimensions.');
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 320;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Your browser cannot process this image.');
+    context.fillStyle='#ffffff';context.fillRect(0,0,320,320);
+    context.drawImage(image,(image.naturalWidth-size)/2,(image.naturalHeight-size)/2,size,size,0,0,320,320);
+    const dataUrl = canvas.toDataURL('image/jpeg',0.85);
+    if (dataUrl.length > 710000) throw new Error('Compressed photo is still too large.');
+    return dataUrl;
+  } finally { URL.revokeObjectURL(url); }
+}
+async function uploadProfilePhoto(file) {
+  const photo=await prepareAvatar(file);
+  const picture=document.querySelector('#profile-avatar-display');
+  const original=picture?.innerHTML;
+  if (picture) picture.innerHTML=`<img src="${photo}" alt="Profile photo preview" />`;
+  try {
+    const result=await request('/api/profile/avatar',{method:'POST',body:{imageDataUrl:photo}});
+    state.user=result.user;
+    toast(result.message);
+    await render();
+  } catch (error) {
+    if (picture) picture.innerHTML=original;
+    throw error;
+  }
+}
 async function refreshCount(){if(state.user?.role==='customer'){try{state.cartCount=(await request('/api/cart')).count;}catch{state.cartCount=0;}}else state.cartCount=0;}
 function navTo(page,opts={}){
   pendingPickup=null;
@@ -101,7 +143,7 @@ function shell(content){
     <nav class="nav-links ${state.mobileOpen?'open':''}" aria-label="Main navigation">${mainNav}</nav>
     <div class="header-actions"><button class="icon-btn header-search" data-action="focusSearch" title="Search stalls" aria-label="Search stalls">${ico('search')}</button>
 ${role==='customer'?`<button type="button" class="icon-btn pickup-bell" aria-label="Pickup notifications" aria-expanded="false" aria-controls="pickup-list"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 17h14l-2-3V9a5 5 0 0 0-10 0v5zM10 20a2 2 0 0 0 4 0"/></svg><span class="pickup-count"></span></button><section id="pickup-list" aria-label="Pickup notifications" hidden></section><button class="icon-btn" data-page="cart" aria-label="Shopping cart">${ico('basket')}${state.cartCount?`<span class="cart-count">${state.cartCount}</span>`:''}</button>`:''}
-    ${user?`<button class="avatar-btn" data-page="profile" title="My profile"><span class="avatar">${esc(user.displayName.charAt(0).toUpperCase())}</span><span class="username">${esc(user.displayName.split(' ')[0])}</span></button>`:`<button class="btn btn-outline btn-sm" data-page="login">Sign In</button><button class="btn btn-sm signup-nav" data-page="signup">Sign Up</button>`}
+    ${user?`<button class="avatar-btn" data-page="profile" title="My profile"><span class="avatar">${user.avatarUrl?`<img src="${esc(user.avatarUrl)}" alt="" />`:esc(user.displayName.charAt(0).toUpperCase())}</span><span class="username">${esc(user.displayName.split(' ')[0])}</span></button>`:`<button class="btn btn-outline btn-sm" data-page="login">Sign In</button><button class="btn btn-sm signup-nav" data-page="signup">Sign Up</button>`}
     <button class="icon-btn mobile-menu" data-action="toggleMenu" aria-label="Toggle menu">${ico('menu')}</button></div>
   </div></header><main class="main" id="content">${content}</main>
   <footer class="site-footer"><div class="container footer-inner"><button class="footer-brand" data-page="home"><img src="/prototype-exact/makan-liao-logo.png" alt="Makan Liao?"/></button><span class="footer-brief">A campus food ordering platform for Singapore Polytechnic students and staff.</span><div class="footer-links"><button data-info="about">About</button><button data-info="help">Help & Support</button><button data-info="terms">Terms</button><button data-info="privacy">Privacy</button></div></div><div class="container footer-disclaimer">Independent class-project reference prototype. FC6 items reflect photographed menu boards. Other courts and accounts are samples. Pay at pickup only; no online payment.</div></footer>`;
@@ -249,9 +291,9 @@ async function addCustomDish(){
 function loginPage(){return `<div class="container"><section class="auth-wrap"><div class="auth-art"><div><img class="auth-logo" src="/prototype-exact/makan-liao-logo.png" alt="Makan Liao?"/><div class="overline">CAMPUS FOOD, SORTED.</div><h1>Your next break <span>starts here.</span></h1><p>Sign in to pre-order your favourites, manage pickup times or run your participating food stall.</p></div><div class="quote">Designed for Singapore Polytechnic students, staff and participating vendors.</div></div><div class="auth-form"><div class="overline">Welcome back</div><h2>Sign in to Makan Liao.</h2><p>Sign in with your registered Makan Liao? account.</p><form id="loginForm"><div class="form-field"><label for="login-email">Email address</label><input id="login-email" type="email" name="email" autocomplete="username" placeholder="you@example.com" required maxlength="254" /></div><div class="form-field"><label for="login-password">Password</label><input id="login-password" type="password" name="password" autocomplete="current-password" placeholder="Enter your password" required /><span class="form-help">Use your own account password.</span></div><button class="btn btn-wide" type="submit">Sign in ${ico('arrow')}</button></form><p class="auth-switch">New to Makan Liao? <button data-page="signup">Create a customer account ${ico('arrow')}</button></p><p class="help-note">Customer accounts may sign up here. Vendor and administrator access is assigned by the team.</p></div></section></div>`;}
 function signupPage(){return `<div class="container"><section class="auth-wrap"><div class="auth-art"><div><img class="auth-logo" src="/prototype-exact/makan-liao-logo.png" alt="Makan Liao?"/><div class="overline">YOUR NEXT BREAK STARTS HERE</div><h1>Good food, <span>on your time.</span></h1><p>Create a customer account to browse FC6 stalls, order ahead and track your meals.</p></div><div class="quote">For Singapore Polytechnic students and staff.</div></div><div class="auth-form"><div class="overline">JOIN MAKAN LIAO</div><h2>Create an Account</h2><p>Use your registered email and a secure password. This is not connected to SP Single Sign-On.</p><form id="signupForm"><div class="form-field"><label for="signup-name">Full name</label><input id="signup-name" name="displayName" autocomplete="name" required minlength="2" maxlength="70" placeholder="Your full name"/></div><div class="form-field"><label for="signup-email">Email address</label><input id="signup-email" type="email" name="email" autocomplete="email" required maxlength="254" placeholder="you@example.com"/></div><div class="form-field"><label for="signup-password">Password</label><input id="signup-password" type="password" name="password" autocomplete="new-password" required minlength="10" maxlength="128" placeholder="10+ characters with letters and numbers"/></div><div class="form-field"><label for="signup-confirm">Confirm password</label><input id="signup-confirm" type="password" name="confirm" autocomplete="new-password" required minlength="10" maxlength="128" placeholder="Repeat your password"/></div><button type="submit" class="btn btn-wide">Create Account ${ico('arrow')}</button></form><p class="auth-switch">Already registered? <button data-page="login">Sign in instead ${ico('arrow')}</button></p><p class="help-note">Vendor and administrator accounts are managed by the platform.</p></div></section></div>`;}
 function profilePage(){const u=state.user;
-  return `<div class="container"><div class="dashboard-head"><div><div class="overline">Account settings</div><h1>Your profile.</h1><p>Keep your contact information up to date.</p></div><span class="role-chip">${esc(titleCase(u.role))} account</span></div><div class="dashboard-grid"><aside class="side-nav"><button class="active">${ico('user')} My details</button><button data-page="${u.role==='customer'?'orders':u.role==='vendor'?'vendor':u.role==='admin'?'admin':'profile'}">${ico('receipt')} ${u.role==='customer'?'My orders':u.role==='vendor'?'Vendor dashboard':u.role==='admin'?'Admin dashboard':'My account'}</button><button data-action="logout">${ico('logout')} Sign out</button></aside><div><section class="panel"><div class="profile-avatar">${esc(u.displayName.charAt(0).toUpperCase())}</div><h2 style="font-size:22px;letter-spacing:-.04em;margin:0">${esc(u.displayName)}</h2><p class="muted tiny">${esc(u.email)}</p><div class="profile-info"><div><div class="detail-label">Account role</div><div class="detail-value">${esc(titleCase(u.role))}</div></div><div><div class="detail-label">${u.role==='vendor'?'Assigned stall':'Access'}</div><div class="detail-value">${u.role==='vendor'?esc(u.stallName||'Not assigned'):u.role==='admin'?'Platform administrator':u.role==='staff'?'SP staff account':'Student / customer account'}</div></div></div></section>
+  return `<div class="container"><div class="dashboard-head"><div><div class="overline">Account settings</div><h1>Your profile.</h1><p>Keep your contact information up to date.</p></div><span class="role-chip">${esc(titleCase(u.role))} account</span></div><div class="dashboard-grid"><aside class="side-nav"><button class="active">${ico('user')} My details</button><button data-page="${u.role==='customer'?'orders':u.role==='vendor'?'vendor':u.role==='admin'?'admin':'profile'}">${ico('receipt')} ${u.role==='customer'?'My orders':u.role==='vendor'?'Vendor dashboard':u.role==='admin'?'Admin dashboard':'My account'}</button><button data-action="logout">${ico('logout')} Sign out</button></aside><div><section class="panel"><div class="profile-avatar" id="profile-avatar-display">${u.avatarUrl?`<img src="${esc(u.avatarUrl)}" alt="Your saved profile photo" />`:esc(u.displayName.charAt(0).toUpperCase())}</div><div class="profile-avatar-actions"><input type="file" id="profile-avatar-input" class="profile-avatar-input" accept="image/png,image/jpeg,image/webp" aria-label="Choose profile photo" /><button type="button" class="btn btn-secondary btn-sm" data-action="changeAvatar">${ico('edit')} Change photo</button>${u.avatarUrl?'<button type="button" class="btn btn-quiet btn-sm" data-action="removeAvatar">Remove photo</button>':''}</div><p class="muted tiny">JPEG, PNG or WebP · up to 8 MB before resizing · saved to your account</p><h2 style="font-size:22px;letter-spacing:-.04em;margin:0">${esc(u.displayName)}</h2><p class="muted tiny">${esc(u.email)}</p><div class="profile-info"><div><div class="detail-label">Account role</div><div class="detail-value">${esc(titleCase(u.role))}</div></div><div><div class="detail-label">${u.role==='vendor'?'Assigned stall':'Access'}</div><div class="detail-value">${u.role==='vendor'?esc(u.stallName||'Not assigned'):u.role==='admin'?'Platform administrator':u.role==='staff'?'SP staff account':'Student / customer account'}</div></div></div></section>
   ${u.role==='customer' ? '<section class="panel"><h2>Pickup alerts</h2><p>Get a phone notification when your meal is ready.</p><button class="btn" id="pickup-enable">Enable device alerts</button> <button class="btn" id="pickup-disable">Turn off device alerts</button><p role="status" id="pickup-help"></p></section>' : ''}
-  <section class="panel"><div class="panel-header"><div><h2>Edit personal details</h2><p>Changes are saved to the database.</p></div></div><form id="profileForm"><div class="form-field"><label for="profile-name">Display name</label><input id="profile-name" name="displayName" value="${esc(u.displayName)}" required minlength="2" maxlength="70" /></div><div class="form-field"><label for="profile-email">Email address</label><input id="profile-email" value="${esc(u.email)}" disabled /><span class="form-help">Email address is managed by the account administrator in this demo.</span></div><div class="form-field"><label for="profile-phone">Phone number (optional)</label><input id="profile-phone" name="phone" value="${esc(u.phone||'')}" maxlength="20" placeholder="e.g. +65 8123 4567" /></div><button class="btn" type="submit">Save changes ${ico('check')}</button></form></section><div class="note-box">${ico('shield')} Account roles and vendor stall assignments are controlled by the server. You cannot change your own permissions.</div></div></div></div>`;
+  <section class="panel"><div class="panel-header"><div><h2>Edit personal details</h2><p>Changes are saved to the database.</p></div></div><form id="profileForm"><div class="form-field"><label for="profile-name">Display name</label><input id="profile-name" name="displayName" value="${esc(u.displayName)}" required minlength="2" maxlength="70" /></div><div class="form-field"><label for="profile-email">Email address</label><input id="profile-email" value="${esc(u.email)}" disabled /><span class="form-help">Email address is managed by the account administrator in this demo.</span></div><div class="form-field"><label for="profile-phone">Phone number (optional)</label><input id="profile-phone" name="phone" value="${esc(u.phone||'')}" maxlength="20" placeholder="e.g. +65 8123 4567" /></div><button class="btn" type="submit">Save changes ${ico('check')}</button></form></section><div class="note-box profile-permission-note" role="note"><span class="profile-permission-icon" aria-hidden="true"><svg class="profile-permission-shield" viewBox="0 0 24 24" fill="none" focusable="false"><path d="M12 2.8 19.5 6.1v5.1c0 5-2.9 8.1-7.5 10.3-4.6-2.2-7.5-5.3-7.5-10.3V6.1L12 2.8Z" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/><path d="m8.65 12.1 2.4 2.4 4.6-4.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div class="profile-permission-text"><strong>Permissions notice</strong><p>Account roles and vendor stall assignments are controlled by the server. You cannot change your own permissions.</p></div></div></div></div></div>`;
 }
 function cartPage(d,slots){
   if(!d.items.length)return `<div class="container"><div class="page-head"><div class="overline">Your basket</div><h1>Almost lunch time.</h1><p>Add something delicious and we'll take care of the rest.</p></div>${empty('Your basket is empty','Choose a food court and add your favourites to get started.')}</div>`;
@@ -505,6 +547,8 @@ document.addEventListener('click',event=>{
   if(d.action==='dishPlus'&&state.dish){state.dish.quantity=Math.min(20,state.dish.quantity+1);renderDish();return;}
   if(d.action==='dishMinus'&&state.dish){state.dish.quantity=Math.max(1,state.dish.quantity-1);renderDish();return;}
   if(d.action==='dishAdd'){run(addCustomDish);return;}
+  if(d.action==='changeAvatar'){$('#profile-avatar-input')?.click();return;}
+  if(d.action==='removeAvatar'){ask('Remove your profile photo?','Your account will show your initial instead.',async()=>{const result=await request('/api/profile/avatar',{method:'DELETE'});state.user=result.user;toast(result.message);await render();},'Remove photo');return;}
   if(d.action==='dishPools'){closeDish();navTo('pools');return;}
   if(d.add){run(()=>addItem(Number(d.add)));return;}
   if(d.cuisine){state.cuisine=d.cuisine;state.focusStalls=true;render();return;}
@@ -564,8 +608,8 @@ document.addEventListener('submit',event=>{
   switch(form.id){
     case 'homeSearchForm':state.selectedCourt=Number(data.courtId)||0;state.query=String(data.search||'').trim();state.cuisine='All';navTo('explore',{focusStalls:true});break;
     case 'searchForm':state.query=String(data.search||'').trim();state.cuisine='All';state.focusStalls=true;render();break;
-    case 'loginForm':run(async()=>{const result=await request('/api/auth/login',{method:'POST',body:{email:data.email,password:data.password}});state.user=result.user;state.csrf=result.csrfToken;await refreshCount();toast(`Welcome back, ${result.user.displayName.split(' ')[0]}.`);navTo(result.user.role==='vendor'?'vendor':result.user.role==='admin'?'admin':'home');});break;
-    case 'signupForm':run(async()=>{if(data.password!==data.confirm){toast('Your passwords do not match.',true);return;}const result=await request('/api/auth/signup',{method:'POST',body:{displayName:data.displayName,email:data.email,password:data.password}});state.user=result.user;state.csrf=result.csrfToken;await refreshCount();toast('Account created successfully.');navTo('home');});break;
+    case 'loginForm':run(async()=>{const result=await request('/api/auth/login',{method:'POST',body:{email:data.email,password:data.password}});state.user=result.user;state.csrf=result.csrfToken;await refreshProfileFromServer();await refreshCount();toast(`Welcome back, ${result.user.displayName.split(' ')[0]}.`);navTo(result.user.role==='vendor'?'vendor':result.user.role==='admin'?'admin':'home');});break;
+    case 'signupForm':run(async()=>{if(data.password!==data.confirm){toast('Your passwords do not match.',true);return;}const result=await request('/api/auth/signup',{method:'POST',body:{displayName:data.displayName,email:data.email,password:data.password}});state.user=result.user;state.csrf=result.csrfToken;await refreshProfileFromServer();await refreshCount();toast('Account created successfully.');navTo('home');});break;
     case 'feedbackForm':run(async()=>{await request('/api/orders/'+form.dataset.orderId+'/feedback',{method:'POST',body:{rating:Number(data.rating),comment:data.comment}});toast('Your review is pending approval.');await render();});break;
     case 'pickupForm':run(()=>collectPickup(data.code.trim()));break;
     case 'profileForm':run(async()=>{const result=await request('/api/profile',{method:'PATCH',body:{displayName:data.displayName,phone:data.phone}});state.user=result.user;toast(result.message);render();});break;
@@ -578,6 +622,11 @@ document.addEventListener('submit',event=>{
 
 document.addEventListener('change',event=>{
   const target=event.target;
+  if(target?.id==='profile-avatar-input'){
+    const file=target.files?.[0];
+    if(file){const button=document.querySelector('[data-action=\"changeAvatar\"]');if(button)button.disabled=true;run(async()=>{try{await uploadProfilePhoto(file);}finally{if(button)button.disabled=false;}});}
+    return;
+  }
   if(target?.id==='loyalty-use'&&target.value&&$('#promo-use'))$('#promo-use').value='';
   if(target?.id==='promo-use'&&target.value&&$('#loyalty-use'))$('#loyalty-use').value='';
 });
