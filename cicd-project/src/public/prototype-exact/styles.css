@@ -389,3 +389,13 @@ img,video,canvas { max-inline-size:100%; }
 
 .cart-item img.cart-art{object-fit:cover;display:block}
 .cart-layout .note-box svg{width:20px;height:20px;vertical-align:middle}
+
+/* SCRUM-24 — restored dish-detail exit animation and accessible focus cues. */
+.dish-scrim.dish-closing{animation:dish-fade-out .2s ease-in forwards;pointer-events:none}
+.dish-scrim.dish-closing .dish-panel{animation:dish-exit .2s ease-in forwards}
+@keyframes dish-fade-out{to{opacity:0;backdrop-filter:blur(0)}}
+@keyframes dish-exit{to{transform:translateY(18px) scale(.975);opacity:0}}
+.dish-preview-trigger:focus-visible,.dish-size:focus-visible,.dish-close:focus-visible,.dish-addon:focus-within{outline:3px solid #ad1818;outline-offset:3px}
+.menu-food-photo img{transition:transform .25s ease-out}
+.menu-card:hover .menu-food-photo img{transform:scale(1.035)}
+@media(prefers-reduced-motion:reduce){.dish-scrim.dish-closing,.dish-scrim.dish-closing .dish-panel{animation:none!important}.menu-food-photo img{transition:none!important}}

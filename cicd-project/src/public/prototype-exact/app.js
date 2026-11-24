@@ -109,7 +109,10 @@ ${role==='customer'?`<button type="button" class="icon-btn pickup-bell" aria-lab
 const introCards=[['shop','Campus Stalls','Your favourite food, all in one place.'],['clock','Order Ahead','Pick a collection time that suits you.'],['receipt','Order Tracking','Follow your order until it is ready for pickup.']];
 const featuredStallPhotos=['stalls/stall_19.webp','stalls/stall_17.webp','stalls/stall_21.webp'];
 function foodImageFor(label=''){const text=String(label).toLowerCase();return /burger|western|sandwich|bun|toast|bake|pizza|pastry/.test(text)?'burger.webp':/noodle|mee|laksa|pasta|udon|wok|ramen|soup/.test(text)?'prawn-noodles.webp':'chicken-rice.webp';}
-function imageForItem(item){return item?.image_path?`/prototype-exact/media/${encodeURI(item.image_path)}`:`/prototype-exact/media/${foodImageFor(item?.name||'food')}`;}
+function imageForItem(item){
+  const path=window.MakanMenuReference?.imageFor(item,item?.stall_name) || item?.image_path || foodImageFor(item?.name||'food');
+  return `/prototype-exact/media/${encodeURI(path)}`;
+}
 function homeHero(){return `<div class="campaign-section"><section class="campaign-hero"><div class="campaign-content"><div class="eyebrow campaign-eyebrow"><span></span> GOOD FOOD, RIGHT ON CAMPUS</div><h1>CRAVING FOR <strong>SMTH?</strong></h1><div class="hero-brush" aria-hidden="true"></div><p>Browse FC6 stalls, order ahead and collect at your preferred pickup time.</p><div class="hero-actions"><button data-page="explore" class="btn">Explore Food Stalls ${ico('arrow')}</button><button class="btn btn-outline" data-page="how">How It Works</button></div></div><div class="campaign-photo" role="img" aria-label="Chicken rice, noodles and iced milk tea" ><img src="/prototype-exact/media/hero-food.webp" alt="Chicken rice, noodles and iced tea"/></div></section>
   <form class="home-search" id="homeSearchForm"><div class="home-court-select">${ico('pin')}<select name="courtId" aria-label="Choose food court"><option value="0">SP Food Courts</option>${state.courts.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>${ico('down')}</div><div class="home-search-divider"></div><div class="home-search-input">${ico('search')}<input type="search" name="search" placeholder="Search for stalls, dishes or cuisines..." aria-label="Search stalls dishes or cuisines"/></div><button class="btn btn-sm" type="submit">Search</button></form>
   <div class="info-benefits">${introCards.map(([i,title,detail])=>`<div class="benefit"><span class="benefit-icon">${ico(i)}</span><div><strong>${title}</strong><small>${detail}</small></div></div>`).join('')}</div></div>`;}
@@ -170,39 +173,68 @@ function formatSelections(sel){
   return `${esc(titleCase(sel.size))}${sel.addons?.length?' · '+(sel.addonLabels||sel.addons).map(x=>esc(titleCase(x))).join(', '):''}`;
 }
 let dishRequestId=0;
+let dishCloseTimer=null;
+let dishOpeningButton=null;
 async function openDish(id,trigger){
   const turn=++dishRequestId;
+  if(dishCloseTimer){clearTimeout(dishCloseTimer);dishCloseTimer=null;}
+  if(!document.body.classList.contains('dish-open') && trigger?.isConnected)dishOpeningButton=trigger;
   trigger?.classList.add('dish-launching');
-  try{
-    const details=await request(`/api/menu/${id}/details`);
-    if(turn!==dishRequestId)return;
-    state.dish={...details,selection:{size:'regular',addons:[]},quantity:1};
-    renderDish();
-    const dialog=$('#dish-dialog');dialog?.focus({preventScroll:true});
-  }finally{trigger?.classList.remove('dish-launching');}
+  // Keep the cutlery spin visible even with a very fast cached response.
+  if(trigger)setTimeout(()=>trigger.classList.remove('dish-launching'),470);
+  const details=await request(`/api/menu/${id}/details`);
+  if(turn!==dishRequestId)return;
+  state.dish={...details,selection:{size:'regular',addons:[]},quantity:1};
+  renderDish();
+  $('#dish-dialog')?.focus({preventScroll:true});
 }
 function renderDish(){
   if(!state.dish)return;
   const previous=$('.dish-panel-scroll');const prevScroll=previous?.scrollTop||0;const updating=!!previous;
+  const focused=document.activeElement;
+  const restoreFocus=updating && focused?.closest?.('#dish-dialog') ? {
+    action:focused.dataset.action, size:focused.dataset.dishsize, addon:focused.dataset.dishaddon
+  } : null;
   const {item,details:meta,recommendations,selection,quantity}=state.dish;
   const size=meta.sizes.find(x=>x.id===selection.size)||meta.sizes[0];
   const selectedExtras=meta.addons.filter(x=>selection.addons.includes(x.id));
   const unit=item.price_cents+size.extraCents+selectedExtras.reduce((sum,x)=>sum+x.extraCents,0);
-  const calories=Math.round(meta.nutrition.calories*size.scale+selectedExtras.reduce((sum,x)=>sum+x.calories,0));
+  const calories=meta.nutrition ? Math.round(meta.nutrition.calories*size.scale) : null;
+  const nutritionGrid=meta.nutrition ? `<div class="nutrition-title">Nutrition at a glance <span>illustrative estimate, regular serving</span></div><div class="nutrition-grid">${[['Calories',meta.nutrition.calories,'kcal'],['Protein',meta.nutrition.proteinG,'g'],['Carbs',meta.nutrition.carbsG,'g'],['Fat',meta.nutrition.fatG,'g']].map(([label,value,unit])=>`<div><strong>${value}<small>${unit}</small></strong><span>${label}</span></div>`).join('')}</div><p class="dish-disclaimer">Illustrative recipe-based estimates, NOT vendor-verified nutrition facts. Ingredient quantities, calories and allergens can differ; confirm with the stall.</p>` : '<p class="dish-disclaimer">Nutrition details have not been supplied or verified for this dish. Ask the stall about ingredients and allergens.</p>';
   const allergenList=[...new Set([...meta.allergens,...selectedExtras.flatMap(x=>x.allergens)])];
   const content=`<div class="dish-panel" id="dish-dialog" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="dish-title">
   <div class="dish-panel-head"><span class="eyebrow">GOOD FOOD, MADE YOUR WAY</span><button type="button" class="dish-close" data-action="closeDish" aria-label="Close dish details">${ico('close')}</button></div>
-  <div class="dish-panel-scroll"><div class="dish-intro"><div class="dish-photo-wrap"><img src="${imageForItem(item)}" alt="${esc(item.name)}" /><div class="dish-photo-sticker">${ico('utensils')} Pick your perfect plate</div></div><div class="dish-about"><span class="tag tag-red">${esc(item.category)}</span><div class="dish-time">${ico('clock')} About ${meta.prepMinutes} min to prepare</div><h2 id="dish-title">${esc(item.name)}</h2><p>${esc(item.description)}</p><strong class="dish-from">From ${money(item.price_cents)}</strong><div class="nutrition-title">Nutrition at a glance <span>estimated per regular serving</span></div><div class="nutrition-grid">${[['Calories',meta.nutrition.calories,'kcal'],['Protein',meta.nutrition.proteinG,'g'],['Carbs',meta.nutrition.carbsG,'g'],['Fat',meta.nutrition.fatG,'g']].map(([label,value,unit])=>`<div><strong>${value}<small>${unit}</small></strong><span>${label}</span></div>`).join('')}</div><p class="dish-disclaimer">Nutrition is not supplied by the current stall API; the numeric examples here are not verified. Ask the vendor about ingredients and allergies.</p></div></div>
+  <div class="dish-panel-scroll"><div class="dish-intro"><div class="dish-photo-wrap"><img src="${imageForItem(item)}" alt="${esc(item.name)}" /><div class="dish-photo-sticker">${ico('utensils')} Pick your perfect plate</div></div><div class="dish-about"><span class="tag tag-red">${esc(item.category)}</span><div class="dish-time">${ico('clock')} About ${meta.prepMinutes} min to prepare</div><h2 id="dish-title">${esc(item.name)}</h2><p>${esc(item.description)}</p><strong class="dish-from">From ${money(item.price_cents)}</strong>${nutritionGrid}</div></div>
   <div class="dish-options"><section class="dish-section"><div class="dish-section-heading"><h3>Choose your size</h3><span>01</span></div><div class="dish-size-grid">${meta.sizes.map(v=>`<button type="button" class="dish-size ${selection.size===v.id?'selected':''}" data-dishsize="${v.id}" aria-pressed="${selection.size===v.id}"><strong>${esc(v.label)}</strong><span>${v.extraCents?`+${money(v.extraCents)}`:'Included'}</span></button>`).join('')}</div></section>
-  ${meta.addons.length?`<section class="dish-section"><div class="dish-section-heading"><h3>Make it yours</h3><span>02 · choose up to 3</span></div><div class="dish-addon-grid">${meta.addons.map(v=>`<label class="dish-addon ${selection.addons.includes(v.id)?'selected':''}"><input type="checkbox" data-dishaddon="${v.id}" ${selection.addons.includes(v.id)?'checked':''}/><span class="addon-symbol">${ico(v.id==='greens'?'leaf':v.id==='cheese'?'sandwich':v.id==='egg'?'bowl':v.id==='pearls'?'drink':'plus')}</span><span class="addon-label"><strong>${esc(v.label)}</strong><small>${v.isDemo?'Demo suggestion · no extra charge':`+${money(v.extraCents)}`}</small></span></label>`).join('')}</div>${meta.addons.some(v=>v.isDemo)?'<p class="dish-disclaimer">Suggested customisations are demonstration options, not confirmed stall offerings. No surcharge is applied until verified.</p>':''}</section>`:''}
-  <section class="dish-section"><div class="dish-section-heading"><h3>Good to know</h3><span>03</span></div><div class="dish-facts"><div>${ico('clock')} <span>Preparation: approx. ${meta.prepMinutes} min<br><small>Pickup slot selected at checkout</small></span></div><div>${ico('info')} <span>Estimated with your choices: <b>${calories} kcal</b><br><small>Possible allergens: ${esc(allergenList.join(', ')||'Not specified')}</small></span></div><div>${ico('receipt')} <span>Pickup orders<br><small>Add your chosen meal to your basket, then select a collection time.</small></span></div></div></section></div>
+  ${meta.addons.length?`<section class="dish-section"><div class="dish-section-heading"><h3>Make it yours</h3><span>02 · choose up to 3</span></div><div class="dish-addon-grid">${meta.addons.map(v=>`<label class="dish-addon ${selection.addons.includes(v.id)?'selected':''}"><input type="checkbox" data-dishaddon="${v.id}" ${selection.addons.includes(v.id)?'checked':''}/><span class="addon-symbol">${ico(v.id==='greens'?'leaf':v.id==='cheese'?'sandwich':v.id==='egg'?'bowl':v.id==='pearls'?'drink':'plus')}</span><span class="addon-label"><strong>${esc(v.label)}</strong><small>${v.isDemo?'Demo suggestion · no extra charge':`+${money(v.extraCents)}`}</small></span></label>`).join('')}</div>${meta.addons.some(v=>v.isDemo)?'<p class="dish-disclaimer">Suggestions are not confirmed by the stall. Their calories are excluded from the estimate and no extra fee is added.</p>':''}</section>`:''}
+  <section class="dish-section"><div class="dish-section-heading"><h3>Good to know</h3><span>03</span></div><div class="dish-facts"><div>${ico('clock')} <span>Preparation: approx. ${meta.prepMinutes} min<br><small>Pickup slot selected at checkout</small></span></div><div>${ico('info')} <span>${calories===null?'Nutrition not verified':`Illustrative base serving: <b>${calories} kcal</b>`}<br><small>Allergens unverified · ask the stall</small></span></div><div>${ico('receipt')} <span>Pickup orders<br><small>Add your chosen meal to your basket, then select a collection time.</small></span></div></div></section></div>
   <section class="dish-recos"><div class="dish-section-heading"><h3>You might also like</h3><span>From the same stall</span></div><div class="dish-reco-grid">${recommendations.map(r=>`<button type="button" class="dish-reco" data-dish="${r.id}"><img src="${imageForItem(r)}" alt=""/><span><b>${esc(r.name)}</b><small>${money(r.price_cents)}</small></span>${ico('chevron')}</button>`).join('')}</div></section>
   </div><div class="dish-panel-footer"><div class="dish-qty"><button data-action="dishMinus" type="button" aria-label="Decrease quantity">${ico('minus')}</button><strong>${quantity}</strong><button data-action="dishPlus" type="button" aria-label="Increase quantity">${ico('plus')}</button></div><div class="dish-total"><span>${esc(size.label)}${selection.addons.length?' + '+selection.addons.length+' extra'+(selection.addons.length>1?'s':''):''}</span><b>${money(unit*quantity)}</b></div><button type="button" class="btn dish-cart-cta" data-action="dishAdd">Add to basket ${ico('arrow')}</button></div></div>`;
   $('#modal-root').innerHTML=`<div class="dish-scrim ${updating?'dish-steady':''}" data-action="closeDish">${content}</div>`;
   const next=$('.dish-panel-scroll');if(next)next.scrollTop=prevScroll;
+  if(restoreFocus){
+    let nextControl=null;
+    if(restoreFocus.action)nextControl=[...document.querySelectorAll('#dish-dialog [data-action]')].find(x=>x.dataset.action===restoreFocus.action);
+    if(restoreFocus.size)nextControl=[...document.querySelectorAll('#dish-dialog [data-dishsize]')].find(x=>x.dataset.dishsize===restoreFocus.size);
+    if(restoreFocus.addon)nextControl=[...document.querySelectorAll('#dish-dialog [data-dishaddon]')].find(x=>x.dataset.dishaddon===restoreFocus.addon);
+    nextControl?.focus({preventScroll:true});
+  }
   document.body.classList.add('dish-open');
 }
-function closeDish(){++dishRequestId;state.dish=null;$('#modal-root').innerHTML='';document.body.classList.remove('dish-open');}
+function closeDish(){
+  ++dishRequestId;state.dish=null;
+  const scrim=$('#modal-root .dish-scrim');
+  if(dishCloseTimer){clearTimeout(dishCloseTimer);dishCloseTimer=null;}
+  const finish=()=>{
+    $('#modal-root').innerHTML='';document.body.classList.remove('dish-open');
+    if(dishOpeningButton?.isConnected)dishOpeningButton.focus({preventScroll:true});
+    dishOpeningButton=null;dishCloseTimer=null;
+  };
+  if(scrim && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches){
+    scrim.classList.add('dish-closing');
+    dishCloseTimer=setTimeout(finish,210);
+  }else finish();
+}
 async function addCustomDish(){
   const d=state.dish;if(!d)return;
   if(state.user?.role!=='customer'){closeDish();toast('Sign in as a customer to order.');navTo('login');return;}
