@@ -1,3 +1,10 @@
+/* ================================================================
+   menu.css  —  Makan Liao shared base styles
+   Loaded by every customer-facing page.
+   ================================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,600;0,700;0,800;0,900;1,900&family=Barlow+Condensed:ital,wght@0,700;0,900;1,700;1,900&display=swap');
+
 :root {
   --red: #b8100f;
   --red-dark: #8f0b0b;
@@ -19,7 +26,14 @@
   --radius-card: 18px;
   --radius-pill: 999px;
   --page-width: 1120px;
-  --font: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+
+  /* Brand fonts */
+  --font: 'DM Sans', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --display: 'Barlow Condensed', 'Arial Narrow', Impact, sans-serif;
+
+  /* Warm shadow used on cards across all pages */
+  --card-shadow: 0 4px 18px rgba(88, 44, 24, 0.07);
+  --card-shadow-hover: 0 12px 32px rgba(88, 44, 24, 0.13);
 }
 
 *,
@@ -77,6 +91,8 @@ a {
   background: var(--ink);
   color: var(--white);
   border-radius: 8px;
+  font-weight: 700;
+  text-decoration: none;
 }
 
 .skip-link:focus {
@@ -88,13 +104,16 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.4rem;
   padding: 0.6rem 1.25rem;
   border: 2px solid var(--red);
   border-radius: var(--radius-pill);
   font: inherit;
-  font-weight: 700;
-  font-size: 0.9rem;
+  font-weight: 800;
+  font-size: 0.88rem;
+  letter-spacing: -0.01em;
   cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
 }
 
 .button--primary {
@@ -116,59 +135,70 @@ a {
   background: var(--red-tint);
 }
 
-/* ── Promo bar and header ─────────────────────────────── */
+/* ── Promo bar ────────────────────────────────────────── */
 .promo-bar {
-  padding: 0.55rem 1rem;
+  padding: 0.6rem 1rem;
   background: var(--red);
   color: var(--white);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.02rem;
   text-align: center;
   text-transform: uppercase;
+  word-spacing: 0.2rem;
 }
 
+/* ── Site header ──────────────────────────────────────── */
 .site-header {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem 1.5rem;
-  padding: 0.9rem max(1rem, calc((100% - var(--page-width)) / 2));
+  padding: 0.75rem max(1rem, calc((100% - var(--page-width)) / 2));
   background: var(--white);
   border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 40;
 }
 
 .brand {
   color: var(--red);
   font-weight: 800;
   text-decoration: none;
+  flex-shrink: 0;
 }
 
 .brand__logo {
+  /* Slightly taller than the original 48px for more presence */
   width: auto;
-  height: 100px;
+  height: 70px;
 }
 
+/* Nav links */
 .site-nav__list {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
+  gap: 0.3rem;
 }
 
 .site-nav a {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.5rem 1rem;
+  padding: 0.45rem 1rem;
   border-radius: var(--radius-pill);
-  font-size: 0.9rem;
-  font-weight: 600;
+  font-size: 0.88rem;
+  font-weight: 700;
   text-decoration: none;
+  color: var(--ink);
+  transition: background 0.15s, color 0.15s;
 }
 
 .site-nav a:hover {
   background: var(--red-tint);
+  color: var(--red-dark);
 }
 
 .site-nav a[aria-current='page'] {
@@ -176,19 +206,21 @@ a {
   color: var(--white);
 }
 
+/* Cart badge */
 .cart-badge {
   display: inline-grid;
   place-items: center;
-  min-width: 1.4rem;
-  height: 1.4rem;
-  padding: 0 0.35rem;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0 0.3rem;
   background: var(--red);
   color: var(--white);
   border-radius: var(--radius-pill);
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-size: 0.72rem;
+  font-weight: 800;
 }
 
+/* Sign-out / user area */
 .site-user {
   display: flex;
   align-items: center;
@@ -196,46 +228,75 @@ a {
 }
 
 .site-user__name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+/* ── Overline / eyebrow label ─────────────────────────── */
+.overline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
+  color: var(--red);
   font-size: 0.9rem;
-  font-weight: 600;
+  font-weight: 900;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.overline::before {
+  content: '';
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: var(--red);
+  border-radius: 2px;
+  flex-shrink: 0;
 }
 
 /* ── Main layout ──────────────────────────────────────── */
 main {
   max-width: var(--page-width);
   margin: 0 auto;
-  padding: 2.5rem 1rem 3rem;
+  padding: 2.5rem 1rem 3.5rem;
+}
+
+/* Page intro (h1 + subtitle) */
+.page-intro {
+  margin-bottom: 0.25rem;
 }
 
 .page-intro h1 {
   font-size: clamp(2rem, 5vw, 2.75rem);
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
+  font-weight: 900;
+  letter-spacing: -0.055em;
+  line-height: 1.08;
 }
 
 .page-intro p {
-  margin-top: 0.5rem;
+  margin-top: 0.55rem;
   color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.7;
 }
 
+/* Section headings */
 main h2 {
-  font-size: clamp(1.4rem, 3.5vw, 1.85rem);
-  font-weight: 800;
-  letter-spacing: -0.01em;
+  font-size: clamp(1.3rem, 3vw, 1.65rem);
+  font-weight: 900;
+  letter-spacing: -0.045em;
+  line-height: 1.15;
 }
 
 .section-hint {
-  margin-top: 0.25rem;
+  margin-top: 0.3rem;
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
-.courts,
-.stalls {
-  margin-top: 2.5rem;
-}
-
+/* ── Court section ────────────────────────────────────── */
 /* ── Food court cards ─────────────────────────────────── */
 .court-list {
   display: grid;
@@ -277,22 +338,22 @@ main h2 {
 }
 
 .court-list li:nth-child(1) .court-card::before {
-  background-image: url('https://placehold.co/112x112/f9dcd7/231a17?text=FC+1');
+  background-image: url('https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?text=FC+1');
 }
 .court-list li:nth-child(2) .court-card::before {
-  background-image: url('https://placehold.co/112x112/fdeab9/231a17?text=FC+2');
+  background-image: url('https://plus.unsplash.com/premium_photo-1673108852141-e8c3c22a4a22?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?text=FC+2');
 }
 .court-list li:nth-child(3) .court-card::before {
-  background-image: url('https://placehold.co/112x112/d9eedd/231a17?text=FC+3');
+  background-image: url('https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?text=FC+3');
 }
 .court-list li:nth-child(4) .court-card::before {
-  background-image: url('https://placehold.co/112x112/dbe8f7/231a17?text=FC+4');
+  background-image: url('https://plus.unsplash.com/premium_photo-1675252369719-dd52bc69c3df?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?text=FC+4');
 }
 .court-list li:nth-child(5) .court-card::before {
-  background-image: url('https://placehold.co/112x112/f6dbe6/231a17?text=FC+5');
+  background-image: url('https://images.unsplash.com/photo-1473093295043-cdd812d0e601?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?text=FC+5');
 }
 .court-list li:nth-child(6) .court-card::before {
-  background-image: url('https://placehold.co/112x112/fde5d3/231a17?text=FC+6');
+  background-image: url('https://images.unsplash.com/photo-1569718212165-3a8278d5f624?q=80&w=880&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?text=FC+6');
 }
 
 .court-card__name {
@@ -316,7 +377,11 @@ main h2 {
   box-shadow: 0 0 0 1px var(--red), 0 8px 20px rgba(184, 16, 15, 0.12);
 }
 
-/* ── Stalls header, search and chips ──────────────────── */
+/* ── Stall section ────────────────────────────────────── */
+.stalls {
+  margin-top: 2.75rem;
+}
+
 .stalls__head {
   display: flex;
   flex-wrap: wrap;
@@ -327,18 +392,20 @@ main h2 {
 
 .stalls__count {
   color: var(--muted);
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
+/* Search bar */
 .search {
   display: flex;
   gap: 0.5rem;
-  margin-top: 1.25rem;
+  margin-top: 1.1rem;
   padding: 0.4rem;
   background: var(--white);
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
+  box-shadow: var(--card-shadow);
 }
 
 .search:focus-within {
@@ -363,6 +430,7 @@ main h2 {
   background: transparent;
   color: var(--ink);
   font: inherit;
+  font-size: 0.95rem;
 }
 
 .search__input:focus {
@@ -373,27 +441,31 @@ main h2 {
   color: var(--muted);
 }
 
+/* Cuisine filter chips */
 .chip-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem;
-  margin-top: 1rem;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
 }
 
 .chip {
-  padding: 0.4rem 1rem;
+  padding: 0.38rem 1rem;
   background: var(--white);
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
-  color: var(--ink);
+  color: var(--muted);
   font: inherit;
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 0.82rem;
+  font-weight: 700;
   cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
 }
 
 .chip:hover {
   border-color: #e0b9a8;
+  background: #fff6f0;
+  color: var(--ink);
 }
 
 .chip[aria-pressed='true'] {
@@ -402,29 +474,31 @@ main h2 {
   color: var(--red-dark);
 }
 
-/* ── Messages ─────────────────────────────────────────── */
+/* ── Messages (loading / error / empty) ───────────────── */
 .message {
   margin-top: 1.5rem;
   padding: 1rem 1.25rem;
   background: var(--white);
   border: 1px dashed var(--line);
-  border-radius: 12px;
+  border-radius: 13px;
   color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.65;
 }
 
 .message--error {
   border: 1px solid var(--red);
   background: var(--red-tint);
   color: var(--red-dark);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 /* ── Stall cards ──────────────────────────────────────── */
 .stall-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1.25rem;
-  margin-top: 1.5rem;
+  gap: 1.1rem;
+  margin-top: 1.4rem;
 }
 
 .stall-card {
@@ -434,29 +508,37 @@ main h2 {
   overflow: hidden;
   background: var(--white);
   border: 1px solid var(--line);
-  border-radius: var(--radius-card);
+  border-radius: 20px;
+  box-shadow: var(--card-shadow);
+  transition: transform 0.2s, box-shadow 0.2s;
 }
 
-.stall-card__image {
+.stall-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--card-shadow-hover);
+}
+
+/* Food photo */
 .stall-card__image {
   width: 100%;
   aspect-ratio: 5 / 3;
   background-color: var(--image-bg);
-  /* DELETE THIS LINE ↓ */
-  /* content: url('https://placehold.co/500x300/efe2d6/6f625c?text=Stall+Photo'); */
-  background-image: url('https://placehold.co/500x300/efe2d6/6f625c?text=Stall+Photo');
-  background-position: center;
-  background-size: cover;
   object-fit: cover;
-}
+  display: block;
+  transition: transform 0.25s;
 }
 
+.stall-card:hover .stall-card__image {
+  transform: scale(1.03);
+}
+
+/* Card body */
 .stall-card__body {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 1rem 1.15rem 1.15rem;
+  gap: 0.4rem;
+  padding: 1rem 1.1rem 1.1rem;
 }
 
 .stall-card__tags {
@@ -466,17 +548,24 @@ main h2 {
   gap: 0.5rem;
 }
 
+/* Tags and status pills — shared with stall-menu.css */
 .tag,
 .status {
-  padding: 0.2rem 0.7rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.22rem 0.75rem;
   border-radius: var(--radius-pill);
   font-size: 0.72rem;
-  font-weight: 700;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 
 .tag {
   background: var(--tag-bg);
   color: var(--tag-ink);
+  border: 1px solid #f0dcc8;
 }
 
 .status--open {
@@ -490,15 +579,17 @@ main h2 {
 }
 
 .stall-card__name {
-  margin-top: 0.35rem;
-  font-size: 1.25rem;
-  font-weight: 800;
-  line-height: 1.25;
+  margin-top: 0.3rem;
+  font-size: 1.15rem;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 1.2;
 }
 
 .stall-card__blurb {
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  line-height: 1.65;
 }
 
 .stall-card__foot {
@@ -513,29 +604,35 @@ main h2 {
 
 .stall-card__meta {
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   font-weight: 700;
 }
 
 .stall-card__link {
   color: var(--red);
-  font-size: 0.85rem;
-  font-weight: 700;
+  font-size: 0.82rem;
+  font-weight: 800;
   text-decoration: none;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .stall-card__link::after {
-  content: ' \2192';
+  content: '\2192';
+  font-size: 1em;
 }
 
 .stall-card__link:hover {
   text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .stall-card__link--disabled {
   color: var(--muted);
   cursor: not-allowed;
+  font-weight: 700;
 }
 
 .stall-card__link--disabled::after {
@@ -544,21 +641,6 @@ main h2 {
 
 .stall-card__link--disabled:hover {
   text-decoration: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .court-card,
-  .chip,
-  .button,
-  .stall-card {
-    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease,
-      transform 0.15s ease;
-  }
-
-  .stall-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 10px 24px rgba(35, 26, 23, 0.1);
-  }
 }
 
 /* ── Footer ───────────────────────────────────────────── */
@@ -578,18 +660,33 @@ main h2 {
 .site-footer__note {
   max-width: 60ch;
   font-size: 0.75rem;
+  color: var(--muted);
+  opacity: 0.8;
+}
+
+/* ── Reduced motion ───────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .court-card,
+  .chip,
+  .button,
+  .stall-card,
+  .stall-card__image {
+    transition: none;
+  }
 }
 
 /* ── Small screens ────────────────────────────────────── */
 @media (max-width: 720px) {
   .site-header {
-    padding-block: 0.75rem;
+    padding-block: 0.6rem;
   }
 
   .site-nav {
     order: 3;
     width: 100%;
     overflow-x: auto;
+    /* Let the nav scroll horizontally on very small phones */
+    -webkit-overflow-scrolling: touch;
   }
 
   main {
@@ -598,6 +695,15 @@ main h2 {
 
   .courts,
   .stalls {
-    margin-top: 2rem;
+    margin-top: 1.75rem;
+  }
+
+  .court-list {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 0.65rem;
+  }
+
+  .stall-grid {
+    grid-template-columns: 1fr;
   }
 }

@@ -1,7 +1,16 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,600;0,700;0,800;0,900;1,900&family=Barlow+Condensed:ital,wght@0,700;0,900;1,700;1,900&display=swap');
+
+/* Override the font set in menu.css for this page */
 :root {
-  --bowl-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64' fill='none' stroke='%23b8100f' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' opacity='.45'%3E%3Cpath d='M8 30h48a24 24 0 0 1-48 0z'/%3E%3Cpath d='M22 12c-3 3 3 6 0 10M32 10c-3 3 3 6 0 10M42 12c-3 3 3 6 0 10'/%3E%3C/svg%3E");
+  --font: 'DM Sans', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --display: 'Barlow Condensed', 'Arial Narrow', Impact, sans-serif;
+
+  /* Warmer card shadow to match reference */
+  --card-shadow: 0 4px 18px rgba(88, 44, 24, 0.07);
+  --card-shadow-hover: 0 12px 32px rgba(88, 44, 24, 0.13);
 }
 
+/* ── Utility ──────────────────────────────────────────── */
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -18,21 +27,48 @@ fieldset {
   border: 0;
 }
 
-/* ── Intro and steps ──────────────────────────────────── */
+/* ── Page intro ───────────────────────────────────────── */
 .cart-intro__eyebrow {
-  margin-bottom: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
   color: var(--red);
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
 }
 
+.cart-intro__eyebrow::before {
+  content: '';
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: var(--red);
+  border-radius: 2px;
+}
+
+.page-intro h1 {
+  font-size: clamp(2rem, 5vw, 2.75rem);
+  font-weight: 900;
+  letter-spacing: -0.055em;
+  line-height: 1.08;
+}
+
+.page-intro > p {
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
+/* ── Checkout steps ───────────────────────────────────── */
 .steps {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem;
-  margin: 1.5rem 0 0;
+  gap: 0.5rem;
+  margin: 1.4rem 0 0;
   padding: 0;
   list-style: none;
 }
@@ -41,29 +77,31 @@ fieldset {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.3rem 0.9rem 0.3rem 0.35rem;
+  padding: 0.4rem 1rem 0.4rem 0.4rem;
   background: var(--white);
   border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
+  border-radius: 999px;
   color: var(--muted);
-  font-size: 0.8rem;
-  font-weight: 700;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
 }
 
 .steps__num {
   display: grid;
   place-items: center;
-  width: 1.4rem;
-  height: 1.4rem;
+  width: 1.5rem;
+  height: 1.5rem;
   background: var(--closed-bg);
   border-radius: 50%;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 800;
 }
 
 .steps__item--active {
-  background: var(--red-tint);
-  border-color: var(--red);
-  color: var(--red-dark);
+  background: #fff0e8;
+  border-color: #f0b79e;
+  color: var(--red);
 }
 
 .steps__item--active .steps__num {
@@ -77,12 +115,12 @@ fieldset {
   grid-template-columns: minmax(0, 1fr) 22rem;
   gap: 1.5rem;
   align-items: start;
-  margin-top: 1.5rem;
+  margin-top: 1.75rem;
 }
 
 .cart-main {
   display: grid;
-  gap: 1.25rem;
+  gap: 1.1rem;
   min-width: 0;
 }
 
@@ -90,11 +128,13 @@ fieldset {
   margin-top: 0;
 }
 
+/* ── Cards ────────────────────────────────────────────── */
 .card {
   padding: 1.5rem;
   background: var(--white);
   border: 1px solid var(--line);
-  border-radius: var(--radius-card);
+  border-radius: 20px;
+  box-shadow: var(--card-shadow);
 }
 
 .card__head {
@@ -105,24 +145,57 @@ fieldset {
   gap: 0.75rem 1rem;
 }
 
+.card__head h2 {
+  font-size: 1.15rem;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  margin: 0;
+}
+
 .card__hint {
   margin-top: 0.4rem;
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+#cart-stall-name {
+  font-size: 1.15rem;
+  font-weight: 900;
+  letter-spacing: -0.04em;
 }
 
 #cart-stall-name:focus {
   outline: none;
 }
 
-/* ── Basket lines ─────────────────────────────────────── */
+/* ── Messages ─────────────────────────────────────────── */
+.message {
+  margin-top: 1.1rem;
+  padding: 0.9rem 1.1rem;
+  background: var(--white);
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.65;
+}
+
+.message--error {
+  border: 1px solid var(--red);
+  background: var(--red-tint);
+  color: var(--red-dark);
+  font-weight: 700;
+}
+
+/* ── Cart lines ───────────────────────────────────────── */
 .cart-lines {
-  margin-top: 1rem;
+  margin-top: 0.75rem;
 }
 
 .cart-line {
   display: grid;
-  grid-template-columns: 4rem minmax(0, 1fr) auto;
+  grid-template-columns: 4.5rem minmax(0, 1fr) auto;
   gap: 1rem;
   padding: 1.1rem 0;
   border-top: 1px solid var(--line);
@@ -132,22 +205,37 @@ fieldset {
   border-top: 0;
 }
 
+/* Food photo thumbnail — falls back to the bowl SVG icon */
 .cart-line__image {
-  width: 4rem;
-  height: 4rem;
-  background: var(--tag-bg) var(--bowl-icon) center / 70% no-repeat;
-  border-radius: 14px;
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 15px;
+  background-color: #fff0e5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64' fill='none' stroke='%23b8100f' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' opacity='.4'%3E%3Cpath d='M8 30h48a24 24 0 0 1-48 0z'/%3E%3Cpath d='M22 12c-3 3 3 6 0 10M32 10c-3 3 3 6 0 10M42 12c-3 3 3 6 0 10'/%3E%3C/svg%3E");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 68%;
+  overflow: hidden;
+}
+
+/* When JS sets a real photo it overrides the SVG fallback */
+.cart-line__image[style*='backgroundImage'] {
+  background-size: cover;
+  background-position: center;
 }
 
 .cart-line__name {
-  font-size: 1rem;
-  font-weight: 800;
+  font-size: 0.95rem;
+  font-weight: 900;
+  letter-spacing: -0.025em;
   line-height: 1.3;
+  margin: 0;
 }
 
 .cart-line__each {
+  margin-top: 0.2rem;
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
 }
 
 .cart-line__status {
@@ -159,17 +247,19 @@ fieldset {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.9rem;
-  margin-top: 0.6rem;
+  gap: 0.75rem;
+  margin-top: 0.65rem;
 }
 
 .cart-line__total {
+  font-size: 0.95rem;
   font-weight: 800;
+  white-space: nowrap;
 }
 
 .cart-line--sold-out .cart-line__image {
   filter: grayscale(1);
-  opacity: 0.5;
+  opacity: 0.45;
 }
 
 .cart-line--sold-out .cart-line__name,
@@ -177,69 +267,76 @@ fieldset {
   color: var(--muted);
 }
 
+/* ── Remove link ──────────────────────────────────────── */
 .link-button {
-  padding: 0.35rem 0;
+  padding: 0.3rem 0;
   background: none;
   border: 0;
-  color: var(--ink);
+  color: var(--red);
   font: inherit;
-  font-size: 0.8rem;
-  font-weight: 700;
+  font-size: 0.78rem;
+  font-weight: 800;
   text-decoration: underline;
+  text-underline-offset: 3px;
   cursor: pointer;
 }
 
 .link-button:hover {
-  color: var(--red);
+  color: var(--red-dark);
 }
 
 /* ── Quantity stepper ─────────────────────────────────── */
 .stepper {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.15rem;
+  gap: 0.55rem;
+  padding: 0.2rem 0.6rem 0.2rem 0.2rem;
   background: var(--white);
-  border: 2px solid var(--red);
-  border-radius: var(--radius-pill);
+  border: 1px solid #e8d5ca;
+  border-radius: 13px;
 }
 
 .stepper button {
   display: grid;
   place-items: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 2rem;
+  height: 2rem;
   padding: 0;
-  background: var(--red);
-  border: 0;
-  border-radius: 50%;
-  color: var(--white);
+  background: var(--white);
+  border: 1px solid #e8d5ca;
+  border-radius: 9px;
+  color: var(--ink);
   font: inherit;
-  font-size: 1.15rem;
-  font-weight: 700;
+  font-size: 1.1rem;
+  font-weight: 900;
   line-height: 1;
   cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
 }
 
 .stepper button:hover:not(:disabled) {
-  background: var(--red-dark);
+  border-color: var(--red);
+  color: var(--red);
 }
 
 .stepper button:disabled {
-  background: var(--closed-bg);
-  color: var(--muted);
+  color: #c5b8b2;
+  border-color: var(--line);
   cursor: not-allowed;
 }
 
 .stepper__qty {
-  min-width: 1.5rem;
-  font-weight: 700;
+  min-width: 1.4rem;
+  font-size: 0.88rem;
+  font-weight: 800;
   text-align: center;
 }
 
-/* ── Pickup slots ─────────────────────────────────────── */
-#pickup-title {
-  font-size: clamp(1.4rem, 3.5vw, 1.85rem);
+/* ── Pickup slot section ──────────────────────────────── */
+.card h2#pickup-title {
+  font-size: clamp(1.1rem, 3vw, 1.25rem);
+  font-weight: 900;
+  letter-spacing: -0.04em;
 }
 
 .card .message {
@@ -248,33 +345,34 @@ fieldset {
 
 .slot-list {
   display: grid;
-  gap: 0.35rem;
-  max-height: 18rem;
+  gap: 0.3rem;
+  max-height: 17rem;
   margin-top: 1rem;
-  padding: 0.5rem;
+  padding: 0.4rem;
   overflow-y: auto;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 13px;
 }
 
 .slot {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.7rem 0.9rem;
+  padding: 0.65rem 0.85rem;
   border: 1px solid transparent;
   border-radius: 10px;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   cursor: pointer;
+  transition: background 0.12s;
 }
 
 .slot:hover {
-  background: var(--cream);
+  background: #fff6ef;
 }
 
 .slot:has(input:checked) {
-  background: var(--red-tint);
-  border-color: var(--red);
+  background: #fff0e8;
+  border-color: #f0b79e;
 }
 
 .slot:has(input:focus-visible) {
@@ -287,6 +385,7 @@ fieldset {
   height: 1rem;
   margin: 0;
   accent-color: var(--red);
+  flex-shrink: 0;
 }
 
 .slot input:focus-visible {
@@ -295,27 +394,29 @@ fieldset {
 
 .slot__time {
   flex: 1;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .slot__left {
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   white-space: nowrap;
 }
 
 .slot--full {
+  opacity: 0.5;
   cursor: not-allowed;
-  opacity: 0.55;
 }
 
 .slot--full:hover {
   background: transparent;
 }
 
-/* ── Order summary ────────────────────────────────────── */
+/* ── Order summary sidebar ────────────────────────────── */
 .order-summary h2 {
-  font-size: 1.1rem;
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: -0.04em;
 }
 
 .summary-rows {
@@ -326,14 +427,15 @@ fieldset {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
+  padding: 0.3rem 0;
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 0.88rem;
 }
 
 .summary-rows dd {
   margin: 0;
   color: var(--ink);
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .summary-total {
@@ -344,113 +446,150 @@ fieldset {
   margin-top: 0.9rem;
   padding-top: 1rem;
   border-top: 1px solid var(--line);
-  font-weight: 800;
+  font-size: 0.95rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
 }
 
 .summary-total strong {
-  font-size: 1.6rem;
-  letter-spacing: -0.01em;
+  font-size: 1.65rem;
+  letter-spacing: -0.04em;
 }
 
+/* Pay-at-pickup note — amber info box */
 .pay-note {
-  margin-top: 1rem;
+  margin-top: 1.1rem;
   padding: 0.9rem 1rem;
-  background: #fff6e5;
-  border: 1px solid #f1dfb8;
+  background: #fff8e6;
+  border: 1px solid #f5e3b0;
   border-radius: 12px;
-  color: #5b4a1f;
-  font-size: 0.85rem;
+  color: #614f1c;
+  font-size: 0.82rem;
+  line-height: 1.75;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.pay-note::before {
+  content: '';
+  display: block;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a37a1a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 11v6m0-10v.2'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
 }
 
 .order-summary .message {
   margin-top: 1rem;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
 }
 
+/* ── Place order button ───────────────────────────────── */
 .place-order {
   width: 100%;
-  margin-top: 1rem;
-  padding: 0.85rem 1.25rem;
-  font-size: 1rem;
+  margin-top: 1.1rem;
+  padding: 0.9rem 1.25rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  border-radius: 13px;
 }
 
 .place-order:disabled,
 .place-order:disabled:hover {
-  background: var(--closed-bg);
-  border-color: var(--closed-bg);
-  color: var(--muted);
+  background: #f0ebe8;
+  border-color: #f0ebe8;
+  color: #b0a09a;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
-/* ── Empty basket ─────────────────────────────────────── */
+/* ── Empty basket state ───────────────────────────────── */
 .cart-empty {
   margin-top: 2rem;
-  padding: 2.5rem 1.5rem;
+  padding: 3rem 1.5rem;
   background: var(--white);
-  border: 1px dashed var(--line);
-  border-radius: var(--radius-card);
+  border: 1px dashed #dfd5cf;
+  border-radius: 20px;
   text-align: center;
+  box-shadow: var(--card-shadow);
+}
+
+.cart-empty h2 {
+  font-size: 1.3rem;
+  font-weight: 900;
+  letter-spacing: -0.04em;
 }
 
 .cart-empty p {
   margin-top: 0.5rem;
   color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .cart-empty .button {
-  margin-top: 1.25rem;
+  margin-top: 1.4rem;
 }
 
-/* ── Clear basket dialog ──────────────────────────────── */
+/* ── Clear-basket dialog ──────────────────────────────── */
 dialog {
-  width: min(26rem, calc(100% - 2rem));
-  padding: 1.5rem;
+  width: min(28rem, calc(100% - 2rem));
+  padding: 1.75rem;
   background: var(--white);
   border: 1px solid var(--line);
-  border-radius: var(--radius-card);
+  border-radius: 20px;
   color: var(--ink);
+  box-shadow: 0 25px 70px rgba(35, 26, 23, 0.18);
 }
 
 dialog::backdrop {
-  background: rgba(35, 26, 23, 0.55);
+  background: rgba(35, 26, 23, 0.5);
+  backdrop-filter: blur(4px);
 }
 
 dialog h2 {
-  font-size: 1.25rem;
-  font-weight: 800;
+  font-size: 1.3rem;
+  font-weight: 900;
+  letter-spacing: -0.045em;
 }
 
 dialog p {
   margin-top: 0.5rem;
   color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.65;
 }
 
 .dialog-actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 0.75rem;
-  margin-top: 1.25rem;
+  gap: 0.65rem;
+  margin-top: 1.4rem;
 }
 
-/* ── Wider screens: keep the summary in view ──────────── */
+/* ── Sticky summary on wide screens ───────────────────── */
 @media (min-width: 901px) {
   .cart-side {
     position: sticky;
-    top: 1rem;
+    top: 1.25rem;
   }
 }
 
-/* ── Tablet and mobile ────────────────────────────────── */
+/* ── Tablet ───────────────────────────────────────────── */
 @media (max-width: 900px) {
   .cart-layout {
     grid-template-columns: 1fr;
   }
 }
 
+/* ── Mobile ───────────────────────────────────────────── */
 @media (max-width: 600px) {
   .card {
-    padding: 1.15rem;
+    padding: 1.1rem;
   }
 
   .cart-line {
@@ -465,5 +604,22 @@ dialog p {
 
   .cart-line__total {
     grid-column: 2;
+  }
+
+  .steps__item {
+    font-size: 0.72rem;
+    padding: 0.35rem 0.75rem 0.35rem 0.35rem;
+  }
+
+  .summary-total strong {
+    font-size: 1.45rem;
+  }
+}
+
+/* ── Reduced motion ───────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .slot,
+  .stepper button {
+    transition: none;
   }
 }
