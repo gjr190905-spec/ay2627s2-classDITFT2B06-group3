@@ -6,7 +6,7 @@
   'use strict';
   // Only features available in the active Express app should be treated as live.
   // Independent teammate branches are not automatically merged into this branch.
-  const FEATURES = Object.freeze({auth:true,stallReads:true,cartBrowserOnly:true,checkout:false,vendorWrites:false,adminWrites:false,pickup:false,reviews:false,profiles:true});
+  const FEATURES = Object.freeze({auth:true,stallReads:true,cartBrowserOnly:true,checkout:false,vendorWrites:false,adminWrites:false,pickup:true,reviews:false,profiles:true});
   const FIXTURES = root.__ML_EXACT_FIXTURES__ || null;
   const MENU_REFERENCE = root.MakanMenuReference || null;
   let previewCatalog = false;
@@ -56,6 +56,7 @@
       try { data = await response.json(); } catch { /* invalid JSON handled below */ }
     }
     if (!response.ok) {
+      if (response.status === 404 && (endpoint === '/api/pickup/review' || endpoint === '/api/pickup/approve')) throw bodyError(data, 404);
       if (response.status === 404) fail(`This backend route (${endpoint.split('?')[0]}) is not available on the current branch. No data was changed.`,503);
       throw bodyError(data, response.status);
     }
@@ -314,6 +315,8 @@
       try{root.localStorage.removeItem(cartKey());}catch{/* no-op */}
       token=null;tokenExpiry=0;me=null;csrfToken=null;return result;
     }
+    if(path==='/api/pickup/ready-orders'&&method==='GET')return http(path,{auth:true});
+    if(path==='/api/pickup/issue'&&method==='POST')return http(path,{method,body,auth:true});
     if(path==='/api/food-courts') {await catalog();return {courts};}
     if(path==='/api/stalls')return {stalls:await catalog()};
     if(path==='/api/featured'){await catalog();return {items:previewCatalog?(FIXTURES.menus||[]).filter(i=>i.is_featured).slice(0,9):[]};} // Preview items are labelled by preview banner.
@@ -382,15 +385,15 @@
     if(path==='/api/vendor/pickup/review'&&method==='POST'){
       if(!FEATURES.pickup)unsupported('Pickup verification');
       const code=clean(body?.code);
-      if(!/^PICKUP-[1-9]\d*-[a-f0-9]{36}$/.test(code))fail('Invalid pickup QR reference.',400);
+      if(!/^MLP-[a-f0-9]{64}$/.test(code))fail('Invalid pickup QR reference.',400);
       // Confirmation screen is not a backend authorization or a payment confirmation.
-      return {code,reviewPending:true};
+      return http('/api/pickup/review',{method:'POST',body:{code},auth:true});
     }
     if(path==='/api/vendor/pickup/approve'&&method==='POST'){
       if(!FEATURES.pickup)unsupported('Pickup collection');
       const code=clean(body?.code);
-      const result=await http('/pickup/verify',{method:'POST',body:{collectionReference:code},auth:true});
-      return {ok:true,orderStatus:result.orderStatus,orderId:result.orderId};
+      const result=await http('/api/pickup/approve',{method:'POST',body,auth:true});
+      return {...result,ok:true};
     }
     // Unknown feature actions are UI placeholders, never unverified database writes.
     if(method!=='GET') unsupported('This feature');
@@ -412,9 +415,9 @@
     const image=el?.querySelector?.('[data-live-qr]');
     if(!image || !FEATURES.pickup)return;
     try {
-      const data=await http(`/pickup/${image.dataset.liveQr}/qr`,{auth:true});
+      const data=await http('/api/pickup/issue',{method:'POST',body:{orderId:Number(image.dataset.liveQr)},auth:true});
       const uri=data?.pickup?.qrCode;
-      if(!uri||!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(uri))fail('The pickup QR service returned an invalid image.',502);
+      if(!uri||!/^data:image\/svg\+xml;base64,[A-Za-z0-9+/=]+$/.test(uri))fail('The pickup QR service returned an invalid image.',502);
       if(image.isConnected){image.src=uri;image.alt='Verified pickup code for this order';}
     } catch(e) {
       if(image.isConnected){

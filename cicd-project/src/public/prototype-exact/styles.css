@@ -430,3 +430,9 @@ img,video,canvas { max-inline-size:100%; }
 .profile-permission-text strong{display:block;font-size:12px;font-weight:800;line-height:1.35;margin-bottom:3px}
 .profile-permission-text p{margin:0;font-size:11px;line-height:1.55}
 @media(max-width:520px){.profile-permission-note{padding:12px;gap:10px}.profile-permission-icon{width:36px;height:36px;flex-basis:36px}}
+
+/* SCRUM QR: responsive vendor scanner and explicit collection confirmation. */
+#pickupVideo:not([hidden]){width:100%;height:auto;max-height:60dvh;aspect-ratio:4/3;object-fit:cover;background:#171717;border-radius:14px;}
+.pickup-verify-check{display:flex;align-items:center;gap:.7rem;padding:.65rem .25rem;min-height:44px;font-weight:600;}
+.pickup-verify-check input{width:19px;height:19px;accent-color:#a11628;}
+@media(max-width:600px){.pickup-verify-check{align-items:flex-start}.pickup-verify-check input{flex:none}}
