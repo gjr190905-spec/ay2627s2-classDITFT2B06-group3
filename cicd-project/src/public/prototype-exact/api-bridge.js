@@ -6,7 +6,7 @@
   'use strict';
   // Only features available in the active Express app should be treated as live.
   // Independent teammate branches are not automatically merged into this branch.
-  const FEATURES = Object.freeze({auth:true,stallReads:true,cartBrowserOnly:true,checkout:false,vendorWrites:false,adminWrites:false,pickup:true,reviews:false,profiles:true});
+  const FEATURES = Object.freeze({auth:true,stallReads:true,cartBrowserOnly:true,checkout:true,vendorWrites:false,adminWrites:false,pickup:true,reviews:false,profiles:true});
   const FIXTURES = root.__ML_EXACT_FIXTURES__ || null;
   const MENU_REFERENCE = root.MakanMenuReference || null;
   let previewCatalog = false;
@@ -123,7 +123,7 @@
     if (catalogPromise && !force) return catalogPromise;
     catalogPromise = (async()=>{
       let rows;
-      try { rows = asArray(await http('/stalls')); previewCatalog = false; catalogIssue = ''; }
+      try { rows = asArray(await http('/api/live/stalls')); previewCatalog = false; catalogIssue = ''; }
       catch(error) {
         if(!FIXTURES || !Array.isArray(FIXTURES.stalls)) throw error;
         previewCatalog = true;
@@ -149,7 +149,7 @@
       const menu = (FIXTURES.menus||[]).filter(m=>Number(m.stall_id)===Number(stallId)).map(m=>normalizeMenuItem(m,stallId));
       return {stall:{...stall},menu};
     }
-    const [stallRow, menuRows]=await Promise.all([http(`/stalls/${stallId}`), http(`/stalls/${stallId}/menu`)]);
+    const [stallRow, menuRows]=await Promise.all([http(`/api/live/stalls/${stallId}`), http(`/api/live/stalls/${stallId}/menu`)]);
     const cached=stallsCache.get(Number(stallId)) || (await catalog(),stallsCache.get(Number(stallId)));
     const stall=normalizeStall({...cached,...stallRow,foodCourtName:cached?.court_name});
     const menu=asArray(menuRows).map(x=>normalizeMenuItem(x,stall.id));
@@ -213,7 +213,7 @@
   }
   async function pickupSlots(stallId) {
     if (previewCatalog) return {slots:[]}; // No fabricated pickup availability.
-    const windows=asArray(await http(`/stalls/${stallId}/windows`));
+    const windows=asArray(await http(`/api/live/stalls/${stallId}/windows`,{auth:true}));
     const slots=windows.map(w=>({id:id(w.id),at:w.startTime||w.at||w.start_time,
       available:w.isFull||w.is_full?0:Math.max(0,num(w.spacesLeft??w.available,0))}));
     windowsCache.set(Number(stallId),slots);
@@ -235,10 +235,10 @@
   }
   async function ordersList() {
     if (!FEATURES.checkout) return {orders:[],_integrationPending:true};
-    const result=await optional('/orders',{auth:true});
+    const result=await optional('/api/live/orders',{auth:true});
     return result===null ? {orders:[],_integrationPending:true} : {orders:asArray(result).map(orderOf)};
   }
-  async function orderDetail(orderId) { if(!FEATURES.checkout) unsupported('Customer order history');return {order:orderOf(await http(`/orders/${orderId}`,{auth:true}))}; }
+  async function orderDetail(orderId) { if(!FEATURES.checkout) unsupported('Customer order history');return {order:orderOf(await http(`/api/live/orders/${orderId}`,{auth:true}))}; }
   async function checkout(body) {
     if(!FEATURES.checkout || previewCatalog) unsupported('Placing orders');
     const cart=await cartView();
@@ -247,10 +247,11 @@
     const available=(await pickupSlots(cart.stallId)).slots;
     const chosen=available.find(x=>x.at===body.pickupAt && x.available>0);
     if(!chosen)fail('Pickup time unavailable or full. Select another.',409);
-    const payload={stallId:cart.stallId,pickupWindowId:chosen.id,
+    if (body.loyaltyRewardId != null || body.promoVoucherId != null) fail('Vouchers and rewards are not yet enabled for live checkout.',409);
+    const payload={stallId:cart.stallId,pickupAt:chosen.at,notes:body.notes||'',
       items:cart.items.map(x=>({menuItemId:x.id,quantity:x.quantity}))};
     // IMPORTANT: Server must calculate prices and enforce capacity atomically.
-    const response=await http('/orders',{method:'POST',body:payload,auth:true});
+    const response=await http('/api/live/orders',{method:'POST',body:payload,auth:true});
     writeCart({stallId:null,items:[]});
     return {order:orderOf(response)};
   }
@@ -289,7 +290,7 @@
   }
   async function pickupReady() {
     if(!me||me.role!=='customer'||!FEATURES.pickup)return {orders:[]};
-    const list=await optional('/orders',{auth:true});
+    const list=await optional('/api/live/orders',{auth:true});
     if(!list)return {orders:[]};
     return {orders:asArray(list).map(orderOf).filter(x=>x.status==='READY').map(x=>({id:x.id,order_number:x.order_number,stall:x.stall_name}))};
   }
@@ -342,6 +343,8 @@
       if(!sid)fail('A stall must be selected.',400);return pickupSlots(sid);}
     if(path==='/api/orders'&&method==='GET')return ordersList();
     if(path==='/api/orders'&&method==='POST')return checkout(body);
+    const cancelMatch=path.match(/^\/api\/orders\/(\d+)\/cancel$/);
+    if(cancelMatch&&method==='POST')return http(`/api/live/orders/${cancelMatch[1]}/cancel`,{method:'POST',body:{},auth:true});
     const orderMatch=path.match(/^\/api\/orders\/(\d+)$/);
     if(orderMatch&&method==='GET')return orderDetail(Number(orderMatch[1]));
     if(path==='/api/vendor/dashboard'&&method==='GET')return vendorDashboard();
@@ -429,5 +432,5 @@
   }
   root.MakanLiveBridge={request,decorate,API_PENDING,normalizeStall,normalizeMenuItem,orderOf,
     diagnostics:()=>({activeUser:me?{id:me.id,role:me.role}:null,previewCatalog,catalogIssue,features:FEATURES,cartStorage:'browser-local',
-      checkoutContract:'POST /orders',stallsContract:'GET /stalls',authContract:'/api/auth/*'})};
+      checkoutContract:'POST /api/live/orders',stallsContract:'GET /api/live/stalls',authContract:'/api/auth/*'})};
 })(window);
