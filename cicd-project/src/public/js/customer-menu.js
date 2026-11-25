@@ -1,6 +1,6 @@
 const TOKEN_KEY = 'token';
 const CART_KEY = 'cart'; 
-const LOGIN_PAGE = 'index.html';
+const LOGIN_PAGE = '/index.html';
 const PLACEHOLDER_IMAGE = 'images/stalls/placeholder.png';
 
 const FALLBACK_DETAILS = {

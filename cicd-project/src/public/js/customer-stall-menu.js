@@ -1,6 +1,6 @@
 const TOKEN_KEY = 'token';
 const CART_KEY = 'cart';
-const LOGIN_PAGE = 'index.html';
+const LOGIN_PAGE = '/index.html';
 const MAX_QUANTITY = 20;
 
 const money = new Intl.NumberFormat('en-SG', { style: 'currency', currency: 'SGD' });
@@ -39,6 +39,7 @@ const ITEM_IMAGES = {
   'Grande Yogurt with 3 Toppings':   'https://images.unsplash.com/photo-1593450298197-e6031f033a44?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?w=400&h=300&fit=crop',
   'Parfait with 5 Toppings':         'https://images.unsplash.com/photo-1615522894493-2f3e3fda615c?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?w=400&h=300&fit=crop',
   'Extra Topping':                   'https://images.unsplash.com/photo-1601493701002-3223e7e1ebaf?q=80&w=1074&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?w=400&h=300&fit=crop',
+  'Braised Pig Trotter':             'https://images.unsplash.com/photo-1623130320585-28986bf80859?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?w=400&h=300&fit=crop'
 };
 
 // ── Page state ───────────────────────────────────────────

@@ -1,6 +1,6 @@
 const TOKEN_KEY = 'token';
 const CART_KEY = 'cart';
-const LOGIN_PAGE = 'index.html';
+const LOGIN_PAGE = '/index.html';
 const ORDERS_PAGE = 'orders.html';
 const POLL_MS = 30000;
 

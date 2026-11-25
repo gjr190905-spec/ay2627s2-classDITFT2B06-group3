@@ -1,6 +1,6 @@
 const TOKEN_KEY = 'token';
 const CART_KEY = 'cart';
-const LOGIN_PAGE = 'index.html';
+const LOGIN_PAGE = '/index.html';
 const ORDERS_PAGE = 'orders.html';
 const MAX_QUANTITY = 20;
 
@@ -40,6 +40,16 @@ const checkoutMessage = document.getElementById('checkout-message');
 const checkoutHint = document.getElementById('checkout-hint');
 const placeOrderButton = document.getElementById('place-order');
 const clearDialog = document.getElementById('clear-dialog');
+const ITEM_IMAGES = {
+  'Just Yogurt Petite':              'https://images.unsplash.com/photo-1786912029812-f1516e62b8f4?q=80&w=880&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?w=400&h=300&fit=crop',
+  'Just Yogurt Regular':             'https://images.unsplash.com/photo-1786386370191-6c427763c0a3?q=80&w=627&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?w=400&h=300&fit=crop',
+  'Just Yogurt Grande':              'https://images.unsplash.com/photo-1786386370191-6c427763c0a3?q=80&w=627&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?w=400&h=300&fit=crop',
+  'Petite Yogurt with 1 Topping':    'https://images.unsplash.com/photo-1669127045641-0ae683639570?q=80&w=688&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?w=400&h=300&fit=crop',
+  'Regular Yogurt with 2 Toppings':  'https://images.unsplash.com/photo-1670843838196-0c1c15e85d5e?q=80&w=1169&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?w=400&h=300&fit=crop',
+  'Grande Yogurt with 3 Toppings':   'https://images.unsplash.com/photo-1593450298197-e6031f033a44?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?w=400&h=300&fit=crop',
+  'Parfait with 5 Toppings':         'https://images.unsplash.com/photo-1615522894493-2f3e3fda615c?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?w=400&h=300&fit=crop',
+  'Extra Topping':                   'https://images.unsplash.com/photo-1601493701002-3223e7e1ebaf?q=80&w=1074&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?w=400&h=300&fit=crop',
+};
 
 // ── Page state ───────────────────────────────────────────
 let cart = readCart();
@@ -161,12 +171,19 @@ function showEmpty() {
 
 function renderLines() {
   cartLines.replaceChildren();
-
   cart.items.forEach((line) => {
     const fragment = lineTemplate.content.cloneNode(true);
     const row = fragment.querySelector('.cart-line');
     const minus = fragment.querySelector('.stepper__minus');
     const plus = fragment.querySelector('.stepper__plus');
+
+    const imageEl = fragment.querySelector('.cart-line__image');
+    const imageUrl = ITEM_IMAGES[line.name];
+    if (imageEl && imageUrl) {
+      imageEl.style.backgroundImage = `url('${imageUrl}')`;
+      imageEl.style.backgroundSize = 'cover';
+      imageEl.style.backgroundPosition = 'center';
+    }
 
     row.dataset.id = String(line.menuItemId);
     fragment.querySelector('.cart-line__name').textContent = line.name;
@@ -191,7 +208,6 @@ function renderLines() {
     cartLines.appendChild(fragment);
   });
 }
-
 function renderSummary() {
   const count = itemCount();
   summaryItemsLabel.textContent = `Items (${count})`;
