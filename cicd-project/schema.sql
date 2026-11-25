@@ -29,3 +29,13 @@ CREATE TABLE "Person" (
 
 -- Indexes
 CREATE UNIQUE INDEX "Person_email_key" ON "Person"("email");
+
+-- FAQ storage for the admin help centre.
+CREATE TABLE IF NOT EXISTS "FAQ" (
+  "id" SERIAL PRIMARY KEY,
+  "question" TEXT NOT NULL,
+  "answer" TEXT NOT NULL,
+  "category" TEXT NOT NULL CHECK ("category" IN ('Ordering', 'Payment', 'Pickup')),
+  "isPublished" BOOLEAN NOT NULL DEFAULT TRUE,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+);

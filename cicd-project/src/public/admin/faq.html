@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin FAQ | Makan Liao</title>
+    <link rel="stylesheet" href="../customer-styles/orders.css" />
+    <link rel="stylesheet" href="../customer-styles/menu.css" />
+    <style>
+      .admin-card {
+        border: 1px solid var(--line, #ddd);
+        border-radius: 0.75rem;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        background: #fff;
+      }
+
+      .admin-form label {
+        display: block;
+        margin-top: 0.75rem;
+        font-weight: 700;
+      }
+
+      .admin-form input,
+      .admin-form textarea,
+      .admin-form select {
+        width: 100%;
+        margin-top: 0.25rem;
+        padding: 0.5rem;
+        box-sizing: border-box;
+      }
+
+      .admin-actions button {
+        margin-right: 0.5rem;
+        margin-top: 0.75rem;
+      }
+
+      .hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="main" style="max-width: 900px; margin: 2rem auto; padding: 0 1rem;">
+      <h1>Admin FAQ Management</h1>
+
+      <section id="admin-section">
+        <section class="admin-card">
+          <h2>Create FAQ</h2>
+          <form id="create-form" class="admin-form">
+            <label for="create-question">Question</label>
+            <input id="create-question" type="text" required />
+
+            <label for="create-answer">Answer</label>
+            <textarea id="create-answer" rows="4" required></textarea>
+
+            <label for="create-category">Category</label>
+            <select id="create-category">
+              <option value="Ordering">Ordering</option>
+              <option value="Payment">Payment</option>
+              <option value="Pickup">Pickup</option>
+            </select>
+
+            <label for="create-published">Published</label>
+            <select id="create-published">
+              <option value="true">Yes</option>
+              <option value="false">No</option>
+            </select>
+
+            <div class="admin-actions">
+              <button type="submit">Create FAQ</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="admin-card">
+          <h2>All FAQs</h2>
+          <p id="admin-message" class="message" hidden></p>
+          <div id="admin-faq-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="../js/admin-faq.js" defer></script>
+  </body>
+</html>
