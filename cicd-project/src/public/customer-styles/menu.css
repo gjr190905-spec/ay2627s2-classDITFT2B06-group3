@@ -300,20 +300,18 @@ main h2 {
 /* ── Food court cards ─────────────────────────────────── */
 .court-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 1rem;
   margin-top: 1.25rem;
 }
 
+
 .court-card {
-  display: grid;
-  grid-template-columns: 56px 1fr;
-  grid-template-rows: auto auto;
-  column-gap: 1rem;
-  align-content: center;
+  display: flex;
   align-items: center;
+  gap: 1rem;
   width: 100%;
-  padding: 1rem 1.1rem;
+  padding: 1rem;
   background: var(--white);
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
@@ -321,63 +319,77 @@ main h2 {
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
 }
 
-/* Placeholder images replacing the solid coloured tiles */
+
+
 .court-card::before {
   content: '';
-  grid-row: 1 / span 2;
-  width: 56px;
-  height: 56px;
-  border-radius: 14px;
+  flex-shrink: 0;
+  width: 100px;
+  height: 100px;
+  border-radius: 16px;
   background-color: var(--image-bg);
-  background-image: url('https://placehold.co/112x112/efe2d6/231a17?text=FC');
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
 }
 
-.court-list li:nth-child(1) .court-card::before {
-  background-image: url('https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?text=FC+1');
-}
-.court-list li:nth-child(2) .court-card::before {
-  background-image: url('https://plus.unsplash.com/premium_photo-1673108852141-e8c3c22a4a22?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?text=FC+2');
-}
-.court-list li:nth-child(3) .court-card::before {
-  background-image: url('https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?text=FC+3');
-}
-.court-list li:nth-child(4) .court-card::before {
-  background-image: url('https://plus.unsplash.com/premium_photo-1675252369719-dd52bc69c3df?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?text=FC+4');
-}
-.court-list li:nth-child(5) .court-card::before {
-  background-image: url('https://images.unsplash.com/photo-1473093295043-cdd812d0e601?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?text=FC+5');
-}
-.court-list li:nth-child(6) .court-card::before {
-  background-image: url('https://images.unsplash.com/photo-1569718212165-3a8278d5f624?q=80&w=880&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D?text=FC+6');
+/* Add this new rule for the text stack */
+.court-card__text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;  /* vertically centre the text block */
+  gap: 0.2rem;
+  min-width: 0;
+  flex: 1;
 }
 
 .court-card__name {
-  align-self: end;
-  font-weight: 700;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
 }
 
+  .court-list li:nth-child(1) .court-card::before {
+    background-image: url('https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=200&h=200&fit=crop');
+  }
+  .court-list li:nth-child(2) .court-card::before {
+    background-image: url('https://plus.unsplash.com/premium_photo-1673108852141-e8c3c22a4a22?w=200&h=200&fit=crop');
+  }
+  .court-list li:nth-child(3) .court-card::before {
+    background-image: url('https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop');
+  }
+  .court-list li:nth-child(4) .court-card::before {
+    background-image: url('https://plus.unsplash.com/premium_photo-1675252369719-dd52bc69c3df?w=200&h=200&fit=crop');
+  }
+  .court-list li:nth-child(5) .court-card::before {
+    background-image: url('https://images.unsplash.com/photo-1473093295043-cdd812d0e601?w=200&h=200&fit=crop');
+  }
+  .court-list li:nth-child(6) .court-card::before {
+    background-image: url('https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=200&h=200&fit=crop');
+  }
+
 .court-card__count {
-  align-self: start;
   color: var(--red);
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   font-weight: 700;
 }
 
 .court-card:hover {
   border-color: #e0b9a8;
+  box-shadow: var(--card-shadow-hover);
+  transform: translateY(-2px);
 }
 
 .court-card[aria-pressed='true'] {
   border-color: var(--red);
-  box-shadow: 0 0 0 1px var(--red), 0 8px 20px rgba(184, 16, 15, 0.12);
+  box-shadow: 0 0 0 1px var(--red), var(--card-shadow-hover);
+  background: #fffaf7;
 }
 
-/* ── Stall section ────────────────────────────────────── */
+/*── Stall section ────────────────────────────────────── */
 .stalls {
   margin-top: 2.75rem;
 }
