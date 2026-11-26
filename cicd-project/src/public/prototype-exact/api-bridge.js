@@ -21,7 +21,7 @@
   let tokenExpiry = 0;
   let csrfToken = null;
   let catalogPromise = null;
-  const API_PENDING = 'The backend for this feature is not integrated yet. The screen is ready; no changes have been saved.';
+  const API_PENDING = 'This feature is currently unavailable. No changes have been saved.';
   const clean = (v, fallback = '') => typeof v === 'string' && v.trim() ? v.trim() : fallback;
   const num = (v, fallback = 0) => Number.isFinite(Number(v)) ? Number(v) : fallback;
   const asArray = data => Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : Array.isArray(data?.orders) ? data.orders : [];
@@ -145,7 +145,7 @@
     if(!id(stallId)) fail('Please choose a valid stall.',400);
     if (previewCatalog) {
       const stall = FIXTURES?.stalls?.find(s=>Number(s.id)===Number(stallId));
-      if (!stall) fail('Prototype stall not found.',404);
+      if (!stall) fail('Stall not found.',404);
       const menu = (FIXTURES.menus||[]).filter(m=>Number(m.stall_id)===Number(stallId)).map(m=>normalizeMenuItem(m,stallId));
       return {stall:{...stall},menu};
     }
@@ -416,7 +416,7 @@
         banner.setAttribute('role','status');
         banner.className='note-box';
         banner.style.cssText='max-width:1120px;margin:12px auto;padding:12px 18px;border:1px solid #e9b85c;';
-        banner.textContent='PREVIEW DATA — stall/menu listings are local design samples because the current /stalls API is not compatible with PostgreSQL. No sample checkout or database updates are enabled.';
+        banner.textContent='Live stall data is unavailable. Displayed stall and menu information is illustrative; placing orders is disabled until live data is available.';
         el.prepend(banner);
       }
     }
