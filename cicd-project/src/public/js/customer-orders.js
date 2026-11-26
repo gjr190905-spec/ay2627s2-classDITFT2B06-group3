@@ -182,7 +182,7 @@ function renderList(orders) {
 
 async function loadList(isRefresh) {
   try {
-    const orders = await apiGet('/orders');
+    const orders = await apiGet('/customer-orders');
 
     const signature = JSON.stringify(orders);
     if (signature === lastSignature) {
@@ -299,8 +299,10 @@ async function loadDetail(id, isRefresh) {
 function showPlacedBanner(placedId) {
   placedLink.href = `${ORDERS_PAGE}?id=${encodeURIComponent(placedId)}`;
   placedBanner.hidden = false;
-  // Drop ?placed= so refreshing the page does not show the banner again.
-  window.history.replaceState(null, '', ORDERS_PAGE);
+  const params = new URLSearchParams(window.location.search);
+  params.delete('placed');
+  const newUrl = params.toString() ? `${ORDERS_PAGE}?${params}` : ORDERS_PAGE;
+  window.history.replaceState(null, '', newUrl);
 }
 
 async function loadPage() {
