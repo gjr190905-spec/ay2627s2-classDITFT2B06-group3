@@ -1,0 +1,4 @@
+Bundled QRCode for JavaScript
+Copyright (c) 2009 Kazuhiko Arase.
+Licensed under MIT. The original copyright and MIT attribution header is included in index.js.
+This code is copied from the user-supplied Makan Liao? reference project and used for creating SVG QR images on the server. Do not change attribution.

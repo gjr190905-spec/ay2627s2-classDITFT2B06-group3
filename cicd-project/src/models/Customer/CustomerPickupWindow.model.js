@@ -35,9 +35,9 @@ module.exports.getUpcomingWindowsByStallId = async function getUpcomingWindowsBy
             (w."maxOrders" - w."bookedCount") AS "spacesLeft",
             (w."bookedCount" >= w."maxOrders")  AS "isFull"
        FROM "PickupWindow" w
-       JOIN "Vendor" v ON v."id" = w."stallId"
+       JOIN "Stall" s ON s."id" = w."stallId"
       WHERE w."stallId" = $1
-        AND v."isActive" = true
+        AND s."isActive" = true
         AND w."isActive" = true
         AND w."startTime" > NOW()
       ORDER BY w."startTime"
@@ -57,9 +57,9 @@ module.exports.getUpcomingWindowsByStallId = async function getUpcomingWindowsBy
               (w."maxOrders" - w."bookedCount") AS "spacesLeft",
               (w."bookedCount" >= w."maxOrders")  AS "isFull"
          FROM "PickupWindow" w
-         JOIN "Vendor" v ON v."id" = w."stallId"
+         JOIN "Stall" s ON s."id" = w."stallId"
         WHERE w."stallId" = $1
-          AND v."isActive" = true
+          AND s."isActive" = true
           AND w."isActive" = true
           AND w."startTime" > NOW()
         ORDER BY w."startTime"

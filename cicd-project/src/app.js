@@ -9,6 +9,8 @@ const personRouter = require('./routers/Person.router');
 const CustomerStallRouter = require('./routers/customer/Customer.Stall.router.js');
 const CustomerOrderRouter = require('./routers/customer/Customer.Order.router.js');
 const authRouter = require('./routers/Auth.router');
+const profileRouter = require('./routers/Profile.router');
+const weeklyStatsRouter = require('./routers/VendorWeekly.router');
 const vendorRouter = require('./routers/Vendor.router');
 const vendorMenuRouter = require('./routers/Vendor.Menu.router.js');
 const vendorOrderRouter = require('./routers/Vendor.Order.router');
@@ -18,6 +20,10 @@ const paymentRouter = require('./routers/PaymentRouter.js');
 const pickupWindowRouter = require('./routers/pickupWindowRouter');
 const vendorOrderStatusRouter = require('./routers/VendorOrdersStatusRouter.js');
 const { loadSession } = require('./middleware/auth-session');
+const pickupQrRouter = require('./routers/PickupQr.router');
+const liveCheckoutRouter = require('./routers/LiveCheckout.router');
+const customerNotificationsRouter = require('./routers/CustomerNotifications.router');
+const roleNotificationsRouter = require('./routers/RoleNotifications.router');
 
 const app = express();
 
@@ -28,9 +34,21 @@ app.use(express.json({ limit: '1mb' }));
 app.use(loadSession);
 
 app.use(express.static(path.join(__dirname, 'public')));
+// Serve only the two pinned PDF.js browser modules; parsing stays client-side.
+app.get('/prototype-exact/pdfjs/:filename', (req, res, next) => {
+  const allowed = new Set(['pdf.min.mjs', 'pdf.worker.min.mjs']);
+  if (!allowed.has(req.params.filename)) return next();
+  return res.type('text/javascript').sendFile(path.join(__dirname, '../node_modules/pdfjs-dist/build', req.params.filename));
+});
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 app.use('/api/auth', authRouter);
+app.use('/api/pickup', pickupQrRouter);
+app.use('/api/live', liveCheckoutRouter);
+app.use('/api/notifications', customerNotificationsRouter);
+app.use('/api/activity-notifications', roleNotificationsRouter);
+app.use('/api/profile', profileRouter);
+app.use('/api/vendor/weekly-stats', weeklyStatsRouter);
 app.use('/somethings', somethingRouter);
 app.use('/persons', personRouter);
 app.use('/stalls', CustomerStallRouter);

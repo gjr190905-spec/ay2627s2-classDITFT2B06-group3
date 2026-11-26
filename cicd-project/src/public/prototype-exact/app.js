@@ -75,7 +75,49 @@ async function request(endpoint, {method='GET', body}={}) {
 }
 
 function errorReport(error){toast(error?.message||'Something went wrong. Please try again.',true);}
-async function refreshMe(){const d=await request('/api/auth/me');state.user=d.user;state.csrf=d.csrfToken;}
+async function refreshProfileFromServer(){
+  if (!state.user) return;
+  try {
+    const result = await request('/api/profile');
+    if (result.user) state.user = result.user;
+  } catch { /* A temporarily unavailable profile API must not block sign-in. */ }
+}
+async function refreshMe(){const d=await request('/api/auth/me');state.user=d.user;state.csrf=d.csrfToken;await refreshProfileFromServer();}
+async function prepareAvatar(file) {
+  if (!file || !['image/jpeg','image/png','image/webp'].includes(file.type)) throw new Error('Choose a JPEG, PNG or WebP photo.');
+  if (file.size > 8 * 1024 * 1024) throw new Error('Choose a photo smaller than 8 MB.');
+  const url = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    await new Promise((resolve,reject) => {image.onload = resolve;image.onerror = () => reject(new Error('This photo could not be opened.'));image.src = url;});
+    const size = Math.min(image.naturalWidth, image.naturalHeight);
+    if (!size) throw new Error('This photo has invalid dimensions.');
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 320;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Your browser cannot process this image.');
+    context.fillStyle='#ffffff';context.fillRect(0,0,320,320);
+    context.drawImage(image,(image.naturalWidth-size)/2,(image.naturalHeight-size)/2,size,size,0,0,320,320);
+    const dataUrl = canvas.toDataURL('image/jpeg',0.85);
+    if (dataUrl.length > 710000) throw new Error('Compressed photo is still too large.');
+    return dataUrl;
+  } finally { URL.revokeObjectURL(url); }
+}
+async function uploadProfilePhoto(file) {
+  const photo=await prepareAvatar(file);
+  const picture=document.querySelector('#profile-avatar-display');
+  const original=picture?.innerHTML;
+  if (picture) picture.innerHTML=`<img src="${photo}" alt="Profile photo preview" />`;
+  try {
+    const result=await request('/api/profile/avatar',{method:'POST',body:{imageDataUrl:photo}});
+    state.user=result.user;
+    toast(result.message);
+    await render();
+  } catch (error) {
+    if (picture) picture.innerHTML=original;
+    throw error;
+  }
+}
 async function refreshCount(){if(state.user?.role==='customer'){try{state.cartCount=(await request('/api/cart')).count;}catch{state.cartCount=0;}}else state.cartCount=0;}
 function navTo(page,opts={}){
   pendingPickup=null;
@@ -89,7 +131,7 @@ function navTo(page,opts={}){
   state.mobileOpen=false;
   window.history.replaceState(null,'',`#${page}${page==='stall'&&state.stallId?'/'+state.stallId:''}${page==='order'&&state.orderId?'/'+state.orderId:''}`);
   if(!opts.focusStalls)window.scrollTo({top:0,behavior:'instant'});
-  render();
+  return render();
 }
 function navItem(page,label){return `<button class="nav-link ${state.page===page?'active':''}" data-page="${page}">${label}</button>`;}
 function shell(content){
@@ -100,16 +142,19 @@ function shell(content){
     <button class="brand" data-page="home" aria-label="Makan Liao homepage"><img src="/prototype-exact/makan-liao-logo.png" alt="Makan Liao?" /></button>
     <nav class="nav-links ${state.mobileOpen?'open':''}" aria-label="Main navigation">${mainNav}</nav>
     <div class="header-actions"><button class="icon-btn header-search" data-action="focusSearch" title="Search stalls" aria-label="Search stalls">${ico('search')}</button>
-${role==='customer'?`<button type="button" class="icon-btn pickup-bell" aria-label="Pickup notifications" aria-expanded="false" aria-controls="pickup-list"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 17h14l-2-3V9a5 5 0 0 0-10 0v5zM10 20a2 2 0 0 0 4 0"/></svg><span class="pickup-count"></span></button><section id="pickup-list" aria-label="Pickup notifications" hidden></section><button class="icon-btn" data-page="cart" aria-label="Shopping cart">${ico('basket')}${state.cartCount?`<span class="cart-count">${state.cartCount}</span>`:''}</button>`:''}
-    ${user?`<button class="avatar-btn" data-page="profile" title="My profile"><span class="avatar">${esc(user.displayName.charAt(0).toUpperCase())}</span><span class="username">${esc(user.displayName.split(' ')[0])}</span></button>`:`<button class="btn btn-outline btn-sm" data-page="login">Sign In</button><button class="btn btn-sm signup-nav" data-page="signup">Sign Up</button>`}
+${user?`<button type="button" class="icon-btn pickup-bell" aria-label="Pickup notifications" aria-expanded="false" aria-controls="pickup-list"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 17h14l-2-3V9a5 5 0 0 0-10 0v5zM10 20a2 2 0 0 0 4 0"/></svg><span class="pickup-count"></span></button><section id="pickup-list" aria-label="Pickup notifications" hidden></section>`:''}${role==='customer'?`<button class="icon-btn" data-page="cart" aria-label="Shopping cart">${ico('basket')}${state.cartCount?`<span class="cart-count">${state.cartCount}</span>`:''}</button>`:''}
+    ${user?`<button class="avatar-btn" data-page="profile" title="My profile"><span class="avatar">${user.avatarUrl?`<img src="${esc(user.avatarUrl)}" alt="" />`:esc(user.displayName.charAt(0).toUpperCase())}</span><span class="username">${esc(user.displayName.split(' ')[0])}</span></button>`:`<button class="btn btn-outline btn-sm" data-page="login">Sign In</button><button class="btn btn-sm signup-nav" data-page="signup">Sign Up</button>`}
     <button class="icon-btn mobile-menu" data-action="toggleMenu" aria-label="Toggle menu">${ico('menu')}</button></div>
   </div></header><main class="main" id="content">${content}</main>
-  <footer class="site-footer"><div class="container footer-inner"><button class="footer-brand" data-page="home"><img src="/prototype-exact/makan-liao-logo.png" alt="Makan Liao?"/></button><span class="footer-brief">A campus food ordering platform for Singapore Polytechnic students and staff.</span><div class="footer-links"><button data-info="about">About</button><button data-info="help">Help & Support</button><button data-info="terms">Terms</button><button data-info="privacy">Privacy</button></div></div><div class="container footer-disclaimer">Independent class-project reference prototype. FC6 items reflect photographed menu boards. Other courts and accounts are samples. Pay at pickup only; no online payment.</div></footer>`;
+  <footer class="site-footer"><div class="container footer-inner"><button class="footer-brand" data-page="home"><img src="/prototype-exact/makan-liao-logo.png" alt="Makan Liao?"/></button><span class="footer-brief">A campus food ordering platform for Singapore Polytechnic students and staff.</span><div class="footer-links"><button data-info="about">About</button><button data-info="help">Help & Support</button><button data-info="terms">Terms</button><button data-info="privacy">Privacy</button></div></div></footer>`;
 }
 const introCards=[['shop','Campus Stalls','Your favourite food, all in one place.'],['clock','Order Ahead','Pick a collection time that suits you.'],['receipt','Order Tracking','Follow your order until it is ready for pickup.']];
 const featuredStallPhotos=['stalls/stall_19.webp','stalls/stall_17.webp','stalls/stall_21.webp'];
 function foodImageFor(label=''){const text=String(label).toLowerCase();return /burger|western|sandwich|bun|toast|bake|pizza|pastry/.test(text)?'burger.webp':/noodle|mee|laksa|pasta|udon|wok|ramen|soup/.test(text)?'prawn-noodles.webp':'chicken-rice.webp';}
-function imageForItem(item){return item?.image_path?`/prototype-exact/media/${encodeURI(item.image_path)}`:`/prototype-exact/media/${foodImageFor(item?.name||'food')}`;}
+function imageForItem(item){
+  const path=window.MakanMenuReference?.imageFor(item,item?.stall_name) || item?.image_path || foodImageFor(item?.name||'food');
+  return `/prototype-exact/media/${encodeURI(path)}`;
+}
 function homeHero(){return `<div class="campaign-section"><section class="campaign-hero"><div class="campaign-content"><div class="eyebrow campaign-eyebrow"><span></span> GOOD FOOD, RIGHT ON CAMPUS</div><h1>CRAVING FOR <strong>SMTH?</strong></h1><div class="hero-brush" aria-hidden="true"></div><p>Browse FC6 stalls, order ahead and collect at your preferred pickup time.</p><div class="hero-actions"><button data-page="explore" class="btn">Explore Food Stalls ${ico('arrow')}</button><button class="btn btn-outline" data-page="how">How It Works</button></div></div><div class="campaign-photo" role="img" aria-label="Chicken rice, noodles and iced milk tea" ><img src="/prototype-exact/media/hero-food.webp" alt="Chicken rice, noodles and iced tea"/></div></section>
   <form class="home-search" id="homeSearchForm"><div class="home-court-select">${ico('pin')}<select name="courtId" aria-label="Choose food court"><option value="0">SP Food Courts</option>${state.courts.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>${ico('down')}</div><div class="home-search-divider"></div><div class="home-search-input">${ico('search')}<input type="search" name="search" placeholder="Search for stalls, dishes or cuisines..." aria-label="Search stalls dishes or cuisines"/></div><button class="btn btn-sm" type="submit">Search</button></form>
   <div class="info-benefits">${introCards.map(([i,title,detail])=>`<div class="benefit"><span class="benefit-icon">${ico(i)}</span><div><strong>${title}</strong><small>${detail}</small></div></div>`).join('')}</div></div>`;}
@@ -123,15 +168,15 @@ function homePage(){
 }
 function infoPage(){
   const pages={
-    about:['About Makan Liao?','Makan Liao? is a demonstration of campus food ordering for Singapore Polytechnic students and staff. The project lets users discover food stalls, schedule pickup and track orders. FC6 menus are based on photographed menu boards; other food courts use sample data.'],
-    help:['Help & Support','To place an order, sign in as a customer, browse a stall and add your meal to the cart. Pick an available collection slot, confirm, then check My Orders for updates. This is a demo: assistance and real stall support are not connected.'],
-    terms:['Terms of Demonstration','This application is an educational reference prototype. All participating stalls, menu details, prices and accounts are simulated. Do not use real SP credentials or personal information. No real transactions, bookings or payments are conducted at actual Singapore Polytechnic canteens.'],
-    privacy:['Privacy for This Prototype','Customer demo data, account records, sessions, sample orders and profile updates are stored in the configured PostgreSQL database. No institution Single Sign-On, analytics, advertising or external payment services are connected. Delete the local database file to reset the demo. Do not enter real personal or financial information.'],
+    about:['About Makan Liao?','Makan Liao? brings campus food discovery, pre-ordering and pickup tracking into one place. Explore food courts, browse menus, choose a collection time and follow your order from confirmation to pickup.'],
+    help:['Help & Support','To place an order, sign in as a customer, browse a stall and add your meal to the basket. Choose an available pickup slot, confirm your order, then check My Orders for status updates.'],
+    terms:['Terms of Use','Makan Liao? is a student-built demonstration, not an official Singapore Polytechnic canteen ordering service. Menu images and descriptions may be based on photographed references or illustrative data, and stall prices and availability are not verified with operators. Orders placed here do not reserve meals at physical canteens. Do not use institutional passwords or enter sensitive payment information.'],
+    privacy:['Privacy & Data','Account details, sessions, orders and profile changes are stored in the configured PostgreSQL database. This service does not use Singapore Polytechnic single sign-on or an external payment provider. Avoid entering sensitive payment or personal information. Contact the project team for questions about the handling of stored information.'],
   };
   const [title,body]=pages[state.infoTab]||pages.about;
-  return `<div class="container"><div class="page-head"><span class="overline">MAKAN LIAO?</span><h1>${esc(title)}</h1><p>${esc(body)}</p></div><div class="panel" style="max-width:720px"><h2 style="font-size:23px">Explore the platform</h2><p>Food discovery, scheduled pickup, account management and vendor order operations are part of this CA2 demonstration.</p><div class="flex-wrap"><button class="btn" data-page="explore">Explore Food Stalls ${ico('arrow')}</button><button class="btn btn-outline" data-page="how">How It Works</button></div></div></div>`;
+  return `<div class="container"><div class="page-head"><span class="overline">MAKAN LIAO?</span><h1>${esc(title)}</h1><p>${esc(body)}</p></div><div class="panel" style="max-width:720px"><h2 style="font-size:23px">Explore the platform</h2><p>Explore stalls, manage your account and follow order progress with tools designed for campus pickup.</p><div class="flex-wrap"><button class="btn" data-page="explore">Explore Food Stalls ${ico('arrow')}</button><button class="btn btn-outline" data-page="how">How It Works</button></div></div></div>`;
 }
-function howPage(){return `<div class="container"><div class="page-head"><span class="overline">SIMPLE, FAST, CAMPUS-FRIENDLY</span><h1>Good food, right on time.</h1><p>Ordering from your favourite stalls at Singapore Polytechnic shouldn't take up your entire break.</p></div><div class="how-page-grid">${[['01','Explore the campus','Browse the available food courts, filter by cuisine and view real stall menus.'],['02','Choose your meal','Add dishes to your cart, then choose an available collection slot.'],['03','Confirm & collect','Receive an order reference, track preparation and pay at the stall.'],['04','Track your order','Check your order status and collect it when the stall marks it ready.']].map(([n,title,desc])=>`<article class="how-page-card"><span>${n}</span><h2>${title}</h2><p>${desc}</p></article>`).join('')}</div><div class="pool-banner compact"><div class="pool-banner-image"><img src="/prototype-exact/media/food-pool-pack.webp" alt="Takeaway meals"/></div><div class="pool-banner-copy"><h2>Ready for your next break?</h2><p>Find a stall that looks good and pick your meal.</p><button class="btn" data-page="explore">Explore Food Stalls ${ico('arrow')}</button></div></div></div>`;}
+function howPage(){return `<div class="container"><div class="page-head"><span class="overline">SIMPLE, FAST, CAMPUS-FRIENDLY</span><h1>Good food, right on time.</h1><p>Ordering from your favourite stalls at Singapore Polytechnic shouldn't take up your entire break.</p></div><div class="how-page-grid">${[['01','Explore the campus','Browse food courts, filter by cuisine and explore stall menus.'],['02','Choose your meal','Add dishes to your cart, then choose an available collection slot.'],['03','Confirm & collect','Receive an order reference, track preparation and pay at the stall.'],['04','Track your order','Check your order status and collect it when the stall marks it ready.']].map(([n,title,desc])=>`<article class="how-page-card"><span>${n}</span><h2>${title}</h2><p>${desc}</p></article>`).join('')}</div><div class="pool-banner compact"><div class="pool-banner-image"><img src="/prototype-exact/media/food-pool-pack.webp" alt="Takeaway meals"/></div><div class="pool-banner-copy"><h2>Ready for your next break?</h2><p>Find a stall that looks good and pick your meal.</p><button class="btn" data-page="explore">Explore Food Stalls ${ico('arrow')}</button></div></div></div>`;}
 function courtCard(c,i){return `<button class="court-card" data-court="${c.id}" aria-label="Browse ${esc(c.name)}"><div class="court-art court-photo"><img src="/prototype-exact/media/${esc(c.image_path||`courts/fc${c.id}.webp`)}" alt="${esc(c.name)} dining area" loading="lazy"/></div><div><h3>${esc(c.name)}</h3><span>${c.stall_count} stalls ${ico('chevron','class="chevron"')}</span></div></button>`;}
 function stallCard(s){return `<article class="stall-card"><button data-stall="${s.id}" class="stall-cover branded-stall-cover" aria-label="Open ${esc(s.name)} menu"><img src="/prototype-exact/media/${esc(s.image_path||`stalls/stall_${String(s.id).padStart(2,'0')}.webp`)}" alt="Food speciality at ${esc(s.name)}" loading="lazy"/><span class="stall-photo-logo">${esc(s.name)}</span></button><div class="stall-body"><div class="stall-topline"><span class="tag">${esc(s.cuisine)}</span>${s.is_open===null?'<span class="tag tag-grey">Hours not confirmed</span>':s.is_open?'<span class="tag tag-green">Accepting orders</span>':'<span class="tag tag-grey">Temporarily closed</span>'}</div><h3>${esc(s.name)}</h3><p>${esc(s.description)}</p><div class="stall-foot"><span>${esc(s.court_name)} · ${s.item_count} items</span><button class="mini-arrow" data-stall="${s.id}">View menu ${ico('arrow')}</button></div></div></article>`;}
 function featuredCard(item){return `<article class="featured-card"><div class="featured-art tone-${accent(item.accent)}">${ico(mealIcon(item.name))}</div><div style="display:flex;flex-direction:column;flex:1"><h3>${esc(item.name)}</h3><p>${esc(item.stall_name)}</p><div class="featured-foot"><strong>${money(item.price_cents)}</strong><button class="btn btn-sm btn-secondary" data-stall="${item.stall_id}">View menu ${ico('chevron')}</button></div></div></article>`;}
@@ -170,41 +215,74 @@ function formatSelections(sel){
   return `${esc(titleCase(sel.size))}${sel.addons?.length?' · '+(sel.addonLabels||sel.addons).map(x=>esc(titleCase(x))).join(', '):''}`;
 }
 let dishRequestId=0;
+let dishCloseTimer=null;
+let dishOpeningButton=null;
 async function openDish(id,trigger){
   const turn=++dishRequestId;
+  if(dishCloseTimer){clearTimeout(dishCloseTimer);dishCloseTimer=null;}
+  if(!document.body.classList.contains('dish-open') && trigger?.isConnected)dishOpeningButton=trigger;
   trigger?.classList.add('dish-launching');
-  try{
-    const details=await request(`/api/menu/${id}/details`);
-    if(turn!==dishRequestId)return;
-    state.dish={...details,selection:{size:'regular',addons:[]},quantity:1};
-    renderDish();
-    const dialog=$('#dish-dialog');dialog?.focus({preventScroll:true});
-  }finally{trigger?.classList.remove('dish-launching');}
+  // Keep the cutlery spin visible even with a very fast cached response.
+  if(trigger)setTimeout(()=>trigger.classList.remove('dish-launching'),470);
+  const details=await request(`/api/menu/${id}/details`);
+  if(turn!==dishRequestId)return;
+  state.dish={...details,selection:{size:'regular',addons:[]},quantity:1};
+  renderDish();
+  $('#dish-dialog')?.focus({preventScroll:true});
 }
 function renderDish(){
   if(!state.dish)return;
   const previous=$('.dish-panel-scroll');const prevScroll=previous?.scrollTop||0;const updating=!!previous;
+  const focused=document.activeElement;
+  const restoreFocus=updating && focused?.closest?.('#dish-dialog') ? {
+    action:focused.dataset.action, size:focused.dataset.dishsize, addon:focused.dataset.dishaddon
+  } : null;
   const {item,details:meta,recommendations,selection,quantity}=state.dish;
   const size=meta.sizes.find(x=>x.id===selection.size)||meta.sizes[0];
+  const sizeIsDemo=size.isDemo===true; // Never submit a demo surcharge to live checkout.
   const selectedExtras=meta.addons.filter(x=>selection.addons.includes(x.id));
   const unit=item.price_cents+size.extraCents+selectedExtras.reduce((sum,x)=>sum+x.extraCents,0);
-  const calories=Math.round(meta.nutrition.calories*size.scale+selectedExtras.reduce((sum,x)=>sum+x.calories,0));
+  // Nutrition values are estimates for a REGULAR serving only. Do not invent upsized values.
+  const calories=meta.nutrition ? meta.nutrition.calories : null;
+  const nutritionGrid=meta.nutrition ? `<div class="nutrition-title">Nutrition at a glance <span>estimated values (regular serving)</span></div><div class="nutrition-grid">${[['Calories',meta.nutrition.calories,'kcal'],['Protein',meta.nutrition.proteinG,'g'],['Carbs',meta.nutrition.carbsG,'g'],['Fat',meta.nutrition.fatG,'g']].map(([label,value,unit])=>`<div><strong>${value}<small>${unit}</small></strong><span>${label}</span></div>`).join('')}</div><p class="dish-disclaimer">Nutrition is estimated and may vary from the prepared dish. Ingredient quantities, calories and allergens can differ; confirm with the stall.</p>` : '<p class="dish-disclaimer">Nutrition details have not been supplied or verified for this dish. Ask the stall about ingredients and allergens.</p>';
   const allergenList=[...new Set([...meta.allergens,...selectedExtras.flatMap(x=>x.allergens)])];
   const content=`<div class="dish-panel" id="dish-dialog" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="dish-title">
   <div class="dish-panel-head"><span class="eyebrow">GOOD FOOD, MADE YOUR WAY</span><button type="button" class="dish-close" data-action="closeDish" aria-label="Close dish details">${ico('close')}</button></div>
-  <div class="dish-panel-scroll"><div class="dish-intro"><div class="dish-photo-wrap"><img src="${imageForItem(item)}" alt="${esc(item.name)}" /><div class="dish-photo-sticker">${ico('utensils')} Pick your perfect plate</div></div><div class="dish-about"><span class="tag tag-red">${esc(item.category)}</span><div class="dish-time">${ico('clock')} About ${meta.prepMinutes} min to prepare</div><h2 id="dish-title">${esc(item.name)}</h2><p>${esc(item.description)}</p><strong class="dish-from">From ${money(item.price_cents)}</strong><div class="nutrition-title">Nutrition at a glance <span>estimated per regular serving</span></div><div class="nutrition-grid">${[['Calories',meta.nutrition.calories,'kcal'],['Protein',meta.nutrition.proteinG,'g'],['Carbs',meta.nutrition.carbsG,'g'],['Fat',meta.nutrition.fatG,'g']].map(([label,value,unit])=>`<div><strong>${value}<small>${unit}</small></strong><span>${label}</span></div>`).join('')}</div><p class="dish-disclaimer">Nutrition is not supplied by the current stall API; the numeric examples here are not verified. Ask the vendor about ingredients and allergies.</p></div></div>
-  <div class="dish-options"><section class="dish-section"><div class="dish-section-heading"><h3>Choose your size</h3><span>01</span></div><div class="dish-size-grid">${meta.sizes.map(v=>`<button type="button" class="dish-size ${selection.size===v.id?'selected':''}" data-dishsize="${v.id}" aria-pressed="${selection.size===v.id}"><strong>${esc(v.label)}</strong><span>${v.extraCents?`+${money(v.extraCents)}`:'Included'}</span></button>`).join('')}</div></section>
-  ${meta.addons.length?`<section class="dish-section"><div class="dish-section-heading"><h3>Make it yours</h3><span>02 · choose up to 3</span></div><div class="dish-addon-grid">${meta.addons.map(v=>`<label class="dish-addon ${selection.addons.includes(v.id)?'selected':''}"><input type="checkbox" data-dishaddon="${v.id}" ${selection.addons.includes(v.id)?'checked':''}/><span class="addon-symbol">${ico(v.id==='greens'?'leaf':v.id==='cheese'?'sandwich':v.id==='egg'?'bowl':v.id==='pearls'?'drink':'plus')}</span><span class="addon-label"><strong>${esc(v.label)}</strong><small>${v.isDemo?'Demo suggestion · no extra charge':`+${money(v.extraCents)}`}</small></span></label>`).join('')}</div>${meta.addons.some(v=>v.isDemo)?'<p class="dish-disclaimer">Suggested customisations are demonstration options, not confirmed stall offerings. No surcharge is applied until verified.</p>':''}</section>`:''}
-  <section class="dish-section"><div class="dish-section-heading"><h3>Good to know</h3><span>03</span></div><div class="dish-facts"><div>${ico('clock')} <span>Preparation: approx. ${meta.prepMinutes} min<br><small>Pickup slot selected at checkout</small></span></div><div>${ico('info')} <span>Estimated with your choices: <b>${calories} kcal</b><br><small>Possible allergens: ${esc(allergenList.join(', ')||'Not specified')}</small></span></div><div>${ico('receipt')} <span>Pickup orders<br><small>Add your chosen meal to your basket, then select a collection time.</small></span></div></div></section></div>
+  <div class="dish-panel-scroll"><div class="dish-intro"><div class="dish-photo-wrap"><img src="${imageForItem(item)}" alt="${esc(item.name)}" /><div class="dish-photo-sticker">${ico('utensils')} Pick your perfect plate</div></div><div class="dish-about"><span class="tag tag-red">${esc(item.category)}</span><div class="dish-time">${ico('clock')} About ${meta.prepMinutes} min to prepare</div><h2 id="dish-title">${esc(item.name)}</h2><p>${esc(item.description)}</p><strong class="dish-from">From ${money(item.price_cents)}</strong>${nutritionGrid}</div></div>
+  <div class="dish-options"><section class="dish-section"><div class="dish-section-heading"><h3>Choose your size</h3><span>01</span></div><div class="dish-size-grid">${meta.sizes.map(v=>`<button type="button" class="dish-size ${selection.size===v.id?'selected':''}" data-dishsize="${v.id}" aria-pressed="${selection.size===v.id}"><strong>${esc(v.label)}</strong><span>${v.isDemo?'Unavailable':v.extraCents?`+${money(v.extraCents)}`:'Included'}</span></button>`).join('')}</div>${meta.sizes.some(v=>v.isDemo)?'<p class="dish-size-note">Large and Sharing are not available for ordering at the moment.</p>':''}</section>
+  ${meta.addons.length?`<section class="dish-section"><div class="dish-section-heading"><h3>Make it yours</h3><span>02 · choose up to 3</span></div><div class="dish-addon-grid">${meta.addons.map(v=>`<label class="dish-addon ${selection.addons.includes(v.id)?'selected':''}"><input type="checkbox" data-dishaddon="${v.id}" ${selection.addons.includes(v.id)?'checked':''}/><span class="addon-symbol">${ico(v.id==='greens'?'leaf':v.id==='cheese'?'sandwich':v.id==='egg'?'bowl':v.id==='pearls'?'drink':'plus')}</span><span class="addon-label"><strong>${esc(v.label)}</strong><small>${v.isDemo?'Availability not confirmed':`+${money(v.extraCents)}`}</small></span></label>`).join('')}</div>${meta.addons.some(v=>v.isDemo)?'<p class="dish-disclaimer">Suggestions are not confirmed by the stall. Their calories are excluded from the estimate and no extra fee is added.</p>':''}</section>`:''}
+  <section class="dish-section"><div class="dish-section-heading"><h3>Good to know</h3><span>03</span></div><div class="dish-facts"><div>${ico('clock')} <span>Preparation: approx. ${meta.prepMinutes} min<br><small>Pickup slot selected at checkout</small></span></div><div>${ico('info')} <span>${calories===null?'Nutrition not verified':`Estimated regular serving: <b>${calories} kcal</b>`}<br><small>Allergens unverified · ask the stall</small></span></div><div>${ico('receipt')} <span>Pickup orders<br><small>Add your chosen meal to your basket, then select a collection time.</small></span></div></div></section></div>
   <section class="dish-recos"><div class="dish-section-heading"><h3>You might also like</h3><span>From the same stall</span></div><div class="dish-reco-grid">${recommendations.map(r=>`<button type="button" class="dish-reco" data-dish="${r.id}"><img src="${imageForItem(r)}" alt=""/><span><b>${esc(r.name)}</b><small>${money(r.price_cents)}</small></span>${ico('chevron')}</button>`).join('')}</div></section>
-  </div><div class="dish-panel-footer"><div class="dish-qty"><button data-action="dishMinus" type="button" aria-label="Decrease quantity">${ico('minus')}</button><strong>${quantity}</strong><button data-action="dishPlus" type="button" aria-label="Increase quantity">${ico('plus')}</button></div><div class="dish-total"><span>${esc(size.label)}${selection.addons.length?' + '+selection.addons.length+' extra'+(selection.addons.length>1?'s':''):''}</span><b>${money(unit*quantity)}</b></div><button type="button" class="btn dish-cart-cta" data-action="dishAdd">Add to basket ${ico('arrow')}</button></div></div>`;
+  </div><div class="dish-panel-footer"><div class="dish-qty"><button data-action="dishMinus" type="button" aria-label="Decrease quantity">${ico('minus')}</button><strong>${quantity}</strong><button data-action="dishPlus" type="button" aria-label="Increase quantity">${ico('plus')}</button></div><div class="dish-total"><span>${sizeIsDemo?'Not available · ':''}${esc(size.label)}${selection.addons.length?' + '+selection.addons.length+' extra'+(selection.addons.length>1?'s':''):''}</span><b>${sizeIsDemo?'Price unavailable':money(unit*quantity)}</b></div><button type="button" class="btn dish-cart-cta" data-action="dishAdd" ${sizeIsDemo?'disabled aria-disabled="true" title="Size price has not been verified for checkout"':''}>${sizeIsDemo?'Unavailable':'Add to basket '+ico('arrow')}</button></div></div>`;
   $('#modal-root').innerHTML=`<div class="dish-scrim ${updating?'dish-steady':''}" data-action="closeDish">${content}</div>`;
   const next=$('.dish-panel-scroll');if(next)next.scrollTop=prevScroll;
+  if(restoreFocus){
+    let nextControl=null;
+    if(restoreFocus.action)nextControl=[...document.querySelectorAll('#dish-dialog [data-action]')].find(x=>x.dataset.action===restoreFocus.action);
+    if(restoreFocus.size)nextControl=[...document.querySelectorAll('#dish-dialog [data-dishsize]')].find(x=>x.dataset.dishsize===restoreFocus.size);
+    if(restoreFocus.addon)nextControl=[...document.querySelectorAll('#dish-dialog [data-dishaddon]')].find(x=>x.dataset.dishaddon===restoreFocus.addon);
+    nextControl?.focus({preventScroll:true});
+  }
   document.body.classList.add('dish-open');
 }
-function closeDish(){++dishRequestId;state.dish=null;$('#modal-root').innerHTML='';document.body.classList.remove('dish-open');}
+function closeDish(){
+  ++dishRequestId;state.dish=null;
+  const scrim=$('#modal-root .dish-scrim');
+  if(dishCloseTimer){clearTimeout(dishCloseTimer);dishCloseTimer=null;}
+  const finish=()=>{
+    $('#modal-root').innerHTML='';document.body.classList.remove('dish-open');
+    if(dishOpeningButton?.isConnected)dishOpeningButton.focus({preventScroll:true});
+    dishOpeningButton=null;dishCloseTimer=null;
+  };
+  if(scrim && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches){
+    scrim.classList.add('dish-closing');
+    dishCloseTimer=setTimeout(finish,210);
+  }else finish();
+}
 async function addCustomDish(){
   const d=state.dish;if(!d)return;
+  const selectedSize=d.details.sizes.find(x=>x.id===d.selection.size);
+  if(selectedSize?.isDemo){toast('Large and Sharing cannot be ordered until the stall confirms their availability and prices.',true);return;}
   if(state.user?.role!=='customer'){closeDish();toast('Sign in as a customer to order.');navTo('login');return;}
   const body={itemId:d.item.id,quantity:d.quantity,selections:d.selection};
   await request('/api/cart/items',{method:'POST',body});
@@ -213,9 +291,10 @@ async function addCustomDish(){
 function loginPage(){return `<div class="container"><section class="auth-wrap"><div class="auth-art"><div><img class="auth-logo" src="/prototype-exact/makan-liao-logo.png" alt="Makan Liao?"/><div class="overline">CAMPUS FOOD, SORTED.</div><h1>Your next break <span>starts here.</span></h1><p>Sign in to pre-order your favourites, manage pickup times or run your participating food stall.</p></div><div class="quote">Designed for Singapore Polytechnic students, staff and participating vendors.</div></div><div class="auth-form"><div class="overline">Welcome back</div><h2>Sign in to Makan Liao.</h2><p>Sign in with your registered Makan Liao? account.</p><form id="loginForm"><div class="form-field"><label for="login-email">Email address</label><input id="login-email" type="email" name="email" autocomplete="username" placeholder="you@example.com" required maxlength="254" /></div><div class="form-field"><label for="login-password">Password</label><input id="login-password" type="password" name="password" autocomplete="current-password" placeholder="Enter your password" required /><span class="form-help">Use your own account password.</span></div><button class="btn btn-wide" type="submit">Sign in ${ico('arrow')}</button></form><p class="auth-switch">New to Makan Liao? <button data-page="signup">Create a customer account ${ico('arrow')}</button></p><p class="help-note">Customer accounts may sign up here. Vendor and administrator access is assigned by the team.</p></div></section></div>`;}
 function signupPage(){return `<div class="container"><section class="auth-wrap"><div class="auth-art"><div><img class="auth-logo" src="/prototype-exact/makan-liao-logo.png" alt="Makan Liao?"/><div class="overline">YOUR NEXT BREAK STARTS HERE</div><h1>Good food, <span>on your time.</span></h1><p>Create a customer account to browse FC6 stalls, order ahead and track your meals.</p></div><div class="quote">For Singapore Polytechnic students and staff.</div></div><div class="auth-form"><div class="overline">JOIN MAKAN LIAO</div><h2>Create an Account</h2><p>Use your registered email and a secure password. This is not connected to SP Single Sign-On.</p><form id="signupForm"><div class="form-field"><label for="signup-name">Full name</label><input id="signup-name" name="displayName" autocomplete="name" required minlength="2" maxlength="70" placeholder="Your full name"/></div><div class="form-field"><label for="signup-email">Email address</label><input id="signup-email" type="email" name="email" autocomplete="email" required maxlength="254" placeholder="you@example.com"/></div><div class="form-field"><label for="signup-password">Password</label><input id="signup-password" type="password" name="password" autocomplete="new-password" required minlength="10" maxlength="128" placeholder="10+ characters with letters and numbers"/></div><div class="form-field"><label for="signup-confirm">Confirm password</label><input id="signup-confirm" type="password" name="confirm" autocomplete="new-password" required minlength="10" maxlength="128" placeholder="Repeat your password"/></div><button type="submit" class="btn btn-wide">Create Account ${ico('arrow')}</button></form><p class="auth-switch">Already registered? <button data-page="login">Sign in instead ${ico('arrow')}</button></p><p class="help-note">Vendor and administrator accounts are managed by the platform.</p></div></section></div>`;}
 function profilePage(){const u=state.user;
-  return `<div class="container"><div class="dashboard-head"><div><div class="overline">Account settings</div><h1>Your profile.</h1><p>Keep your contact information up to date.</p></div><span class="role-chip">${esc(titleCase(u.role))} account</span></div><div class="dashboard-grid"><aside class="side-nav"><button class="active">${ico('user')} My details</button><button data-page="${u.role==='customer'?'orders':u.role==='vendor'?'vendor':'admin'}">${ico('receipt')} ${u.role==='customer'?'My orders':u.role==='vendor'?'Vendor dashboard':'Admin dashboard'}</button><button data-action="logout">${ico('logout')} Sign out</button></aside><div><section class="panel"><div class="profile-avatar">${esc(u.displayName.charAt(0).toUpperCase())}</div><h2 style="font-size:22px;letter-spacing:-.04em;margin:0">${esc(u.displayName)}</h2><p class="muted tiny">${esc(u.email)}</p><div class="profile-info"><div><div class="detail-label">Account role</div><div class="detail-value">${esc(titleCase(u.role))}</div></div><div><div class="detail-label">${u.role==='vendor'?'Assigned stall':'Access'}</div><div class="detail-value">${u.role==='vendor'?esc(u.stallName||'Not assigned'):u.role==='admin'?'Platform administrator':'SP student / staff customer'}</div></div></div></section>
+  const qrCard=u.role==='customer'?'<section class="panel"><h2>Pickup QR codes</h2><p>When your order is ready, show its pickup QR to the vendor for secure collection.</p><a class="btn btn-secondary" href="/prototype-exact/pickup-qr.html">View ready orders &amp; QR codes</a></section>':'';
+  return `<div class="container"><div class="dashboard-head"><div><div class="overline">Account settings</div><h1>Your profile.</h1><p>Keep your contact information up to date.</p></div><span class="role-chip">${esc(titleCase(u.role))} account</span></div><div class="dashboard-grid"><aside class="side-nav"><button class="active">${ico('user')} My details</button><button data-page="${u.role==='customer'?'orders':u.role==='vendor'?'vendor':u.role==='admin'?'admin':'profile'}">${ico('receipt')} ${u.role==='customer'?'My orders':u.role==='vendor'?'Vendor dashboard':u.role==='admin'?'Admin dashboard':'My account'}</button><button data-action="logout">${ico('logout')} Sign out</button></aside><div><section class="panel"><div class="profile-avatar" id="profile-avatar-display">${u.avatarUrl?`<img src="${esc(u.avatarUrl)}" alt="Your saved profile photo" />`:esc(u.displayName.charAt(0).toUpperCase())}</div><div class="profile-avatar-actions"><input type="file" id="profile-avatar-input" class="profile-avatar-input" accept="image/png,image/jpeg,image/webp" aria-label="Choose profile photo" /><button type="button" class="btn btn-secondary btn-sm" data-action="changeAvatar">${ico('edit')} Change photo</button>${u.avatarUrl?'<button type="button" class="btn btn-quiet btn-sm" data-action="removeAvatar">Remove photo</button>':''}</div><p class="muted tiny">JPEG, PNG or WebP · up to 8 MB before resizing · saved to your account</p><h2 style="font-size:22px;letter-spacing:-.04em;margin:0">${esc(u.displayName)}</h2><p class="muted tiny">${esc(u.email)}</p><div class="profile-info"><div><div class="detail-label">Account role</div><div class="detail-value">${esc(titleCase(u.role))}</div></div><div><div class="detail-label">${u.role==='vendor'?'Assigned stall':'Access'}</div><div class="detail-value">${u.role==='vendor'?esc(u.stallName||'Not assigned'):u.role==='admin'?'Platform administrator':u.role==='staff'?'SP staff account':'Student / customer account'}</div></div></div></section>
   ${u.role==='customer' ? '<section class="panel"><h2>Pickup alerts</h2><p>Get a phone notification when your meal is ready.</p><button class="btn" id="pickup-enable">Enable device alerts</button> <button class="btn" id="pickup-disable">Turn off device alerts</button><p role="status" id="pickup-help"></p></section>' : ''}
-  <section class="panel"><div class="panel-header"><div><h2>Edit personal details</h2><p>Changes are saved to the database.</p></div></div><form id="profileForm"><div class="form-field"><label for="profile-name">Display name</label><input id="profile-name" name="displayName" value="${esc(u.displayName)}" required minlength="2" maxlength="70" /></div><div class="form-field"><label for="profile-email">Email address</label><input id="profile-email" value="${esc(u.email)}" disabled /><span class="form-help">Email address is managed by the account administrator in this demo.</span></div><div class="form-field"><label for="profile-phone">Phone number (optional)</label><input id="profile-phone" name="phone" value="${esc(u.phone||'')}" maxlength="20" placeholder="e.g. +65 8123 4567" /></div><button class="btn" type="submit">Save changes ${ico('check')}</button></form></section><div class="note-box">${ico('shield')} Account roles and vendor stall assignments are controlled by the server. Customers and vendors cannot change their own permissions.</div></div></div></div>`;
+  <section class="panel"><div class="panel-header"><div><h2>Edit personal details</h2><p>Changes are saved to the database.</p></div></div><form id="profileForm"><div class="form-field"><label for="profile-name">Display name</label><input id="profile-name" name="displayName" value="${esc(u.displayName)}" required minlength="2" maxlength="70" /></div><div class="form-field"><label for="profile-email">Email address</label><input id="profile-email" value="${esc(u.email)}" disabled /><span class="form-help">Email address is managed by the account administrator in this demo.</span></div><div class="form-field"><label for="profile-phone">Phone number (optional)</label><input id="profile-phone" name="phone" value="${esc(u.phone||'')}" maxlength="20" placeholder="e.g. +65 8123 4567" /></div><button class="btn" type="submit">Save changes ${ico('check')}</button></form></section>${qrCard}<div class="note-box profile-permission-note" role="note"><span class="profile-permission-icon" aria-hidden="true"><svg class="profile-permission-shield" viewBox="0 0 24 24" fill="none" focusable="false"><path d="M12 2.8 19.5 6.1v5.1c0 5-2.9 8.1-7.5 10.3-4.6-2.2-7.5-5.3-7.5-10.3V6.1L12 2.8Z" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/><path d="m8.65 12.1 2.4 2.4 4.6-4.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div class="profile-permission-text"><strong>Permissions notice</strong><p>Account roles and vendor stall assignments are controlled by the server. You cannot change your own permissions.</p></div></div></div></div></div>`;
 }
 function cartPage(d,slots){
   if(!d.items.length)return `<div class="container"><div class="page-head"><div class="overline">Your basket</div><h1>Almost lunch time.</h1><p>Add something delicious and we'll take care of the rest.</p></div>${empty('Your basket is empty','Choose a food court and add your favourites to get started.')}</div>`;
@@ -247,6 +326,10 @@ function feedbackPanel(reviews, admin) {
 async function dashboardWithFeedback(role, tab) {
   const data = await request(`/api/${role}/dashboard`);
   if (tab === 'feedback') data.reviews = (await request(`/api/${role}/feedback`)).reviews;
+  if (role === 'vendor') {
+    try { data.weeklyStats = (await request('/api/vendor/weekly-stats')).stats; }
+    catch (err) { data.weeklyStatsError = err.message || 'Weekly figures are unavailable.'; }
+  }
   return data;
 }
 
@@ -256,18 +339,30 @@ function orderPage(o){
   displayedOrderStatus=o.status;const stages=['PLACED','ACCEPTED','PREPARING','READY','COLLECTED'];const idx=stages.indexOf(o.status);
   return `<div class="container"><div class="breadcrumbs"><button data-page="${backPage}">${backLabel}</button><span>/</span><span>${esc(o.order_number)}</span></div><div class="panel" style="max-width:820px;margin:25px auto"><div class="receipt-heading"><div><div class="overline">Order confirmed</div><h1>${esc(o.order_number)}</h1><p class="muted tiny">Placed ${esc(prettyDate(o.created_at))}</p></div>${tagStatus(o.status)}</div><div class="receipt-grid"><div><div class="detail-label">Collect from</div><div class="detail-value">${esc(o.stall_name)} · ${esc(o.court_name)}</div></div><div><div class="detail-label">Pickup time</div><div class="detail-value">${esc(prettyTime(o.pickup_at))}</div></div><div><div class="detail-label">Customer</div><div class="detail-value">${esc(o.customer_name)}</div></div><div><div class="detail-label">Payment</div><div class="detail-value">Pay at pickup</div></div></div><h3 style="font-size:15px">Your items</h3><table class="receipt-items"><thead><tr><th>Item</th><th>Qty</th><th>Price</th></tr></thead><tbody>${o.items.map(i=>`<tr><td>${esc(i.name_snapshot)}<div class="muted tiny">${formatSelections(i.selections)}</div></td><td>${i.quantity}</td><td>${money(i.price_cents*i.quantity)}</td></tr>`).join('')}</tbody></table>${o.loyalty_discount_cents?`<div class="summary-row"><span>Loyalty reward saved</span><strong>-${money(o.loyalty_discount_cents)}</strong></div>`:''}${o.promotional_discount_cents?`<div class="summary-row"><span>Seasonal voucher saved</span><strong>-${money(o.promotional_discount_cents)}</strong></div>`:''}<div class="summary-row summary-total"><span>Total</span><strong>${money(o.total_cents)}</strong></div>${o.notes?`<p class="muted tiny">Notes: ${esc(o.notes)}</p>`:''}<hr class="subtle-divider"/><h3 style="font-size:15px">Order progress</h3>${o.status==='CANCELLED'?'<div class="note-box">This order has been cancelled and will not be prepared.</div>':`<div class="timeline">${stages.map((s,i)=>`<div class="timeline-node ${i<=idx?'done':''}">${esc(titleCase(s))}</div>`).join('')}</div>`}<div class="flex-wrap no-print"><button class="btn btn-secondary" data-page="${backPage}">${ico('chevron')} ${backLabel}</button><button class="btn btn-secondary" data-action="printOrder">${ico('receipt')} Print receipt</button>${o.status==='PLACED'&&state.user.role==='customer'?`<button class="btn btn-quiet" data-cancelorder="${o.id}">Cancel order</button>`:''}</div>${customerFeedback(o)}${state.user?.role==='customer' && o.status==='READY'?`<section class="receipt-pickup"><h2>Pickup QR code</h2><p>Show this code to the vendor when you receive your food.</p><img width="200" height="200" src="/prototype-exact/pickup-unavailable.svg" data-live-qr="${o.id}" alt="Pickup code loading"></section>`:''}</div></div>`;
 }
+function vendorWeeklyPanel(stats, error) {
+  if (!stats) return `<section class="panel"><div class="panel-header"><div><h2>Weekly sales statistics</h2><p>Completed order value for your assigned stall, Monday–Sunday (Singapore time).</p></div></div><p class="muted" role="status">${esc(error || 'Sales statistics are currently unavailable. Please try again later.')}</p></section>`;
+  const days = Array.isArray(stats.days) ? stats.days : [];
+  const maximum = Math.max(1,...days.map(day=>Number(day.completedValueCents)||0));
+  const bars = days.map(day=>{
+    const date = new Date(day.date+'T12:00:00Z');
+    const label = new Intl.DateTimeFormat('en-SG',{weekday:'short',timeZone:'UTC'}).format(date);
+    const cents = Math.max(0,Number(day.completedValueCents)||0);
+    return `<div class="weekly-sales-day" aria-label="${esc(label)} ${esc(money(cents))}"><span class="muted tiny">${esc(label)}</span><div class="weekly-sales-track"><div class="weekly-sales-bar" style="height:${Math.max(2,Math.round((cents/maximum)*100))}%" title="${esc(money(cents))}"></div></div><strong class="tiny">${esc(money(cents))}</strong></div>`;
+  }).join('');
+  return `<section class="panel weekly-sales"><div class="panel-header"><div><h2>Weekly sales statistics</h2><p>${esc(stats.weekStart)} to ${esc(stats.weekEnd)} · Singapore time</p></div></div><div class="stat-grid"><div class="stat"><span class="desk-metric-label">Completed order value</span><strong>${esc(money(stats.totalCents))}</strong></div><div class="stat"><span class="desk-metric-label">Completed orders</span><strong>${Number(stats.completedOrders)||0}</strong></div><div class="stat"><span class="desk-metric-label">Average completed order</span><strong>${esc(money(stats.averageCents))}</strong></div></div><div class="weekly-sales-chart" role="img" aria-label="Daily completed order value chart">${bars}</div><p class="form-help">Figures include only collected/completed orders, not pending or cancelled orders. Completed order value is not proof that payment has settled.</p></section>`;
+}
 let lastVendorOrders='';
 function vendorPage(d){
   lastVendorOrders=JSON.stringify(d.orders);
   const orders=d.orders, open=orders.filter(o=>!['COLLECTED','CANCELLED'].includes(o.status));
   const counts={new:orders.filter(o=>o.status==='PLACED').length,active:open.length,ready:orders.filter(o=>o.status==='READY').length,completed:orders.filter(o=>o.status==='COLLECTED').length};
-  const integrationBanner=d._integrationPending?'<div class="note-box" role="status">Order dashboard backend is not integrated yet. These counts are not live.</div>':'';
+  const integrationBanner=d._integrationPending && state.vendorTab!=='scanner'?'<div class="note-box" role="status">Order dashboard backend is not integrated yet. These counts are not live.</div>':'';
   const section=state.vendorTab==='feedback'?feedbackPanel(d.reviews||[],false):state.vendorTab==='orders'?`<section class="panel"><div class="panel-header"><div><h2>Incoming orders</h2><p>Process each order as it moves through preparation.</p></div><button class="btn btn-sm btn-secondary" data-action="refreshVendor">Refresh ${ico('arrow')}</button></div>${orders.length?`<div class="table-wrap"><table class="data-table"><thead><tr><th>Order / Customer</th><th>Pickup</th><th>Amount</th><th>Status</th><th>Next action</th></tr></thead><tbody>${orders.map(o=>{
   const next={PLACED:['ACCEPTED','Accept order'],ACCEPTED:['PREPARING','Start preparing'],PREPARING:['READY','Mark ready']}[o.status];
   return `<tr><td><strong>${esc(o.order_number)}</strong><div class="muted tiny">${esc(o.customer_name)}</div></td><td>${esc(prettyTime(o.pickup_at))}</td><td><strong>${money(o.total_cents)}</strong></td><td>${tagStatus(o.status)}</td><td><div class="row-actions">${next?`<button class="btn btn-sm ${next[0]==='READY'?'btn-green':''}" data-vendorstatus="${o.id}" data-status="${next[0]}">${esc(next[1])}</button>`:''}<button class="btn btn-sm btn-secondary" data-order="${o.id}">Details</button>${['PLACED','ACCEPTED','PREPARING'].includes(o.status)?`<button class="btn btn-sm btn-quiet" data-vendorstatus="${o.id}" data-status="CANCELLED">Cancel</button>`:''}</div></td></tr>`;}).join('')}</tbody></table></div>`:empty('No orders yet','New orders from customers will appear here.','vendor','Refresh dashboard')}</section>`:
   state.vendorTab==='menu'?`<section class="panel"><div class="panel-header"><div><h2>Menu management</h2><p>Edit prices, availability and descriptions.</p></div><button class="btn btn-sm" data-action="addMenu">${ico('plus')} Add item</button></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Item</th><th>Category</th><th>Price</th><th>Available</th><th>Manage</th></tr></thead><tbody>${d.menu.map(i=>`<tr><td><strong>${esc(i.name)}</strong><div class="tiny muted" style="max-width:250px">${esc(i.description)}</div></td><td>${esc(i.category)}</td><td>${money(i.price_cents)}</td><td>${i.is_available?'<span class="tag tag-green">Available</span>':'<span class="tag tag-grey">Paused</span>'}</td><td><div class="row-actions"><button class="btn btn-sm btn-secondary" data-editmenu="${i.id}">${ico('edit')} Edit</button><button class="btn btn-sm btn-quiet" data-togglemenu="${i.id}" data-available="${i.is_available?'false':'true'}">${i.is_available?'Pause':'Enable'}</button></div></td></tr>`).join('')}</tbody></table></div></section>`:
   `<section class="panel"><div class="panel-header"><div><h2>Stall operations</h2><p>Control availability and per-slot pickup capacity.</p></div></div><form id="vendorSettingsForm"><div class="form-field"><label for="vendor-open">Accepting orders</label><select id="vendor-open" name="isOpen"><option value="true" ${d.stall.is_open?'selected':''}>Open for orders</option><option value="false" ${!d.stall.is_open?'selected':''}>Temporarily closed</option></select></div><div class="form-field"><label for="vendor-capacity">Maximum orders per pickup slot</label><input id="vendor-capacity" name="capacityPerSlot" type="number" min="1" max="60" value="${d.stall.capacity_per_slot}" required/><span class="form-help">This controls how many orders customers can reserve in each 30-minute pickup slot.</span></div><button class="btn" type="submit">Save stall settings ${ico('check')}</button></form></section>`;
-  return `<div class="container desk desk-vendor"><div class="dashboard-head"><div><div class="overline">Vendor desk · ${esc(d.stall.court_name)}</div><h1>${esc(d.stall.name)}</h1><p>${counts.new===1?'1 order awaits acceptance.':counts.new+' orders await acceptance.'}</p></div><div class="flex-wrap">${d.stall.is_open?'<span class="tag tag-green">Accepting orders</span>':'<span class="tag tag-grey">Orders paused</span>'}<button class="btn btn-secondary btn-sm" data-stall="${d.stall.id}">View storefront ${ico('external')}</button></div></div><div class="stat-grid"><div class="stat"><span class="desk-metric-label">${ico('receipt')} New orders</span><strong>${counts.new}</strong></div><div class="stat"><span class="desk-metric-label">${ico('clock')} Active orders</span><strong>${counts.active}</strong></div><div class="stat"><span class="desk-metric-label">${ico('cloche')} Ready for pickup</span><strong>${counts.ready}</strong></div><div class="stat"><span class="desk-metric-label">${ico('check')} Collected</span><strong>${counts.completed}</strong></div></div><div class="tab-row">${[['orders','Orders'],['scanner','Collection Scanner'],['menu','Menu & availability'],['settings','Stall settings'],['feedback','Reviews']].map(([id,label])=>`<button class="tab-btn ${state.vendorTab===id?'active':''}" aria-pressed="${state.vendorTab===id}" data-vendortab="${id}">${ico(({orders:'receipt',scanner:'phone',menu:'bowl',settings:'sliders',overview:'shop',accounts:'user',stalls:'shop',feedback:'receipt'})[id])} ${label}</button>`).join('')}</div>${integrationBanner}${state.vendorTab==='scanner'?scannerPage():section}</div>`;
+  return `<div class="container desk desk-vendor"><div class="dashboard-head"><div><div class="overline">Vendor desk · ${esc(d.stall.court_name)}</div><h1>${esc(d.stall.name)}</h1><p>${counts.new===1?'1 order awaits acceptance.':counts.new+' orders await acceptance.'}</p></div><div class="flex-wrap">${d.stall.is_open?'<span class="tag tag-green">Accepting orders</span>':'<span class="tag tag-grey">Orders paused</span>'}<button class="btn btn-secondary btn-sm" data-stall="${d.stall.id}">View storefront ${ico('external')}</button></div></div><div class="stat-grid"><div class="stat"><span class="desk-metric-label">${ico('receipt')} New orders</span><strong>${counts.new}</strong></div><div class="stat"><span class="desk-metric-label">${ico('clock')} Active orders</span><strong>${counts.active}</strong></div><div class="stat"><span class="desk-metric-label">${ico('cloche')} Ready for pickup</span><strong>${counts.ready}</strong></div><div class="stat"><span class="desk-metric-label">${ico('check')} Collected</span><strong>${counts.completed}</strong></div></div><div class="tab-row">${[['orders','Orders'],['scanner','Collection Scanner'],['menu','Menu & availability'],['settings','Stall settings'],['feedback','Reviews']].map(([id,label])=>`<button class="tab-btn ${state.vendorTab===id?'active':''}" aria-pressed="${state.vendorTab===id}" data-vendortab="${id}">${ico(({orders:'receipt',scanner:'phone',menu:'bowl',settings:'sliders',overview:'shop',accounts:'user',stalls:'shop',feedback:'receipt'})[id])} ${label}</button>`).join('')}</div>${integrationBanner}${state.vendorTab==='scanner'?scannerPage():section}${vendorWeeklyPanel(d.weeklyStats,d.weeklyStatsError)}</div>`;
 }
 function adminPage(d){const integrationBanner=d._integrationPending?'<div class="note-box" role="status">Admin APIs are not integrated yet. Account and order metrics are unavailable, not zero.</div>':'';const section=state.adminTab==='feedback'?feedbackPanel(d.reviews||[],true):state.adminTab==='overview'?`<section class="panel"><div class="panel-header"><div><h2>Platform overview</h2><p>Metrics loaded from the connected backend where available.</p></div></div><div class="stat-grid" style="margin-bottom:0"><div class="stat"><span class="desk-metric-label">${ico('user')} Accounts</span><strong>${d.counts.users}</strong></div><div class="stat"><span class="desk-metric-label">${ico('shop')} Stalls</span><strong>${d.counts.stalls}</strong></div><div class="stat"><span class="desk-metric-label">${ico('receipt')} All orders</span><strong>${d.counts.orders}</strong></div><div class="stat"><span class="desk-metric-label">${ico('clock')} Active orders</span><strong>${d.counts.active_orders}</strong></div></div><div class="note-box" style="margin-top:20px">Only connected endpoints provide live figures. Unavailable features remain pending until their backend is merged.</div></section>`:
   state.adminTab==='accounts'?`<section class="panel"><div class="panel-header"><div><h2>Account permissions</h2><p>Manage roles and vendor stall assignments.</p></div></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Account</th><th>Role</th><th>Assigned stall</th><th>Enabled</th><th>Action</th></tr></thead><tbody>${d.users.map(u=>`<tr data-userrow="${u.id}"><td><strong>${esc(u.displayName)}</strong><div class="muted tiny">${esc(u.email)}</div></td><td><select class="role-select" aria-label="Role for ${esc(u.displayName)}">${['customer','vendor','admin'].map(role=>`<option value="${role}" ${u.role===role?'selected':''}>${titleCase(role)}</option>`).join('')}</select></td><td><select class="stall-select" aria-label="Assigned stall for ${esc(u.displayName)}"><option value="">None</option>${d.stalls.map(s=>`<option value="${s.id}" ${u.stallId===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select></td><td><select class="active-select" aria-label="Account status for ${esc(u.displayName)}"><option value="true" ${u.active?'selected':''}>Enabled</option><option value="false" ${!u.active?'selected':''}>Disabled</option></select></td><td><button class="btn btn-sm btn-secondary" data-saveuser="${u.id}" ${u.id===state.user.id?'disabled':''}>Save</button></td></tr>`).join('')}</tbody></table></div><p class="help-note">Your own admin account cannot be modified through this form. Inactive accounts cannot sign in.</p></section>`:
@@ -279,9 +374,9 @@ let pendingPickup=null;
 let closePickupCamera=null;
 function scannerPage(){
   if(pendingPickup){
-    return `<section class="panel"><h2>Confirm collection?</h2><p>The QR format was read successfully, but the order has <strong>not yet been verified</strong>. Confirm the food and payment with the customer first.</p><p>The backend will check the QR, stall ownership, payment and Ready status when you approve.</p><button class="btn" data-action="approvePickup">Verify &amp; collect</button> <button class="btn btn-secondary" data-action="declinePickup">Cancel</button></section>`;
+    return `<section class="panel"><h2>Confirm collection</h2><p><strong>${esc(pendingPickup.orderNumber||'Order')}</strong> has been verified by the server as READY for your assigned stall.</p><p>Check the customer's food before completing collection.</p><label class="pickup-verify-check"><input type="checkbox" id="pickupHandoverConfirmed"/> Food handed to the customer</label><label class="pickup-verify-check"><input type="checkbox" id="pickupPaymentConfirmed"/> Payment confirmed at pickup</label><div class="row-actions"><button class="btn" data-action="approvePickup">Verify &amp; collect</button> <button class="btn btn-secondary" data-action="declinePickup">Cancel</button></div></section>`;
   }
-  return `<section class="panel"><h2>Collection Scanner</h2><p>Scan the pickup QR on the customer’s receipt or upload a clear image of it.</p><button class="btn" data-action="pickupCamera">Scan with camera</button><video id="pickupVideo" muted playsinline hidden width="240"></video><div class="form-field"><label for="pickupFile">Upload QR image or receipt PDF</label><input type="file" id="pickupFile" accept="image/*,application/pdf,.pdf"></div><form id="pickupForm" class="form-field"><label for="pickupCode">USB QR scanner</label><input id="pickupCode" name="code" required autocomplete="off"><button class="btn btn-secondary">Review scan</button></form></section>`;
+  return `<section class="panel"><h2>Collection Scanner</h2><p>Use your phone camera, upload a pickup receipt PDF or QR screenshot, or use a USB scanner. Camera permission requires localhost or HTTPS.</p><button class="btn" data-action="pickupCamera">Scan with camera</button><video id="pickupVideo" muted playsinline hidden width="240"></video><div class="form-field"><label for="pickupFile">Upload pickup receipt PDF or QR image</label><input type="file" id="pickupFile" accept="application/pdf,.pdf,image/png,image/jpeg,image/webp"></div><form id="pickupForm" class="form-field"><label for="pickupCode">USB QR scanner</label><input id="pickupCode" name="code" required autocomplete="off"><button class="btn btn-secondary">Review scan</button></form></section>`;
 }
 async function collectPickup(code){
   const turn=renderId;
@@ -302,12 +397,17 @@ document.addEventListener('change',event=>{
   const input=event.target,file=input.files[0];if(!file)return;
   closePickupCamera?.();input.value='';
   run(async()=>{
+    const isPdf=file.type==='application/pdf' || /\.pdf$/i.test(file.name);
+    if(file.size===0)throw Error('The selected receipt is empty.');
+    if(file.size>10*1024*1024)throw Error('Receipt file is too large. Maximum 10 MB.');
+    if(!isPdf && !/^image\/(png|jpeg|webp)$/.test(file.type))throw Error('Use a PDF, PNG, JPEG or WebP file.');
     let code;
-    if(file.type==='application/pdf' || /\.pdf$/i.test(file.name)){
+    if(isPdf){
       const pdfjs=await import('/prototype-exact/pdfjs/pdf.min.mjs');
       pdfjs.GlobalWorkerOptions.workerSrc='/prototype-exact/pdfjs/pdf.worker.min.mjs';
-      const pdf=await pdfjs.getDocument({data:await file.arrayBuffer(),isEvalSupported:false,useSystemFonts:true}).promise;
+      const pdf=await pdfjs.getDocument({data:await file.arrayBuffer(),isEvalSupported:false,enableScripting:false,useSystemFonts:true}).promise;
       try{
+        if(pdf.numPages>10)throw Error('Receipt PDF has too many pages. Maximum 10 pages.');
         for(let pageNumber=1;pageNumber<=pdf.numPages && !code && input.isConnected;pageNumber++){
           const page=await pdf.getPage(pageNumber);
           const size=page.getViewport({scale:1});
@@ -331,7 +431,7 @@ document.addEventListener('change',event=>{
       try{await img.decode();}catch{throw Error('This image format could not be opened. Choose a PNG, JPEG, or receipt PDF.');}
       code=readQR(img,img.naturalWidth,img.naturalHeight);
     }
-    if(!code)throw Error('No QR found. Choose the customer receipt or a clear screenshot of its pickup QR.');
+    if(!code)throw Error(isPdf?'No pickup QR found in this PDF. Ask the student to save their READY-order pickup QR as a PDF.':'No pickup QR found in the image. Upload a clear screenshot.');
     if(input.isConnected)await collectPickup(code);
   });
 });
@@ -378,14 +478,18 @@ async function render() {
     else if(state.page==='info')html=infoPage();
     else if(state.page==='signup')html=signupPage();
     else if(state.page==='login')html=loginPage();
-    else if(state.page==='profile')html=profilePage();
+    else if(state.page==='profile'){
+      const fresh = await request('/api/profile');
+      if (fresh.user) state.user = fresh.user;
+      html=profilePage();
+    }
     else if(state.page==='stall'){html=stallPage(await request(`/api/stalls/${state.stallId}`));}
     else if(state.page==='cart'){
       const cart=await request('/api/cart');
       const slots=cart.stallId?(await request(`/api/slots?stallId=${cart.stallId}`)).slots:[];
       html=cartPage(cart,slots);
     }
-    else if(state.page==='orders'){const resp=await request('/api/orders');html=(resp._integrationPending?'<div class="container note-box" role="status">Order history awaits the customer order backend. No sample order is displayed as real.</div>':'')+ordersPage(resp.orders);}
+    else if(state.page==='orders'){const resp=await request('/api/orders');html=(resp._integrationPending?'<div class="container note-box" role="status">Order history is temporarily unavailable. Please try again later.</div>':'')+ordersPage(resp.orders);}
     else if(state.page==='order')html=orderPage((await request(`/api/orders/${state.orderId}`)).order);
     else if(state.page==='vendor')html=vendorPage(await dashboardWithFeedback('vendor',state.vendorTab));
     else if(state.page==='admin')html=adminPage(await dashboardWithFeedback('admin',state.adminTab));
@@ -449,6 +553,8 @@ document.addEventListener('click',event=>{
   if(d.action==='dishPlus'&&state.dish){state.dish.quantity=Math.min(20,state.dish.quantity+1);renderDish();return;}
   if(d.action==='dishMinus'&&state.dish){state.dish.quantity=Math.max(1,state.dish.quantity-1);renderDish();return;}
   if(d.action==='dishAdd'){run(addCustomDish);return;}
+  if(d.action==='changeAvatar'){$('#profile-avatar-input')?.click();return;}
+  if(d.action==='removeAvatar'){ask('Remove your profile photo?','Your account will show your initial instead.',async()=>{const result=await request('/api/profile/avatar',{method:'DELETE'});state.user=result.user;toast(result.message);await render();},'Remove photo');return;}
   if(d.action==='dishPools'){closeDish();navTo('pools');return;}
   if(d.add){run(()=>addItem(Number(d.add)));return;}
   if(d.cuisine){state.cuisine=d.cuisine;state.focusStalls=true;render();return;}
@@ -475,14 +581,17 @@ document.addEventListener('click',event=>{
     case 'confirmPending':{const action=pendingConfirm;pendingConfirm=null;dismissModal();if(action)run(action);break;}
     case 'logout':run(async()=>{await request('/api/auth/logout',{method:'POST'});state.user=null;clearPickupBanner();state.csrf=null;state.cartCount=0;toast('Signed out successfully.');navTo('home');});break;
     case 'clearCart':ask('Clear your basket?','All items will be removed from your basket.',async()=>{await request('/api/cart',{method:'DELETE'});await refreshCount();toast('Your basket is now empty.');render();},'Clear basket');break;
-    case 'checkout':run(async()=>{const radio=$('input[name="pickupAt"]:checked');if(!radio){toast('Please choose a pickup time.',true);return;}const response=await request('/api/orders',{method:'POST',body:{pickupAt:radio.value,notes:$('#pickup-notes')?.value||'',loyaltyRewardId:$('#loyalty-use')?.value?Number($('#loyalty-use').value):null,promoVoucherId:$('#promo-use')?.value?Number($('#promo-use').value):null}});state.cartCount=0;toast('Order placed successfully.');navTo('order',{orderId:response.order.id});});break;
+    case 'checkout':run(async()=>{const radio=$('input[name="pickupAt"]:checked');if(!radio){toast('Please choose a pickup time.',true);return;}const response=await request('/api/orders',{method:'POST',body:{pickupAt:radio.value,notes:$('#pickup-notes')?.value||'',loyaltyRewardId:$('#loyalty-use')?.value?Number($('#loyalty-use').value):null,promoVoucherId:$('#promo-use')?.value?Number($('#promo-use').value):null}});state.cartCount=0;toast('Order placed successfully.');await navTo('order',{orderId:response.order.id});await refreshOrderNotifications({announceOrderId:response.order.id});});break;
     case 'printOrder':window.print();break;
     case 'declinePickup':pendingPickup=null;render();break;
     case 'approvePickup':run(async()=>{
       if(!pendingPickup)return;
+      const handoverConfirmed=!!document.querySelector('#pickupHandoverConfirmed')?.checked;
+      const paymentConfirmed=!!document.querySelector('#pickupPaymentConfirmed')?.checked;
+      if(!handoverConfirmed||!paymentConfirmed)throw Error('Confirm both handover and payment first.');
       e.disabled=true;
       try{
-        const result=await request('/api/vendor/pickup/approve',{method:'POST',body:{code:pendingPickup.code}});
+        const result=await request('/api/vendor/pickup/approve',{method:'POST',body:{code:pendingPickup.code,handoverConfirmed,paymentConfirmed}});
         pendingPickup=null;state.vendorTab='orders';toast(result.message);await render();
       }finally{e.disabled=false;}
     });break;
@@ -508,8 +617,8 @@ document.addEventListener('submit',event=>{
   switch(form.id){
     case 'homeSearchForm':state.selectedCourt=Number(data.courtId)||0;state.query=String(data.search||'').trim();state.cuisine='All';navTo('explore',{focusStalls:true});break;
     case 'searchForm':state.query=String(data.search||'').trim();state.cuisine='All';state.focusStalls=true;render();break;
-    case 'loginForm':run(async()=>{const result=await request('/api/auth/login',{method:'POST',body:{email:data.email,password:data.password}});state.user=result.user;state.csrf=result.csrfToken;await refreshCount();toast(`Welcome back, ${result.user.displayName.split(' ')[0]}.`);navTo(result.user.role==='vendor'?'vendor':result.user.role==='admin'?'admin':'home');});break;
-    case 'signupForm':run(async()=>{if(data.password!==data.confirm){toast('Your passwords do not match.',true);return;}const result=await request('/api/auth/signup',{method:'POST',body:{displayName:data.displayName,email:data.email,password:data.password}});state.user=result.user;state.csrf=result.csrfToken;await refreshCount();toast('Account created successfully.');navTo('home');});break;
+    case 'loginForm':run(async()=>{const result=await request('/api/auth/login',{method:'POST',body:{email:data.email,password:data.password}});state.user=result.user;state.csrf=result.csrfToken;await refreshProfileFromServer();await refreshCount();toast(`Welcome back, ${result.user.displayName.split(' ')[0]}.`);navTo(result.user.role==='vendor'?'vendor':result.user.role==='admin'?'admin':'home');});break;
+    case 'signupForm':run(async()=>{if(data.password!==data.confirm){toast('Your passwords do not match.',true);return;}const result=await request('/api/auth/signup',{method:'POST',body:{displayName:data.displayName,email:data.email,password:data.password}});state.user=result.user;state.csrf=result.csrfToken;await refreshProfileFromServer();await refreshCount();toast('Account created successfully.');navTo('home');});break;
     case 'feedbackForm':run(async()=>{await request('/api/orders/'+form.dataset.orderId+'/feedback',{method:'POST',body:{rating:Number(data.rating),comment:data.comment}});toast('Your review is pending approval.');await render();});break;
     case 'pickupForm':run(()=>collectPickup(data.code.trim()));break;
     case 'profileForm':run(async()=>{const result=await request('/api/profile',{method:'PATCH',body:{displayName:data.displayName,phone:data.phone}});state.user=result.user;toast(result.message);render();});break;
@@ -522,6 +631,11 @@ document.addEventListener('submit',event=>{
 
 document.addEventListener('change',event=>{
   const target=event.target;
+  if(target?.id==='profile-avatar-input'){
+    const file=target.files?.[0];
+    if(file){const button=document.querySelector('[data-action=\"changeAvatar\"]');if(button)button.disabled=true;run(async()=>{try{await uploadProfilePhoto(file);}finally{if(button)button.disabled=false;}});}
+    return;
+  }
   if(target?.id==='loyalty-use'&&target.value&&$('#promo-use'))$('#promo-use').value='';
   if(target?.id==='promo-use'&&target.value&&$('#loyalty-use'))$('#loyalty-use').value='';
 });
@@ -538,7 +652,7 @@ async function refreshIncomingOrders(){
   const turn=renderId;
   checkingOrders=true;
   try{
-    const data=await request('/api/vendor/dashboard');
+    const data=await dashboardWithFeedback('vendor','orders');
     if(turn===renderId && !$('#modal-root').firstChild && JSON.stringify(data.orders)!==lastVendorOrders){
       const content=$('#content');
       if(content?.querySelector('.dashboard-head'))content.innerHTML=vendorPage(data);
@@ -570,8 +684,113 @@ function flag(order,kind,write=false) {
   catch { return memoryFlags.has(key); }
 }
 function visibleAlerts() { return pickupOwner===state.user?.id ? pickupOrders.filter(o=>!flag(o,'dismissed')) : []; }
-function hidePopup(){clearTimeout(popupTimer); $('#pickup-pop').hidden=true;}
-function clearPickupBanner(){pickupOwner=null;pickupOrders=[];hidePopup();paintAlerts();}
+let notificationOwner = null;
+let fetchingNotifications = false;
+/* Shared authenticated inbox: one notification per real database event and recipient. */
+function roleNotificationSection(){
+  const notes=notificationOwner===state.user?.id?state.notifications:[];
+  if(!notes.length)return '<strong class="pickup-heading">Notifications</strong><p>No notifications yet.</p>';
+  const role=state.user?.role;
+  return '<strong class="pickup-heading">Notifications</strong>'+notes.map(n=>{
+    const id=Number(n.id),entityId=Number(n.entityId),kind=String(n.entityType||'');
+    const open=Number.isSafeInteger(entityId)&&entityId>0&&['order','review','stall'].includes(kind)?
+      `<button type="button" data-notif-open="${entityId}" data-notif-kind="${kind}">View ${kind}</button>`:'';
+    let step='';
+    if(role==='vendor'&&kind==='order'&&Number.isSafeInteger(entityId)&&entityId>0){
+      if(n.eventType==='ORDER_RECEIVED')step=`<button type="button" data-vendor-notif-order="${entityId}" data-vendor-notif-status="PREPARING">Start preparation</button>`;
+      else if(n.eventType==='VENDOR_ORDER_PREPARING')step=`<button type="button" data-vendor-notif-order="${entityId}" data-vendor-notif-status="READY">Mark ready</button>`;
+    }
+    return `<article class="order-notification" ${n.readAt?'':'data-unread="true"'}>`+
+      `<strong>${esc(n.title)}</strong><p>${esc(n.message)}</p><div class="notification-actions">`+
+      `${n.readAt?'<span class="muted tiny">Read</span>':`<button type="button" data-notif-read="${id}">Mark as read</button>`}`+
+      `<button type="button" data-notif-dismiss="${id}">Dismiss</button>${open}${step}</div></article>`;
+  }).join('');
+}
+
+/* Day 11 auto-popup patch */
+let autoNotificationOwner = null;
+let autoNotificationSeen = new Set();
+let queuedNotificationOrderId = null;
+
+// Uses the existing authenticated inbox. The first fetch establishes a baseline;
+// later genuinely new, unread notifications are announced once per tab session.
+function showNewNotificationPopup(note) {
+  const popup=$('#pickup-pop'),bell=$('.pickup-bell'),list=$('#pickup-list');
+  if(!popup||!bell||!list||!list.hidden||document.hidden||!state.user)return;
+  // Do not hide the existing collection-ready popup when it is already visible.
+  if(!popup.hidden&&!popup.classList.contains('activity-popup'))return;
+  popup.classList.add('activity-popup');
+  popup.innerHTML=
+    '<button type="button" data-activity-popup-close class="activity-popup-close" aria-label="Close notification preview">×</button>'+
+    '<strong>'+esc(note.title||'New notification')+'</strong>'+
+    '<p>'+esc(note.message||'You have a new notification.')+'</p>'+
+    '<button type="button" data-activity-popup-open class="activity-popup-view">View notifications</button>';
+  popup.hidden=false;
+  clearTimeout(popupTimer);
+  popupTimer=setTimeout(hidePopup,7500);
+  bell.classList.remove('notification-ring');
+  // Restart the bell animation for the next incoming event.
+  void bell.offsetWidth;
+  bell.classList.add('notification-ring');
+}
+
+async function refreshOrderNotifications({announceOrderId=null}={}) {
+  const user=state.user;
+  if(!user||!['customer','vendor','admin'].includes(user.role)){
+    notificationOwner=null;
+    autoNotificationOwner=null;
+    autoNotificationSeen.clear();
+    queuedNotificationOrderId=null;
+    state.notifications=[];
+    paintAlerts();
+    return;
+  }
+  if(fetchingNotifications||document.hidden){
+    if(announceOrderId)queuedNotificationOrderId=announceOrderId;
+    return;
+  }
+  const owner=user.id;
+  if(notificationOwner!==owner){notificationOwner=owner;state.notifications=[];}
+  const initialFetch=autoNotificationOwner!==owner;
+  if(initialFetch){autoNotificationOwner=owner;autoNotificationSeen=new Set();}
+  fetchingNotifications=true;
+  try{
+    const result=await request('/api/activity-notifications');
+    if(state.user?.id!==owner||notificationOwner!==owner)return;
+    const notes=Array.isArray(result.notifications)?result.notifications:[];
+    const newUnread=notes.filter(n=>!n.readAt&&!autoNotificationSeen.has(Number(n.id)));
+    autoNotificationSeen=new Set(notes.map(n=>Number(n.id)));
+    state.notifications=notes;
+    paintAlerts();
+    // Explicitly announce a just-placed order, even during initial page setup.
+    const explicit=announceOrderId?notes.find(n=>n.eventType==='ORDER_PLACED'&&
+      Number(n.entityId)===Number(announceOrderId)&&!n.readAt):null;
+    // Urgent events can interrupt; routine updates quietly refresh the badge/inbox.
+    // Checkout explicitly announces its own success once, as requested by the customer.
+    // The existing READY pickup popup handles collection alerts; avoid announcing twice.
+    const popupEvents=new Set([
+      'ORDER_RECEIVED', 'ORDER_CANCELLED',
+      'VENDOR_ORDER_CANCELLED', 'STALL_REMOVED', 'REVIEW_REPORTED'
+    ]);
+    const incoming=explicit||(!initialFetch?newUnread.find(n=>popupEvents.has(n.eventType)):null);
+    if(incoming)showNewNotificationPopup(incoming);
+  }catch(err){
+    if(err.status===401||err.status===403){
+      notificationOwner=null;autoNotificationOwner=null;autoNotificationSeen.clear();
+      state.notifications=[];paintAlerts();
+    }
+  }finally{
+    fetchingNotifications=false;
+    if(queuedNotificationOrderId&&state.user?.id===owner){
+      const next=queuedNotificationOrderId;
+      queuedNotificationOrderId=null;
+      queueMicrotask(()=>refreshOrderNotifications({announceOrderId:next}));
+    }
+  }
+}
+
+function hidePopup(){clearTimeout(popupTimer);const popup=$('#pickup-pop');if(popup){popup.hidden=true;popup.classList.remove('activity-popup');}$('.pickup-bell')?.classList.remove('notification-ring');}
+function clearPickupBanner(){pickupOwner=null;pickupOrders=[];if(!state.user||!['customer','vendor','admin'].includes(state.user.role)||!$('#pickup-pop')?.classList.contains('activity-popup'))hidePopup();paintAlerts();}
 function pickupArt(kind) {
   const paths = {
     meal:'<path d="M3 16h18M5 16a7 7 0 0 1 14 0M12 6V4M3 20h18"/>',
@@ -585,19 +804,75 @@ function paintAlerts(){
   const bell=$('.pickup-bell'),list=$('#pickup-list');
   if(!bell||!list)return;
   const orders=visibleAlerts();
-  bell.querySelector('.pickup-count').textContent=orders.length||'';
-  bell.setAttribute('aria-label','Pickup notifications, '+orders.length+' active');
+  const notes=notificationOwner===state.user?.id?state.notifications:[];
+  const count=notes.filter(n=>!n.readAt).length;
+  bell.querySelector('.pickup-count').textContent=count||'';
+  bell.setAttribute('aria-label','Notifications, '+count+' active');
   const markup='<strong class="pickup-heading">'+pickupArt('meal')+' Pickup notifications</strong>'+ (orders.length ? orders.map(o=>
     '<article><p>Order '+esc(o.order_number)+' is ready at '+esc(o.stall)+'.</p><button data-pick-open="'+Number(o.id)+'">View order '+pickupArt('arrow')+'</button> <button data-pick-dismiss="'+Number(o.id)+'">'+pickupArt('check')+' Dismiss</button></article>').join('') : '<p>No pickup alerts.</p>');
-  if(list.innerHTML!==markup && !list.hidden)list.innerHTML=markup;
+  const combinedMarkup=roleNotificationSection();
+  if(list.innerHTML!==combinedMarkup && !list.hidden)list.innerHTML=combinedMarkup;
 }
 function closeList(){
   const list=$('#pickup-list'); if(list)list.hidden=true;
   $('.pickup-bell')?.setAttribute('aria-expanded','false');
 }
 document.addEventListener('click',e=>{
+  if(e.target.closest('[data-activity-popup-close]')){hidePopup();return;}
+  if(e.target.closest('[data-activity-popup-open]')){
+    hidePopup();
+    const inbox=$('#pickup-list'),trigger=$('.pickup-bell');
+    if(inbox&&trigger){inbox.hidden=false;trigger.setAttribute('aria-expanded','true');paintAlerts();}
+    return;
+  }
   const bell=e.target.closest('.pickup-bell');
-  if(bell){const list=$('#pickup-list');list.hidden=!list.hidden;bell.setAttribute('aria-expanded',String(!list.hidden));hidePopup();paintAlerts();return;}
+  if(bell){const list=$('#pickup-list');list.hidden=!list.hidden;bell.setAttribute('aria-expanded',String(!list.hidden));hidePopup();paintAlerts();if(!list.hidden)refreshOrderNotifications();return;}
+  const vendorOrderAction=e.target.closest('[data-vendor-notif-order]');
+  if(vendorOrderAction){
+    const id=Number(vendorOrderAction.dataset.vendorNotifOrder),status=vendorOrderAction.dataset.vendorNotifStatus;
+    if(state.user?.role!=='vendor'||!Number.isSafeInteger(id)||id<1)return;
+    vendorOrderAction.disabled=true;
+    run(async()=>{try{
+      await request(`/api/activity-notifications/orders/${id}/status`,{method:'PATCH',body:{status}});
+      toast(status==='READY'?'Customer notified: food ready.':'Customer notified: preparation started.');
+      await refreshOrderNotifications();
+      if(state.page==='vendor')await render();
+    }finally{if(vendorOrderAction.isConnected)vendorOrderAction.disabled=false;}});
+    return;
+  }
+  const notificationAction=e.target.closest('[data-notif-read],[data-notif-dismiss],[data-notif-open]');
+  if(notificationAction){
+    if(notificationAction.dataset.notifOpen){
+      const id=Number(notificationAction.dataset.notifOpen),kind=notificationAction.dataset.notifKind;
+      if(Number.isSafeInteger(id)&&id>0){
+        closeList();
+        if(kind==='order'){
+          if(state.user?.role==='vendor'){state.vendorTab='orders';navTo('vendor');}
+          else if(state.user?.role==='admin'){state.adminTab='orders';navTo('admin');}
+          else navTo('order',{orderId:id});
+        } else if(kind==='review'){
+          if(state.user?.role==='admin'){state.adminTab='feedback';navTo('admin');}
+          else if(state.user?.role==='vendor'){state.vendorTab='feedback';navTo('vendor');}
+          else navTo('orders');
+        } else if(kind==='stall'){
+          if(state.user?.role==='admin'){state.adminTab='stalls';navTo('admin');}
+          else navTo('vendor');
+        }
+      }
+      return;
+    }
+    const dismissing=notificationAction.hasAttribute('data-notif-dismiss');
+    const id=Number(dismissing?notificationAction.dataset.notifDismiss:notificationAction.dataset.notifRead);
+    if(!Number.isSafeInteger(id)||id<1)return;
+    notificationAction.disabled=true;
+    run(async()=>{
+      try{
+        await request(`/api/activity-notifications/${id}/${dismissing?'dismiss':'read'}`,{method:'POST',body:{}});
+        await refreshOrderNotifications();
+      }finally{if(notificationAction.isConnected)notificationAction.disabled=false;}
+    });
+    return;
+  }
   const item=e.target.closest('[data-pick-dismiss],[data-pick-open]');
   if(item){
     const order=visibleAlerts().find(o=>o.id===Number(item.dataset.pickDismiss||item.dataset.pickOpen));
@@ -636,6 +911,9 @@ async function refreshPickup(){
 }
 new MutationObserver(()=>paintAlerts()).observe($('#app'),{childList:true});
 setInterval(refreshPickup, 5000);
+setInterval(refreshOrderNotifications, 4000);
+document.addEventListener('visibilitychange',refreshOrderNotifications);
+refreshOrderNotifications();
 document.addEventListener('visibilitychange',refreshPickup);
 const pickupRegistration = window.isSecureContext && 'serviceWorker' in navigator ?
   navigator.serviceWorker.register('/prototype-exact/pickup-sw.js').then(()=>navigator.serviceWorker.ready).catch(()=>null) : null;

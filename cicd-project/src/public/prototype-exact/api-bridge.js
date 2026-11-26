@@ -6,8 +6,9 @@
   'use strict';
   // Only features available in the active Express app should be treated as live.
   // Independent teammate branches are not automatically merged into this branch.
-  const FEATURES = Object.freeze({auth:true,stallReads:true,cartBrowserOnly:true,checkout:false,vendorWrites:false,adminWrites:false,pickup:false,reviews:false,profiles:false});
+  const FEATURES = Object.freeze({auth:true,stallReads:true,cartBrowserOnly:true,checkout:true,vendorWrites:false,adminWrites:false,pickup:true,reviews:false,profiles:true});
   const FIXTURES = root.__ML_EXACT_FIXTURES__ || null;
+  const MENU_REFERENCE = root.MakanMenuReference || null;
   let previewCatalog = false;
   let catalogIssue = '';
   const cookieKey = 'makan-live-cart-v1:';
@@ -55,6 +56,7 @@
       try { data = await response.json(); } catch { /* invalid JSON handled below */ }
     }
     if (!response.ok) {
+      if (response.status === 404 && (endpoint === '/api/pickup/review' || endpoint === '/api/pickup/approve')) throw bodyError(data, 404);
       if (response.status === 404) fail(`This backend route (${endpoint.split('?')[0]}) is not available on the current branch. No data was changed.`,503);
       throw bodyError(data, response.status);
     }
@@ -69,6 +71,7 @@
     id:num(u.id), email:clean(u.email), displayName:clean(u.displayName || u.name, 'Customer'),
     role:clean(u.role,'customer').toLowerCase(), phone:clean(u.phone),
     stallId:id(u.stallId || u.vendorId), stallName:clean(u.stallName), active:u.active!==false,
+    avatarUrl: typeof u.avatarUrl === 'string' && u.avatarUrl.startsWith('/api/profile/avatar?v=') ? u.avatarUrl : null,
   } : null; }
   async function obtainToken() {
     if (token && Date.now() + 12000 < tokenExpiry) return token;
@@ -103,11 +106,16 @@
     stallsCache.set(stall.id,stall);return stall;
   }
   function normalizeMenuItem(m,stallId) {
+    const matchedStall=stallsCache.get(id(m.stallId || m.stall_id || m.vendorId || stallId));
+    const stallName=clean(m.stallName || m.stall_name, matchedStall?.name || '');
+    const originalPath=clean(m.imagePath || m.image_path || m.image_url);
     const item={
-      id:id(m.id), stall_id:id(m.stallId||m.vendorId||stallId), name:clean(m.name,'Unnamed item'),
+      id:id(m.id), stall_id:id(m.stallId||m.stall_id||m.vendorId||stallId), name:clean(m.name,'Unnamed item'),
       description:clean(m.description),category:clean(m.category,'Menu'),
       price_cents:num(m.priceCents ?? m.price_cents), is_available:m.isAvailable !== false && m.is_available !== false,
-      image_path:clean(m.image_path), is_featured:!!(m.isFeatured ?? m.is_featured),
+      image_path:MENU_REFERENCE?.imageFor({...m,image_path:originalPath},stallName) || originalPath,
+      stall_name:stallName,
+      is_featured:!!(m.isFeatured ?? m.is_featured),
     };
     menuCache.set(item.id,item);return item;
   }
@@ -115,7 +123,7 @@
     if (catalogPromise && !force) return catalogPromise;
     catalogPromise = (async()=>{
       let rows;
-      try { rows = asArray(await http('/stalls')); previewCatalog = false; catalogIssue = ''; }
+      try { rows = asArray(await http('/api/live/stalls')); previewCatalog = false; catalogIssue = ''; }
       catch(error) {
         if(!FIXTURES || !Array.isArray(FIXTURES.stalls)) throw error;
         previewCatalog = true;
@@ -141,7 +149,7 @@
       const menu = (FIXTURES.menus||[]).filter(m=>Number(m.stall_id)===Number(stallId)).map(m=>normalizeMenuItem(m,stallId));
       return {stall:{...stall},menu};
     }
-    const [stallRow, menuRows]=await Promise.all([http(`/stalls/${stallId}`), http(`/stalls/${stallId}/menu`)]);
+    const [stallRow, menuRows]=await Promise.all([http(`/api/live/stalls/${stallId}`), http(`/api/live/stalls/${stallId}/menu`)]);
     const cached=stallsCache.get(Number(stallId)) || (await catalog(),stallsCache.get(Number(stallId)));
     const stall=normalizeStall({...cached,...stallRow,foodCourtName:cached?.court_name});
     const menu=asArray(menuRows).map(x=>normalizeMenuItem(x,stall.id));
@@ -157,9 +165,17 @@
       }
     }
     if (!item) fail('This menu item is not available.',404,'NOT_FOUND');
-    // No fabricated vendor-specific customisation/price; defaults are explicitly unpriced.
-    return {item,details:{sizes:[{id:'regular',label:'Regular',extraCents:0,scale:1}],addons:[],
-      nutrition:{calories:0,proteinG:0,carbsG:0,fatG:0},allergens:['Not provided by stall'],prepMinutes:0},recommendations:[]};
+    // The reference data is visual/demo-only. Base menu prices still come from the API.
+    // No unverified extra charges are sent to the server.
+    const details=MENU_REFERENCE?.detailsFor(item,item.stall_name) || {
+      sizes:[{id:'regular',label:'Regular',extraCents:0,scale:1}],addons:[],nutrition:null,
+      allergens:['Ask the vendor about ingredients and allergens'],prepMinutes:0,nutritionIsEstimate:false,
+    };
+    const recommendations=[...menuCache.values()]
+      .filter(other=>other.stall_id===item.stall_id && other.id!==item.id && other.is_available)
+      .sort((a,b)=>Number(b.is_featured)-Number(a.is_featured))
+      .slice(0,3);
+    return {item,details,recommendations};
   }
   async function cartView() {
     const cart=readCart();
@@ -174,6 +190,8 @@
       totalCents:lines.reduce((n,x)=>n+x.price_cents*x.quantity,0),items:lines};
   }
   async function addCartItem(itemId, quantity=1, selections=null) {
+    // The server bills the base menu price; reject demo upgrades to prevent checkout mismatches.
+    if(selections?.size && selections.size!=='regular') fail('Size upgrades are not available for checkout until vendor pricing is enabled.',409,'UNVERIFIED_SIZE');
     if(!me || me.role!=='customer') fail('Sign in as a customer to add meals.',401,'UNAUTHENTICATED');
     let item=menuCache.get(Number(itemId));
     if(!item) {await itemDetails(itemId);item=menuCache.get(Number(itemId));}
@@ -183,13 +201,19 @@
     if(cart.stallId && cart.stallId!==item.stall_id) fail('Your basket contains items from another stall. Clear it first to switch stalls.',409,'CART_STALL_CONFLICT');
     cart.stallId=item.stall_id;
     const existing=cart.items.find(x=>x.id===item.id);
-    if(existing){ if(existing.quantity+qty>20) fail('Maximum 20 of an item per order.',400);existing.quantity+=qty;}
+    if(existing){
+      if(existing.quantity+qty>20) fail('Maximum 20 of an item per order.',400);
+      existing.quantity+=qty;
+      // The browser cart has one line per menu item; the most recent preferences
+      // become that line's preferences. These are not billed as verified add-ons.
+      if(selections)existing.selections=selections;
+    }
     else cart.items.push({id:item.id,quantity:qty,selections});
     writeCart(cart);return cartView();
   }
   async function pickupSlots(stallId) {
     if (previewCatalog) return {slots:[]}; // No fabricated pickup availability.
-    const windows=asArray(await http(`/stalls/${stallId}/windows`));
+    const windows=asArray(await http(`/api/live/stalls/${stallId}/windows`,{auth:true}));
     const slots=windows.map(w=>({id:id(w.id),at:w.startTime||w.at||w.start_time,
       available:w.isFull||w.is_full?0:Math.max(0,num(w.spacesLeft??w.available,0))}));
     windowsCache.set(Number(stallId),slots);
@@ -211,10 +235,10 @@
   }
   async function ordersList() {
     if (!FEATURES.checkout) return {orders:[],_integrationPending:true};
-    const result=await optional('/orders',{auth:true});
+    const result=await optional('/api/live/orders',{auth:true});
     return result===null ? {orders:[],_integrationPending:true} : {orders:asArray(result).map(orderOf)};
   }
-  async function orderDetail(orderId) { if(!FEATURES.checkout) unsupported('Customer order history');return {order:orderOf(await http(`/orders/${orderId}`,{auth:true}))}; }
+  async function orderDetail(orderId) { if(!FEATURES.checkout) unsupported('Customer order history');return {order:orderOf(await http(`/api/live/orders/${orderId}`,{auth:true}))}; }
   async function checkout(body) {
     if(!FEATURES.checkout || previewCatalog) unsupported('Placing orders');
     const cart=await cartView();
@@ -223,10 +247,11 @@
     const available=(await pickupSlots(cart.stallId)).slots;
     const chosen=available.find(x=>x.at===body.pickupAt && x.available>0);
     if(!chosen)fail('Pickup time unavailable or full. Select another.',409);
-    const payload={stallId:cart.stallId,pickupWindowId:chosen.id,
+    if (body.loyaltyRewardId != null || body.promoVoucherId != null) fail('Vouchers and rewards are not yet enabled for live checkout.',409);
+    const payload={stallId:cart.stallId,pickupAt:chosen.at,notes:body.notes||'',
       items:cart.items.map(x=>({menuItemId:x.id,quantity:x.quantity}))};
     // IMPORTANT: Server must calculate prices and enforce capacity atomically.
-    const response=await http('/orders',{method:'POST',body:payload,auth:true});
+    const response=await http('/api/live/orders',{method:'POST',body:payload,auth:true});
     writeCart({stallId:null,items:[]});
     return {order:orderOf(response)};
   }
@@ -265,7 +290,7 @@
   }
   async function pickupReady() {
     if(!me||me.role!=='customer'||!FEATURES.pickup)return {orders:[]};
-    const list=await optional('/orders',{auth:true});
+    const list=await optional('/api/live/orders',{auth:true});
     if(!list)return {orders:[]};
     return {orders:asArray(list).map(orderOf).filter(x=>x.status==='READY').map(x=>({id:x.id,order_number:x.order_number,stall:x.stall_name}))};
   }
@@ -291,6 +316,13 @@
       try{root.localStorage.removeItem(cartKey());}catch{/* no-op */}
       token=null;tokenExpiry=0;me=null;csrfToken=null;return result;
     }
+    if(path==='/api/activity-notifications'&&method==='GET')return http(path,{auth:true});
+    if(/^\/api\/activity-notifications\/\d+\/(?:read|dismiss)$/.test(path)&&method==='POST')return http(path,{method,body:body||{},auth:true});
+    if(/^\/api\/activity-notifications\/orders\/\d+\/status$/.test(path)&&method==='PATCH')return http(path,{method,body,auth:true});
+    if(path==='/api/notifications'&&method==='GET')return http(path,{auth:true});
+    if(/^\/api\/notifications\/\d+\/(?:read|dismiss)$/.test(path)&&method==='POST')return http(path,{method,body:body||{},auth:true});
+    if(path==='/api/pickup/ready-orders'&&method==='GET')return http(path,{auth:true});
+    if(path==='/api/pickup/issue'&&method==='POST')return http(path,{method,body,auth:true});
     if(path==='/api/food-courts') {await catalog();return {courts};}
     if(path==='/api/stalls')return {stalls:await catalog()};
     if(path==='/api/featured'){await catalog();return {items:previewCatalog?(FIXTURES.menus||[]).filter(i=>i.is_featured).slice(0,9):[]};} // Preview items are labelled by preview banner.
@@ -316,6 +348,8 @@
       if(!sid)fail('A stall must be selected.',400);return pickupSlots(sid);}
     if(path==='/api/orders'&&method==='GET')return ordersList();
     if(path==='/api/orders'&&method==='POST')return checkout(body);
+    const cancelMatch=path.match(/^\/api\/orders\/(\d+)\/cancel$/);
+    if(cancelMatch&&method==='POST')return http(`/api/live/orders/${cancelMatch[1]}/cancel`,{method:'POST',body:{},auth:true});
     const orderMatch=path.match(/^\/api\/orders\/(\d+)$/);
     if(orderMatch&&method==='GET')return orderDetail(Number(orderMatch[1]));
     if(path==='/api/vendor/dashboard'&&method==='GET')return vendorDashboard();
@@ -327,7 +361,18 @@
     }
     const vendorUpdate=path.match(/^\/api\/vendor\/orders\/(\d+)\/status$/);
     if(vendorUpdate&&method==='PATCH')return vendorStatus(vendorUpdate[1],body);
-    if(path==='/api/profile'&&method==='PATCH'){if(!FEATURES.profiles)unsupported('Profile editing');return http('/api/profile',{method,body,auth:true});}
+    if(path==='/api/profile'&&['GET','PATCH'].includes(method)){
+      if(!FEATURES.profiles)unsupported('Profile editing');
+      return http('/api/profile',{method,body,auth:false});
+    }
+    if(path==='/api/profile/avatar'&&['POST','DELETE'].includes(method)){
+      if(!FEATURES.profiles)unsupported('Profile photo editing');
+      return http('/api/profile/avatar',{method,body,auth:false});
+    }
+    if(path==='/api/vendor/weekly-stats'&&method==='GET'){
+      if(!me||me.role!=='vendor')fail('Vendor account required.',403);
+      return http('/api/vendor/weekly-stats',{auth:false});
+    }
     if(path==='/api/vendor/stall'&&method==='PATCH'){
       if(!FEATURES.vendorWrites)unsupported('Vendor stall settings');
       if(!me?.stallId)unsupported('Vendor stall settings');
@@ -348,15 +393,15 @@
     if(path==='/api/vendor/pickup/review'&&method==='POST'){
       if(!FEATURES.pickup)unsupported('Pickup verification');
       const code=clean(body?.code);
-      if(!/^PICKUP-[1-9]\d*-[a-f0-9]{36}$/.test(code))fail('Invalid pickup QR reference.',400);
+      if(!/^MLP-[a-f0-9]{64}$/.test(code))fail('Invalid pickup QR reference.',400);
       // Confirmation screen is not a backend authorization or a payment confirmation.
-      return {code,reviewPending:true};
+      return http('/api/pickup/review',{method:'POST',body:{code},auth:true});
     }
     if(path==='/api/vendor/pickup/approve'&&method==='POST'){
       if(!FEATURES.pickup)unsupported('Pickup collection');
       const code=clean(body?.code);
-      const result=await http('/pickup/verify',{method:'POST',body:{collectionReference:code},auth:true});
-      return {ok:true,orderStatus:result.orderStatus,orderId:result.orderId};
+      const result=await http('/api/pickup/approve',{method:'POST',body,auth:true});
+      return {...result,ok:true};
     }
     // Unknown feature actions are UI placeholders, never unverified database writes.
     if(method!=='GET') unsupported('This feature');
@@ -378,9 +423,9 @@
     const image=el?.querySelector?.('[data-live-qr]');
     if(!image || !FEATURES.pickup)return;
     try {
-      const data=await http(`/pickup/${image.dataset.liveQr}/qr`,{auth:true});
+      const data=await http('/api/pickup/issue',{method:'POST',body:{orderId:Number(image.dataset.liveQr)},auth:true});
       const uri=data?.pickup?.qrCode;
-      if(!uri||!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(uri))fail('The pickup QR service returned an invalid image.',502);
+      if(!uri||!/^data:image\/svg\+xml;base64,[A-Za-z0-9+/=]+$/.test(uri))fail('The pickup QR service returned an invalid image.',502);
       if(image.isConnected){image.src=uri;image.alt='Verified pickup code for this order';}
     } catch(e) {
       if(image.isConnected){
@@ -392,5 +437,5 @@
   }
   root.MakanLiveBridge={request,decorate,API_PENDING,normalizeStall,normalizeMenuItem,orderOf,
     diagnostics:()=>({activeUser:me?{id:me.id,role:me.role}:null,previewCatalog,catalogIssue,features:FEATURES,cartStorage:'browser-local',
-      checkoutContract:'POST /orders',stallsContract:'GET /stalls',authContract:'/api/auth/*'})};
+      checkoutContract:'POST /api/live/orders',stallsContract:'GET /api/live/stalls',authContract:'/api/auth/*'})};
 })(window);
