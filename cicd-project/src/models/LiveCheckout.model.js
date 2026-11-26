@@ -1,6 +1,7 @@
 'use strict';
 const crypto = require('node:crypto');
 const pool = require('./db');
+const { insertOrderPlaced } = require('./CustomerNotifications.model');
 function problem(status, message) { const e = new Error(message); e.status = status; return e; }
 function validId(x) { const n = Number(x); return Number.isSafeInteger(n) && n > 0 ? n : null; }
 function isoOf(value) { if(typeof value!=='string'||value.length>100)return null;const v=value.trim();return Number.isFinite(Date.parse(v))?v:null; }
@@ -101,6 +102,7 @@ async function createOrder(userId, body) {
       createdAt:timestamp,notes,totalCents:total,stallId,stallName:ss[0].name||'Participating stall',
       items:items.map(line=>({menuItemId:line.menuItemId,name:byId.get(line.menuItemId).name,
         priceCents:byId.get(line.menuItemId).price_cents,quantity:line.quantity}))};
+    await insertOrderPlaced(client, { customerId, orderId: order.id, orderNumber, stallName: ss[0].name });
     await client.query('COMMIT');
     return confirmed;
   } catch(error) {

@@ -131,7 +131,7 @@ function navTo(page,opts={}){
   state.mobileOpen=false;
   window.history.replaceState(null,'',`#${page}${page==='stall'&&state.stallId?'/'+state.stallId:''}${page==='order'&&state.orderId?'/'+state.orderId:''}`);
   if(!opts.focusStalls)window.scrollTo({top:0,behavior:'instant'});
-  render();
+  return render();
 }
 function navItem(page,label){return `<button class="nav-link ${state.page===page?'active':''}" data-page="${page}">${label}</button>`;}
 function shell(content){
@@ -142,7 +142,7 @@ function shell(content){
     <button class="brand" data-page="home" aria-label="Makan Liao homepage"><img src="/prototype-exact/makan-liao-logo.png" alt="Makan Liao?" /></button>
     <nav class="nav-links ${state.mobileOpen?'open':''}" aria-label="Main navigation">${mainNav}</nav>
     <div class="header-actions"><button class="icon-btn header-search" data-action="focusSearch" title="Search stalls" aria-label="Search stalls">${ico('search')}</button>
-${role==='customer'?`<button type="button" class="icon-btn pickup-bell" aria-label="Pickup notifications" aria-expanded="false" aria-controls="pickup-list"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 17h14l-2-3V9a5 5 0 0 0-10 0v5zM10 20a2 2 0 0 0 4 0"/></svg><span class="pickup-count"></span></button><section id="pickup-list" aria-label="Pickup notifications" hidden></section><button class="icon-btn" data-page="cart" aria-label="Shopping cart">${ico('basket')}${state.cartCount?`<span class="cart-count">${state.cartCount}</span>`:''}</button>`:''}
+${user?`<button type="button" class="icon-btn pickup-bell" aria-label="Pickup notifications" aria-expanded="false" aria-controls="pickup-list"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 17h14l-2-3V9a5 5 0 0 0-10 0v5zM10 20a2 2 0 0 0 4 0"/></svg><span class="pickup-count"></span></button><section id="pickup-list" aria-label="Pickup notifications" hidden></section>`:''}${role==='customer'?`<button class="icon-btn" data-page="cart" aria-label="Shopping cart">${ico('basket')}${state.cartCount?`<span class="cart-count">${state.cartCount}</span>`:''}</button>`:''}
     ${user?`<button class="avatar-btn" data-page="profile" title="My profile"><span class="avatar">${user.avatarUrl?`<img src="${esc(user.avatarUrl)}" alt="" />`:esc(user.displayName.charAt(0).toUpperCase())}</span><span class="username">${esc(user.displayName.split(' ')[0])}</span></button>`:`<button class="btn btn-outline btn-sm" data-page="login">Sign In</button><button class="btn btn-sm signup-nav" data-page="signup">Sign Up</button>`}
     <button class="icon-btn mobile-menu" data-action="toggleMenu" aria-label="Toggle menu">${ico('menu')}</button></div>
   </div></header><main class="main" id="content">${content}</main>
@@ -581,7 +581,7 @@ document.addEventListener('click',event=>{
     case 'confirmPending':{const action=pendingConfirm;pendingConfirm=null;dismissModal();if(action)run(action);break;}
     case 'logout':run(async()=>{await request('/api/auth/logout',{method:'POST'});state.user=null;clearPickupBanner();state.csrf=null;state.cartCount=0;toast('Signed out successfully.');navTo('home');});break;
     case 'clearCart':ask('Clear your basket?','All items will be removed from your basket.',async()=>{await request('/api/cart',{method:'DELETE'});await refreshCount();toast('Your basket is now empty.');render();},'Clear basket');break;
-    case 'checkout':run(async()=>{const radio=$('input[name="pickupAt"]:checked');if(!radio){toast('Please choose a pickup time.',true);return;}const response=await request('/api/orders',{method:'POST',body:{pickupAt:radio.value,notes:$('#pickup-notes')?.value||'',loyaltyRewardId:$('#loyalty-use')?.value?Number($('#loyalty-use').value):null,promoVoucherId:$('#promo-use')?.value?Number($('#promo-use').value):null}});state.cartCount=0;toast('Order placed successfully.');navTo('order',{orderId:response.order.id});});break;
+    case 'checkout':run(async()=>{const radio=$('input[name="pickupAt"]:checked');if(!radio){toast('Please choose a pickup time.',true);return;}const response=await request('/api/orders',{method:'POST',body:{pickupAt:radio.value,notes:$('#pickup-notes')?.value||'',loyaltyRewardId:$('#loyalty-use')?.value?Number($('#loyalty-use').value):null,promoVoucherId:$('#promo-use')?.value?Number($('#promo-use').value):null}});state.cartCount=0;toast('Order placed successfully.');await navTo('order',{orderId:response.order.id});await refreshOrderNotifications({announceOrderId:response.order.id});});break;
     case 'printOrder':window.print();break;
     case 'declinePickup':pendingPickup=null;render();break;
     case 'approvePickup':run(async()=>{
@@ -684,8 +684,113 @@ function flag(order,kind,write=false) {
   catch { return memoryFlags.has(key); }
 }
 function visibleAlerts() { return pickupOwner===state.user?.id ? pickupOrders.filter(o=>!flag(o,'dismissed')) : []; }
-function hidePopup(){clearTimeout(popupTimer); $('#pickup-pop').hidden=true;}
-function clearPickupBanner(){pickupOwner=null;pickupOrders=[];hidePopup();paintAlerts();}
+let notificationOwner = null;
+let fetchingNotifications = false;
+/* Shared authenticated inbox: one notification per real database event and recipient. */
+function roleNotificationSection(){
+  const notes=notificationOwner===state.user?.id?state.notifications:[];
+  if(!notes.length)return '<strong class="pickup-heading">Notifications</strong><p>No notifications yet.</p>';
+  const role=state.user?.role;
+  return '<strong class="pickup-heading">Notifications</strong>'+notes.map(n=>{
+    const id=Number(n.id),entityId=Number(n.entityId),kind=String(n.entityType||'');
+    const open=Number.isSafeInteger(entityId)&&entityId>0&&['order','review','stall'].includes(kind)?
+      `<button type="button" data-notif-open="${entityId}" data-notif-kind="${kind}">View ${kind}</button>`:'';
+    let step='';
+    if(role==='vendor'&&kind==='order'&&Number.isSafeInteger(entityId)&&entityId>0){
+      if(n.eventType==='ORDER_RECEIVED')step=`<button type="button" data-vendor-notif-order="${entityId}" data-vendor-notif-status="PREPARING">Start preparation</button>`;
+      else if(n.eventType==='VENDOR_ORDER_PREPARING')step=`<button type="button" data-vendor-notif-order="${entityId}" data-vendor-notif-status="READY">Mark ready</button>`;
+    }
+    return `<article class="order-notification" ${n.readAt?'':'data-unread="true"'}>`+
+      `<strong>${esc(n.title)}</strong><p>${esc(n.message)}</p><div class="notification-actions">`+
+      `${n.readAt?'<span class="muted tiny">Read</span>':`<button type="button" data-notif-read="${id}">Mark as read</button>`}`+
+      `<button type="button" data-notif-dismiss="${id}">Dismiss</button>${open}${step}</div></article>`;
+  }).join('');
+}
+
+/* Day 11 auto-popup patch */
+let autoNotificationOwner = null;
+let autoNotificationSeen = new Set();
+let queuedNotificationOrderId = null;
+
+// Uses the existing authenticated inbox. The first fetch establishes a baseline;
+// later genuinely new, unread notifications are announced once per tab session.
+function showNewNotificationPopup(note) {
+  const popup=$('#pickup-pop'),bell=$('.pickup-bell'),list=$('#pickup-list');
+  if(!popup||!bell||!list||!list.hidden||document.hidden||!state.user)return;
+  // Do not hide the existing collection-ready popup when it is already visible.
+  if(!popup.hidden&&!popup.classList.contains('activity-popup'))return;
+  popup.classList.add('activity-popup');
+  popup.innerHTML=
+    '<button type="button" data-activity-popup-close class="activity-popup-close" aria-label="Close notification preview">×</button>'+
+    '<strong>'+esc(note.title||'New notification')+'</strong>'+
+    '<p>'+esc(note.message||'You have a new notification.')+'</p>'+
+    '<button type="button" data-activity-popup-open class="activity-popup-view">View notifications</button>';
+  popup.hidden=false;
+  clearTimeout(popupTimer);
+  popupTimer=setTimeout(hidePopup,7500);
+  bell.classList.remove('notification-ring');
+  // Restart the bell animation for the next incoming event.
+  void bell.offsetWidth;
+  bell.classList.add('notification-ring');
+}
+
+async function refreshOrderNotifications({announceOrderId=null}={}) {
+  const user=state.user;
+  if(!user||!['customer','vendor','admin'].includes(user.role)){
+    notificationOwner=null;
+    autoNotificationOwner=null;
+    autoNotificationSeen.clear();
+    queuedNotificationOrderId=null;
+    state.notifications=[];
+    paintAlerts();
+    return;
+  }
+  if(fetchingNotifications||document.hidden){
+    if(announceOrderId)queuedNotificationOrderId=announceOrderId;
+    return;
+  }
+  const owner=user.id;
+  if(notificationOwner!==owner){notificationOwner=owner;state.notifications=[];}
+  const initialFetch=autoNotificationOwner!==owner;
+  if(initialFetch){autoNotificationOwner=owner;autoNotificationSeen=new Set();}
+  fetchingNotifications=true;
+  try{
+    const result=await request('/api/activity-notifications');
+    if(state.user?.id!==owner||notificationOwner!==owner)return;
+    const notes=Array.isArray(result.notifications)?result.notifications:[];
+    const newUnread=notes.filter(n=>!n.readAt&&!autoNotificationSeen.has(Number(n.id)));
+    autoNotificationSeen=new Set(notes.map(n=>Number(n.id)));
+    state.notifications=notes;
+    paintAlerts();
+    // Explicitly announce a just-placed order, even during initial page setup.
+    const explicit=announceOrderId?notes.find(n=>n.eventType==='ORDER_PLACED'&&
+      Number(n.entityId)===Number(announceOrderId)&&!n.readAt):null;
+    // Urgent events can interrupt; routine updates quietly refresh the badge/inbox.
+    // Checkout explicitly announces its own success once, as requested by the customer.
+    // The existing READY pickup popup handles collection alerts; avoid announcing twice.
+    const popupEvents=new Set([
+      'ORDER_RECEIVED', 'ORDER_CANCELLED',
+      'VENDOR_ORDER_CANCELLED', 'STALL_REMOVED', 'REVIEW_REPORTED'
+    ]);
+    const incoming=explicit||(!initialFetch?newUnread.find(n=>popupEvents.has(n.eventType)):null);
+    if(incoming)showNewNotificationPopup(incoming);
+  }catch(err){
+    if(err.status===401||err.status===403){
+      notificationOwner=null;autoNotificationOwner=null;autoNotificationSeen.clear();
+      state.notifications=[];paintAlerts();
+    }
+  }finally{
+    fetchingNotifications=false;
+    if(queuedNotificationOrderId&&state.user?.id===owner){
+      const next=queuedNotificationOrderId;
+      queuedNotificationOrderId=null;
+      queueMicrotask(()=>refreshOrderNotifications({announceOrderId:next}));
+    }
+  }
+}
+
+function hidePopup(){clearTimeout(popupTimer);const popup=$('#pickup-pop');if(popup){popup.hidden=true;popup.classList.remove('activity-popup');}$('.pickup-bell')?.classList.remove('notification-ring');}
+function clearPickupBanner(){pickupOwner=null;pickupOrders=[];if(!state.user||!['customer','vendor','admin'].includes(state.user.role)||!$('#pickup-pop')?.classList.contains('activity-popup'))hidePopup();paintAlerts();}
 function pickupArt(kind) {
   const paths = {
     meal:'<path d="M3 16h18M5 16a7 7 0 0 1 14 0M12 6V4M3 20h18"/>',
@@ -699,19 +804,75 @@ function paintAlerts(){
   const bell=$('.pickup-bell'),list=$('#pickup-list');
   if(!bell||!list)return;
   const orders=visibleAlerts();
-  bell.querySelector('.pickup-count').textContent=orders.length||'';
-  bell.setAttribute('aria-label','Pickup notifications, '+orders.length+' active');
+  const notes=notificationOwner===state.user?.id?state.notifications:[];
+  const count=notes.filter(n=>!n.readAt).length;
+  bell.querySelector('.pickup-count').textContent=count||'';
+  bell.setAttribute('aria-label','Notifications, '+count+' active');
   const markup='<strong class="pickup-heading">'+pickupArt('meal')+' Pickup notifications</strong>'+ (orders.length ? orders.map(o=>
     '<article><p>Order '+esc(o.order_number)+' is ready at '+esc(o.stall)+'.</p><button data-pick-open="'+Number(o.id)+'">View order '+pickupArt('arrow')+'</button> <button data-pick-dismiss="'+Number(o.id)+'">'+pickupArt('check')+' Dismiss</button></article>').join('') : '<p>No pickup alerts.</p>');
-  if(list.innerHTML!==markup && !list.hidden)list.innerHTML=markup;
+  const combinedMarkup=roleNotificationSection();
+  if(list.innerHTML!==combinedMarkup && !list.hidden)list.innerHTML=combinedMarkup;
 }
 function closeList(){
   const list=$('#pickup-list'); if(list)list.hidden=true;
   $('.pickup-bell')?.setAttribute('aria-expanded','false');
 }
 document.addEventListener('click',e=>{
+  if(e.target.closest('[data-activity-popup-close]')){hidePopup();return;}
+  if(e.target.closest('[data-activity-popup-open]')){
+    hidePopup();
+    const inbox=$('#pickup-list'),trigger=$('.pickup-bell');
+    if(inbox&&trigger){inbox.hidden=false;trigger.setAttribute('aria-expanded','true');paintAlerts();}
+    return;
+  }
   const bell=e.target.closest('.pickup-bell');
-  if(bell){const list=$('#pickup-list');list.hidden=!list.hidden;bell.setAttribute('aria-expanded',String(!list.hidden));hidePopup();paintAlerts();return;}
+  if(bell){const list=$('#pickup-list');list.hidden=!list.hidden;bell.setAttribute('aria-expanded',String(!list.hidden));hidePopup();paintAlerts();if(!list.hidden)refreshOrderNotifications();return;}
+  const vendorOrderAction=e.target.closest('[data-vendor-notif-order]');
+  if(vendorOrderAction){
+    const id=Number(vendorOrderAction.dataset.vendorNotifOrder),status=vendorOrderAction.dataset.vendorNotifStatus;
+    if(state.user?.role!=='vendor'||!Number.isSafeInteger(id)||id<1)return;
+    vendorOrderAction.disabled=true;
+    run(async()=>{try{
+      await request(`/api/activity-notifications/orders/${id}/status`,{method:'PATCH',body:{status}});
+      toast(status==='READY'?'Customer notified: food ready.':'Customer notified: preparation started.');
+      await refreshOrderNotifications();
+      if(state.page==='vendor')await render();
+    }finally{if(vendorOrderAction.isConnected)vendorOrderAction.disabled=false;}});
+    return;
+  }
+  const notificationAction=e.target.closest('[data-notif-read],[data-notif-dismiss],[data-notif-open]');
+  if(notificationAction){
+    if(notificationAction.dataset.notifOpen){
+      const id=Number(notificationAction.dataset.notifOpen),kind=notificationAction.dataset.notifKind;
+      if(Number.isSafeInteger(id)&&id>0){
+        closeList();
+        if(kind==='order'){
+          if(state.user?.role==='vendor'){state.vendorTab='orders';navTo('vendor');}
+          else if(state.user?.role==='admin'){state.adminTab='orders';navTo('admin');}
+          else navTo('order',{orderId:id});
+        } else if(kind==='review'){
+          if(state.user?.role==='admin'){state.adminTab='feedback';navTo('admin');}
+          else if(state.user?.role==='vendor'){state.vendorTab='feedback';navTo('vendor');}
+          else navTo('orders');
+        } else if(kind==='stall'){
+          if(state.user?.role==='admin'){state.adminTab='stalls';navTo('admin');}
+          else navTo('vendor');
+        }
+      }
+      return;
+    }
+    const dismissing=notificationAction.hasAttribute('data-notif-dismiss');
+    const id=Number(dismissing?notificationAction.dataset.notifDismiss:notificationAction.dataset.notifRead);
+    if(!Number.isSafeInteger(id)||id<1)return;
+    notificationAction.disabled=true;
+    run(async()=>{
+      try{
+        await request(`/api/activity-notifications/${id}/${dismissing?'dismiss':'read'}`,{method:'POST',body:{}});
+        await refreshOrderNotifications();
+      }finally{if(notificationAction.isConnected)notificationAction.disabled=false;}
+    });
+    return;
+  }
   const item=e.target.closest('[data-pick-dismiss],[data-pick-open]');
   if(item){
     const order=visibleAlerts().find(o=>o.id===Number(item.dataset.pickDismiss||item.dataset.pickOpen));
@@ -750,6 +911,9 @@ async function refreshPickup(){
 }
 new MutationObserver(()=>paintAlerts()).observe($('#app'),{childList:true});
 setInterval(refreshPickup, 5000);
+setInterval(refreshOrderNotifications, 4000);
+document.addEventListener('visibilitychange',refreshOrderNotifications);
+refreshOrderNotifications();
 document.addEventListener('visibilitychange',refreshPickup);
 const pickupRegistration = window.isSecureContext && 'serviceWorker' in navigator ?
   navigator.serviceWorker.register('/prototype-exact/pickup-sw.js').then(()=>navigator.serviceWorker.ready).catch(()=>null) : null;

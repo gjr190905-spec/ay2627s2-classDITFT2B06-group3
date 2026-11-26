@@ -316,6 +316,11 @@
       try{root.localStorage.removeItem(cartKey());}catch{/* no-op */}
       token=null;tokenExpiry=0;me=null;csrfToken=null;return result;
     }
+    if(path==='/api/activity-notifications'&&method==='GET')return http(path,{auth:true});
+    if(/^\/api\/activity-notifications\/\d+\/(?:read|dismiss)$/.test(path)&&method==='POST')return http(path,{method,body:body||{},auth:true});
+    if(/^\/api\/activity-notifications\/orders\/\d+\/status$/.test(path)&&method==='PATCH')return http(path,{method,body,auth:true});
+    if(path==='/api/notifications'&&method==='GET')return http(path,{auth:true});
+    if(/^\/api\/notifications\/\d+\/(?:read|dismiss)$/.test(path)&&method==='POST')return http(path,{method,body:body||{},auth:true});
     if(path==='/api/pickup/ready-orders'&&method==='GET')return http(path,{auth:true});
     if(path==='/api/pickup/issue'&&method==='POST')return http(path,{method,body,auth:true});
     if(path==='/api/food-courts') {await catalog();return {courts};}

@@ -22,6 +22,8 @@ const vendorOrderStatusRouter = require('./routers/VendorOrdersStatusRouter.js')
 const { loadSession } = require('./middleware/auth-session');
 const pickupQrRouter = require('./routers/PickupQr.router');
 const liveCheckoutRouter = require('./routers/LiveCheckout.router');
+const customerNotificationsRouter = require('./routers/CustomerNotifications.router');
+const roleNotificationsRouter = require('./routers/RoleNotifications.router');
 
 const app = express();
 
@@ -43,6 +45,8 @@ app.get('/favicon.ico', (req, res) => res.status(204).end());
 app.use('/api/auth', authRouter);
 app.use('/api/pickup', pickupQrRouter);
 app.use('/api/live', liveCheckoutRouter);
+app.use('/api/notifications', customerNotificationsRouter);
+app.use('/api/activity-notifications', roleNotificationsRouter);
 app.use('/api/profile', profileRouter);
 app.use('/api/vendor/weekly-stats', weeklyStatsRouter);
 app.use('/somethings', somethingRouter);
