@@ -1,7 +1,6 @@
 const TOKEN_KEY = 'token';
 const CART_KEY = 'cart';
 const LOGIN_PAGE = 'index.html';
-const ORDERS_PAGE = 'orders.html';
 const MAX_QUANTITY = 20;
 
 //temporaryyy till i get the person table :3
@@ -124,6 +123,7 @@ function readCart() {
       }
     }
   } catch {
+    // ignore parse errors
   }
   return emptyCart();
 }
@@ -450,7 +450,7 @@ async function placeOrder() {
     });
 
     saveCart(emptyCart());
-    window.location.href = `${ORDERS_PAGE}?placed=${encodeURIComponent(order.id)}`;
+    window.location.href = `payment.html?id=${encodeURIComponent(order.id)}`;
     return;
   } catch (error) {
     if (error.redirecting) {

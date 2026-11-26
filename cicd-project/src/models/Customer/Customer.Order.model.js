@@ -178,6 +178,11 @@ module.exports.createOrder = async function createOrder({ customerId, stallId, p
       }
     }
 
+    await client.query(
+      'INSERT INTO payments (order_id, amount, payment_status) VALUES ($1, $2, $3)',
+      [orderId, (totalCents / 100).toFixed(2), 'PENDING'],
+    );
+
     await client.query('COMMIT');
   } catch (error) {
     try {

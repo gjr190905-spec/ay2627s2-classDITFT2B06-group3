@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Payment | Makan Liao</title>
+    <link rel="stylesheet" href="../customer-styles/orders.css" />
+    <link rel="stylesheet" href="../customer-styles/menu.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+
+    <p class="promo-bar">Order before your break. Pay at the stall when you collect.</p>
+
+    <header class="site-header">
+      <a class="brand" href="menu.html">
+        <img class="brand__logo" src="../images/brand/makan-liao-logo.png" alt="Makan Liao" width="120" height="48" />
+      </a>
+
+      <nav class="site-nav" aria-label="Main">
+        <ul class="site-nav__list">
+          <li><a href="menu.html">Food stalls</a></li>
+          <li><a href="orders.html">My orders</a></li>
+          <li>
+            <a href="cart.html">
+              Cart
+              <span class="cart-badge" id="cart-count" aria-live="polite">0</span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+
+      <div class="site-user">
+        <button type="button" class="button button--outline" id="sign-out">Sign out</button>
+      </div>
+    </header>
+
+    <main id="main">
+      <p class="message" id="payment-loading" role="status">Loading your order...</p>
+      <p class="message message--error" id="payment-error" role="alert" hidden></p>
+
+      <div id="payment-content" hidden>
+        <section class="card order-detail" aria-labelledby="detail-title">
+          <div class="detail-head">
+            <div>
+              <p class="orders-eyebrow">Order</p>
+              <h1 id="detail-title"></h1>
+              <p class="detail-stall" id="detail-stall"></p>
+            </div>
+            <p class="order-status" id="detail-status"></p>
+          </div>
+
+          <h2>Items</h2>
+          <ul class="detail-items" id="detail-items"></ul>
+
+          <p class="detail-total">
+            <span>Total</span>
+            <strong id="detail-total"></strong>
+          </p>
+
+          <p class="pay-note" id="pay-note"></p>
+        </section>
+
+        <section class="card" aria-labelledby="payment-title">
+          <h2 id="payment-title">Payment method</h2>
+          <p class="card__hint">Select how you would like to pay.</p>
+
+          <div class="payment-methods">
+            <label class="payment-method">
+              <input type="radio" name="paymentMethod" value="Card" checked />
+              Card
+            </label>
+            <label class="payment-method">
+              <input type="radio" name="paymentMethod" value="Paynow" />
+              Paynow
+            </label>
+            <label class="payment-method">
+              <input type="radio" name="paymentMethod" value="Cash" />
+              Cash
+            </label>
+          </div>
+
+          <p class="message message--error" id="payment-message" role="alert" hidden></p>
+
+          <button type="button" class="button button--primary" id="pay-button">Pay Now</button>
+        </section>
+
+        <section class="card" id="payment-result" hidden aria-labelledby="result-title">
+          <h2 id="result-title">Payment result</h2>
+          <p id="result-message"></p>
+          <p class="card__hint" id="result-detail"></p>
+          <a class="button button--outline" id="receipt-link" href="orders.html" hidden>View digital receipt</a>
+        </section>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <p>A campus food ordering platform for students and staff.</p>
+    </footer>
+
+    <script src="../js/customer-payment.js" defer></script>
+  </body>
+</html>
