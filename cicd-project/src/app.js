@@ -16,7 +16,7 @@ const vendorMenuRouter = require('./routers/Vendor.Menu.router.js');
 const vendorOrderRouter = require('./routers/Vendor.Order.router');
 const { settingsRouter, notificationsRouter } = require('./routers/Vendor.Settings.router.js');
 const ordersRouter = require('./routers/ordersRouter');
-const paymentRouter = require('./routers/PaymentRouter.js');
+const paymentRouter = require('./routers/paymentRouter');
 const pickupWindowRouter = require('./routers/pickupWindowRouter');
 const vendorOrderStatusRouter = require('./routers/VendorOrdersStatusRouter.js');
 const { loadSession } = require('./middleware/auth-session');
@@ -57,6 +57,7 @@ app.use('/customer-orders', CustomerOrderRouter);
 
 // Integrated order-management routes (mounted before the 404 handler)
 app.use('/VendorOrders', vendorOrderRouter);
+app.use('/vendor-orders', vendorOrderRouter);
 app.use('/payments', paymentRouter);
 app.use('/pickup-windows', pickupWindowRouter);
 
@@ -67,11 +68,7 @@ app.use('/vendors/:vendorId/settings', settingsRouter);
 app.use('/vendors/:vendorId/notifications', notificationsRouter);
 app.use('/vendors', vendorRouter);
 
-// Integrated order-management routes (mounted before the 404 handler)
 app.use('/orders', ordersRouter);
-app.use('/vendor-orders', vendorOrderRouter);
-app.use('/payments', paymentRouter);
-app.use('/pickup-windows', pickupWindowRouter);
 app.use((req, res, next) => {
   next(createError(404, `Unknown resource ${req.method} ${req.originalUrl}`));
 });

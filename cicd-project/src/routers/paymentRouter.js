@@ -1,11 +1,13 @@
 const express = require('express');
-
+const { authenticate, requireRole } = require('../middleware/auth');
 const {
   getPaymentByOrderId,
   processPayment
 } = require('../models/paymentModel');
 
 const router = express.Router();
+
+router.use(authenticate, requireRole('customer'));
 
 // Get payment details
 router.get('/:orderId', (req, res, next) => {
@@ -17,7 +19,7 @@ router.get('/:orderId', (req, res, next) => {
     });
   }
 
-  getPaymentByOrderId(orderId)
+  getPaymentByOrderId(orderId, req.user.id)
     .then((payment) => {
       if (!payment) {
         return res.status(404).json({
@@ -54,10 +56,12 @@ router.post('/:orderId/simulate', (req, res, next) => {
     });
   }
 
-  processPayment(orderId, paymentMethod, paymentStatus)
+  processPayment(orderId, paymentMethod, paymentStatus, req.user.id)
     .then((payment) => {
       res.status(200).json({
-        message: 'Payment processed successfully',
+        message: payment.payment_status === 'PAID'
+          ? 'Payment successful'
+          : 'Payment failed',
         payment: payment
       });
     })

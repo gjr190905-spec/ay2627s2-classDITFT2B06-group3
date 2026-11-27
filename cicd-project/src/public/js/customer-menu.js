@@ -99,7 +99,6 @@ function normaliseStall(raw) {
     itemCount = parsedCount;
   }
 
-  console.log(raw.name, STALL_IMAGES[raw.name]);
   return {
     id: raw.id,
     name: raw.name,

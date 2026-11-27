@@ -1,12 +1,14 @@
 const pool = require('./db');
 
-// Get payment details using order ID
-module.exports.getPaymentByOrderId = async function getPaymentByOrderId(orderId) {
+// Get payment details using order ID (only for the order's owner)
+module.exports.getPaymentByOrderId = async function getPaymentByOrderId(orderId, customerId) {
   const { rows } = await pool.query(
-    `SELECT *
-     FROM payments
-     WHERE order_id = $1`,
-    [orderId]
+    `SELECT p.*
+     FROM payments p
+     JOIN "Order" o ON o."id" = p.order_id
+     WHERE p.order_id = $1
+       AND o."customerId" = $2`,
+    [orderId, customerId]
   );
 
   return rows[0];
@@ -16,8 +18,15 @@ module.exports.getPaymentByOrderId = async function getPaymentByOrderId(orderId)
 module.exports.processPayment = async function processPayment(
   orderId,
   paymentMethod,
-  paymentStatus
+  paymentStatus,
+  customerId
 ) {
+  if (!['CARD', 'PAYNOW', 'CASH'].includes(paymentMethod)) {
+    const error = new Error('Invalid payment method');
+    error.statusCode = 400;
+    throw error;
+  }
+
   if (!['PAID', 'FAILED'].includes(paymentStatus)) {
     const error = new Error('Invalid payment status');
     error.statusCode = 400;
@@ -29,12 +38,14 @@ module.exports.processPayment = async function processPayment(
   try {
     await client.query('BEGIN');
 
-    // Check whether payment record exists
     const { rows } = await client.query(
-      `SELECT payment_id, payment_status
-       FROM payments
-       WHERE order_id = $1`,
-      [orderId]
+      `SELECT p.payment_id, p.payment_status
+       FROM payments p
+       JOIN "Order" o ON o."id" = p.order_id
+       WHERE p.order_id = $1
+         AND o."customerId" = $2
+       FOR UPDATE`,
+      [orderId, customerId]
     );
 
     if (rows.length === 0) {
@@ -45,18 +56,15 @@ module.exports.processPayment = async function processPayment(
 
     const payment = rows[0];
 
-    // Check whether payment has already been processed
-    if (payment.payment_status !== 'PENDING') {
-      const error = new Error('Payment has already been processed');
+    if (payment.payment_status === 'PAID') {
+      const error = new Error('Payment has already been completed');
       error.statusCode = 400;
       throw error;
     }
 
-    // Generate transaction reference
     const transactionReference =
       `SIM-${payment.payment_id}-${Date.now()}`;
 
-    // Update payment details
     const { rows: updatedRows } = await client.query(
       `UPDATE payments
        SET payment_status = $1,
@@ -66,17 +74,11 @@ module.exports.processPayment = async function processPayment(
              WHEN $1 = 'PAID' THEN CURRENT_TIMESTAMP
              ELSE NULL
            END
-       WHERE order_id = $4
-       AND payment_status = 'PENDING'
+       WHERE payment_id = $4
+         AND payment_status = 'PENDING'
        RETURNING *`,
-      [paymentStatus, paymentMethod, transactionReference, orderId]
+      [paymentStatus, paymentMethod, transactionReference, payment.payment_id]
     );
-
-    if (updatedRows.length === 0) {
-      const error = new Error('Payment could not be processed');
-      error.statusCode = 400;
-      throw error;
-    }
 
     await client.query('COMMIT');
 
