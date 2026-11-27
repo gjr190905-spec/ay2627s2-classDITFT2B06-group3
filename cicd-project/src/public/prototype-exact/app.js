@@ -305,6 +305,69 @@ function cartPage(d,slots){
 }
 function ordersPage(orders){return `<div class="container"><div class="dashboard-head"><div><div class="overline">Your orders</div><h1>Keep tabs on your makan.</h1><p>All your pickup orders, in one place.</p></div><button class="btn btn-secondary" data-page="explore">Explore stalls ${ico('arrow')}</button></div>${orders.length?orders.map(o=>`<div class="order-row"><div><div class="flex-wrap"><strong>${esc(o.order_number)}</strong>${tagStatus(o.status)}</div><h3>${esc(o.stall_name)}</h3><p>${esc(o.court_name)} · Pickup ${esc(prettyTime(o.pickup_at))}</p></div><div class="order-actions"><strong>${money(o.total_cents)}</strong><button class="btn btn-sm btn-secondary" data-order="${o.id}">View order ${ico('chevron')}</button></div></div>`).join(''):empty('No orders yet','When you place your first order, you can track it right here.')}</div>`;}
 let displayedOrderStatus;
+/* Day 12: after a live order renders, refresh this form from PostgreSQL. */
+async function refreshCustomerReviewDisplay() {
+  const form = document.querySelector('#feedbackForm[data-order-id]');
+  if (!form) return;
+  const orderId = Number(form.dataset.orderId);
+  if (!Number.isSafeInteger(orderId) || orderId < 1) return;
+  try {
+    const result = await request('/api/orders/' + orderId + '/feedback');
+    if (!form.isConnected) return; // Ignore an older page's network response.
+    if (result.review) {
+      const review = result.review;
+      const card = document.createElement('section');
+      card.className = 'note-box';
+      card.setAttribute('role', 'status');
+      card.setAttribute('aria-label', 'Your submitted review');
+
+      const heading = document.createElement('h3');
+      heading.textContent = 'Your review';
+      card.append(heading);
+
+      const rating = Number(review.rating);
+      if (Number.isInteger(rating) && rating >= 1 && rating <= 5) {
+        const stars = document.createElement('p');
+        stars.textContent = 'Your rating: ' + '★'.repeat(rating) + '☆'.repeat(5 - rating) + ' (' + rating + '/5)';
+        card.append(stars);
+      }
+
+      if (typeof review.comment === 'string' && review.comment.trim()) {
+        const caption = document.createElement('p');
+        caption.textContent = 'Your comment:';
+        const comment = document.createElement('p');
+        comment.style.whiteSpace = 'pre-wrap';
+        comment.textContent = review.comment; // Never use innerHTML for customer-supplied text.
+        card.append(caption, comment);
+      }
+
+      const status = String(review.status || '').toUpperCase();
+      const state = document.createElement('p');
+      if (status === 'PENDING') {
+        state.textContent = 'Status: Pending approval. Only you can see this review until it is approved.';
+      } else if (status === 'APPROVED') {
+        state.textContent = 'Status: Approved. Your review has been approved.';
+      } else if (status === 'REJECTED') {
+        state.textContent = 'Status: Rejected. This review is not publicly visible.';
+      } else {
+        state.textContent = 'Status: ' + (status || 'Unavailable') + '.';
+      }
+      card.append(state);
+      form.replaceWith(card);
+    } else if (!result.eligible) {
+      const message = document.createElement('p');
+      message.className = 'note-box';
+      message.setAttribute('role', 'status');
+      message.textContent = 'You can submit a review after this order is collected.';
+      form.replaceWith(message);
+    }
+  } catch (error) {
+    // Retain the form so an existing review request failure remains visible
+    // through normal submission feedback; never claim a successful save.
+    console.warn('Review status unavailable:', error.message);
+  }
+}
+
 function customerFeedback(o) {
   if (state.user.role !== 'customer' || o.status !== 'COLLECTED') return '';
   if (o.feedback) return `<section class="panel no-print"><h2>Your feedback</h2><p>Review status · ${esc(o.feedback.status)}</p></section>`;
@@ -497,6 +560,7 @@ async function render() {
     if(turn===renderId) {
       root.innerHTML=shell(html);
       window.MakanLiveBridge.decorate?.(root);
+          void refreshCustomerReviewDisplay();
       if(state.focusStalls&&state.page==='explore'){state.focusStalls=false;$('#stall-list')?.scrollIntoView({behavior:'smooth'});}
     }
   }catch(error){if(turn===renderId){root.innerHTML=shell(`<div class="container"><div class="page-head"><h1>We couldn't load that page.</h1><p>${esc(error.message)}</p><button class="btn" data-page="explore">Back to Explore</button></div></div>`);errorReport(error);}}
