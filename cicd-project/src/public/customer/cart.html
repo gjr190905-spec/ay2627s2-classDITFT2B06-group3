@@ -8,36 +8,11 @@
     <link rel="stylesheet" href="../customer-styles/cart.css" />
   </head>
   <body>
-    <a class="skip-link" href="#main">Skip to main content</a>
-
-    <p class="promo-bar">Order before your break. Pay at the stall when you collect.</p>
-
-    <header class="site-header">
-      <a class="brand" href="menu.html">
-        <img class="brand__logo" src="../images/brand/makan-liao-logo.png" alt="Makan Liao" width="120" height="48" />
-      </a>
-
-      <nav class="site-nav" aria-label="Main">
-        <ul class="site-nav__list">
-          <li><a href="menu.html">Food stalls</a></li>
-          <li><a href="orders.html">My orders</a></li>
-          <li>
-            <a href="cart.html" aria-current="page">
-              Cart
-              <span class="cart-badge" id="cart-count" aria-live="polite">0</span>
-            </a>
-          </li>
-        </ul>
-      </nav>
-
-      <div class="site-user">
-        <button type="button" class="button button--outline" id="sign-out">Sign out</button>
-      </div>
-    </header>
+ <div id="site-nav-mount"></div>
 
     <main id="main">
       <section class="page-intro" aria-labelledby="page-title">
-        <p class="cart-intro__eyebrow">Your basket</p>
+        <div class="overline">Your basket</div>
         <h1 id="page-title">Ready when you are.</h1>
         <p>Review your items and pick a collection slot. Payment happens at the stall.</p>
       </section>
@@ -151,6 +126,7 @@
       </li>
     </template>
 
-    <script src="../js/customer-cart.js" defer></script>
+      <script src="../js/nav.js" defer></script>
+      <script src="../js/customer-cart.js" defer></script>
   </body>
 </html>

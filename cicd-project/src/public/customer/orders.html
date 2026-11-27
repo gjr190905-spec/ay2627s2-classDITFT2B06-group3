@@ -8,32 +8,7 @@
     <link rel="stylesheet" href="../customer-styles/menu.css" />
   </head>
   <body>
-    <a class="skip-link" href="#main">Skip to main content</a>
-
-    <p class="promo-bar">Order before your break. Pay at the stall when you collect.</p>
-
-    <header class="site-header">
-      <a class="brand" href="menu.html">
-        <img class="brand__logo" src="../images/brand/makan-liao-logo.png" alt="Makan Liao" width="120" height="48" />
-      </a>
-
-      <nav class="site-nav" aria-label="Main">
-        <ul class="site-nav__list">
-          <li><a href="menu.html">Food stalls</a></li>
-          <li><a href="orders.html" aria-current="page">My orders</a></li>
-          <li>
-            <a href="cart.html">
-              Cart
-              <span class="cart-badge" id="cart-count" aria-live="polite">0</span>
-            </a>
-          </li>
-        </ul>
-      </nav>
-
-      <div class="site-user">
-        <button type="button" class="button button--outline" id="sign-out">Sign out</button>
-      </div>
-    </header>
+<div id="site-nav-mount"></div>
 
     <main id="main">
       <p class="message" id="orders-loading" role="status">Loading your orders...</p>
@@ -43,7 +18,7 @@
       <div id="list-view" hidden>
         <section class="page-intro orders-head" aria-labelledby="page-title">
           <div>
-            <p class="orders-eyebrow">Your orders</p>
+            <div class="overline">Your orders</div>
             <h1 id="page-title">Keep tabs on your makan.</h1>
             <p>All your pickup orders, in one place.</p>
           </div>
@@ -135,7 +110,7 @@
         </div>
       </li>
     </template>
-
+    <script src="../js/nav.js" defer></script>
     <script src="../js/customer-orders.js" defer></script>
   </body>
 </html>

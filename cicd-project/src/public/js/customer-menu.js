@@ -1,6 +1,6 @@
-const TOKEN_KEY = 'token';
-const CART_KEY = 'cart'; 
-const LOGIN_PAGE = 'index.html';
+// const TOKEN_KEY = 'token';
+// const CART_KEY = 'cart'; 
+// const LOGIN_PAGE = '/index.html';
 const PLACEHOLDER_IMAGE = 'images/stalls/placeholder.png';
 
 const FALLBACK_DETAILS = {
@@ -43,8 +43,6 @@ const emptyMessage = document.getElementById('stall-empty');
 const searchForm = document.getElementById('search-form');
 const searchInput = document.getElementById('stall-search');
 const cardTemplate = document.getElementById('stall-card-template');
-const cartBadge = document.getElementById('cart-count');
-const signOutButton = document.getElementById('sign-out');
 
 let allStalls = [];
 let selectedCourt = null;
@@ -68,26 +66,7 @@ function courtNameFor(courtNumber) {
 }
 
 // ── Cart badge ───────────────────────────────────────────
-function getCartCount() {
-  try {
-    const cart = JSON.parse(localStorage.getItem(CART_KEY));
-    if (!cart || !Array.isArray(cart.items)) {
-      return 0;
-    }
-    return cart.items.reduce((total, item) => {
-      if (Number.isInteger(item.quantity) && item.quantity > 0) {
-        return total + item.quantity;
-      }
-      return total;
-    }, 0);
-  } catch {
-    return 0;
-  }
-}
 
-function showCartCount() {
-  cartBadge.textContent = String(getCartCount());
-}
 
 function normaliseStall(raw) {
   const fallback = FALLBACK_DETAILS[raw.name] || {};
@@ -258,10 +237,10 @@ searchForm.addEventListener('submit', (event) => {
   renderStalls();
 });
 
-signOutButton.addEventListener('click', () => {
-  localStorage.removeItem(TOKEN_KEY);
-  window.location.href = LOGIN_PAGE;
-});
+// signOutButton.addEventListener('click', () => {
+//   localStorage.removeItem(TOKEN_KEY);
+//   window.location.href = LOGIN_PAGE;
+// });
 
 // ── Start ────────────────────────────────────────────────
 const startingCourt = courtList.querySelector('.court-card[aria-pressed="true"]');
@@ -269,5 +248,4 @@ if (startingCourt) {
   selectedCourt = startingCourt.dataset.court;
 }
 
-showCartCount();
 loadStalls();

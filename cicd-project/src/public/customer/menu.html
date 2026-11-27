@@ -8,36 +8,10 @@
     <link rel="stylesheet" href="../customer-styles/menu.css" />
   </head>
   <body>
-    <a class="skip-link" href="#main">Skip to main content</a>
-
-    <p class="promo-bar">Order before your break. Pay at the stall when you collect.</p>
-
-    <header class="site-header">
-      <a class="brand" href="menu.html">
-        <img class="brand__logo" src="../images/brand/makan-liao-logo.png" alt="Makan Liao" width="120" height="48" />
-      </a>
-
-      <nav class="site-nav" aria-label="Main">
-        <ul class="site-nav__list">
-          <li><a href="menu.html" aria-current="page">Food stalls</a></li>
-          <li><a href="orders.html">My orders</a></li>
-          <li>
-            <a href="cart.html">
-              Cart
-              <span class="cart-badge" id="cart-count" aria-live="polite">0</span>
-            </a>
-          </li>
-        </ul>
-      </nav>
-
-      <div class="site-user">
-        <span class="site-user__name" id="user-name"></span>
-        <button type="button" class="button button--outline" id="sign-out">Sign out</button>
-      </div>
-    </header>
-
+    <div id="site-nav-mount"></div>
     <main id="main">
       <section class="page-intro" aria-labelledby="page-title">
+      <div class="overline">FIND YOUR NEXT FAVOURITE</div>
         <h1 id="page-title">Explore food stalls</h1>
         <p>Browse the campus food courts, pick a stall and order for pickup.</p>
       </section>
@@ -50,8 +24,9 @@
         <ul class="court-list" id="court-list">
           <li>
             <button type="button" class="court-card" data-court="1" aria-pressed="false">
-              <span class="court-card__name">Food Court 1</span>
-              <span class="court-card__count">0 stalls</span>
+                <span class="court-card__name">Food Court 1</span>
+                <span class="court-card__count">0 stalls</span>
+              </span>
             </button>
           </li>
           <li>
@@ -68,7 +43,7 @@
           </li>
           <li>
             <button type="button" class="court-card" data-court="4" aria-pressed="false">
-              <span class="court-card__name">Food Court 4</span>
+              <span class="court-card__name">Food Court 4</span> 
               <span class="court-card__count">0 stalls</span>
             </button>
           </li>
@@ -125,31 +100,6 @@
         <p class="message" id="stall-empty" hidden>No stalls match your search. Try another word or clear the filters.</p>
 
         <ul class="stall-grid" id="stall-grid">
-          <!-- Two static examples so the layout is visible before the JS exists. JS replaces these. -->
-          <li>
-            <article class="stall-card">
-              <img
-                class="stall-card__image"
-                src="images/stalls/placeholder.webp"
-                alt=""
-                width="400"
-                height="240"
-                loading="lazy"
-              />
-              <div class="stall-card__body">
-                <div class="stall-card__tags">
-                  <span class="tag">Japanese</span>
-                  <span class="status status--open">Accepting orders</span>
-                </div>
-                <h3 class="stall-card__name">Japanese Food</h3>
-                <p class="stall-card__blurb">Rice bowls, curry and udon.</p>
-                <div class="stall-card__foot">
-                  <p class="stall-card__meta">Food Court 6, 16 items</p>
-                  <a class="stall-card__link" href="stall-menu.html?id=4">View menu</a>
-                </div>
-              </div>
-            </article>
-          </li>
           <li>
             <article class="stall-card">
               <img
@@ -179,7 +129,7 @@
     </main>
 
     <footer class="site-footer">
-      <img class="brand__logo" src="./images/makanLiao_logo.png" alt="Makan Liao" width="96" height="38" />
+      <img class="brand__logo" src="../images/brand/makan-liao-logo.png" alt="Makan Liao" width="120" height="48" />
       <p>A campus food ordering platform for students and staff.</p>
       <p class="site-footer__note">
         Independent class project prototype. Locations, menus and accounts are fictional. Pay at pickup only. There is no
@@ -207,7 +157,7 @@
         </article>
       </li>
     </template>
-
+    <script src="../js/nav.js" defer></script>
     <script src="../js/customer-menu.js" defer></script>
   </body>
 </html>
