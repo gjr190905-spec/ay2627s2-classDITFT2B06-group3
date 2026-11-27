@@ -25,6 +25,7 @@ const liveCheckoutRouter = require('./routers/LiveCheckout.router');
 const customerReviewRouter = require('./routers/CustomerReview.router');
 const customerNotificationsRouter = require('./routers/CustomerNotifications.router');
 const roleNotificationsRouter = require('./routers/RoleNotifications.router');
+const reviewModerationRouter = require('./routers/ReviewModeration.router');
 
 const app = express();
 
@@ -50,6 +51,7 @@ app.use('/api/live', liveCheckoutRouter);
 app.use('/api/orders', customerReviewRouter);
 app.use('/api/notifications', customerNotificationsRouter);
 app.use('/api/activity-notifications', roleNotificationsRouter);
+app.use('/api/reviews', reviewModerationRouter);
 app.use('/api/profile', profileRouter);
 app.use('/api/vendor/weekly-stats', weeklyStatsRouter);
 app.use('/somethings', somethingRouter);

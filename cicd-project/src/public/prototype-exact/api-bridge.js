@@ -318,6 +318,10 @@
     }
     /* DAY12_REAL_REVIEW_ENDPOINT */
     if(/^\/api\/orders\/\d+\/feedback$/.test(path)&&(method==='GET'||method==='POST'))return http(path,{method,body,auth:true});
+    /* DAY13_14_ROLE_REVIEW_ENDPOINTS */
+    if(path==='/api/reviews/moderation'&&method==='GET')return http(path,{auth:true});
+    if(path==='/api/reviews/vendor'&&method==='GET')return http(path,{auth:true});
+    if(/^\/api\/reviews\/moderation\/\d+$/.test(path)&&method==='PATCH')return http(path,{method,body,auth:true});
     if(path==='/api/activity-notifications'&&method==='GET')return http(path,{auth:true});
     if(/^\/api\/activity-notifications\/\d+\/(?:read|dismiss)$/.test(path)&&method==='POST')return http(path,{method,body:body||{},auth:true});
     if(/^\/api\/activity-notifications\/orders\/\d+\/status$/.test(path)&&method==='PATCH')return http(path,{method,body,auth:true});

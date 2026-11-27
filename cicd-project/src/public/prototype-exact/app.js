@@ -368,6 +368,92 @@ async function refreshCustomerReviewDisplay() {
   }
 }
 
+/* Day 13/14: authenticated admin moderation and vendor approved reviews. */
+async function refreshReviewModerationPanels(root) {
+  /* DAY13_14_SINGLE_REVIEW_PANEL_V1 */
+  const role = state.user?.role;
+  if (role !== 'admin' && role !== 'vendor') return;
+  const isReviewTab = role === 'admin'
+    ? state.page === 'admin' && state.adminTab === 'feedback'
+    : state.page === 'vendor' && state.vendorTab === 'feedback';
+  if (!isReviewTab) return;
+  const slot = root.querySelector(`[data-role-review-slot="${role}"]`);
+  if (!slot || slot.querySelector('[data-role-review-panel]')) return;
+  const panel = document.createElement('section');
+  panel.className = 'panel';
+  panel.dataset.roleReviewPanel = role;
+  const header = document.createElement('h2');
+  header.textContent = role === 'admin' ? 'Review moderation' : 'Customer reviews';
+  panel.append(header);
+  const notice = document.createElement('p');
+  notice.className = 'muted';
+  notice.textContent = role === 'admin' ?
+    'Approve or reject pending reviews. Previously moderated reviews remain available below.' :
+    'Approved anonymous reviews from customers of your assigned stall.';
+  panel.append(notice);
+  const body = document.createElement('div');
+  body.textContent = 'Loading reviews…';
+  body.setAttribute('aria-live','polite');
+  panel.append(body);
+  slot.replaceChildren(panel);
+  async function load() {
+    try {
+      const url = role === 'admin' ? '/api/reviews/moderation' : '/api/reviews/vendor';
+      const response = await request(url);
+      if (!panel.isConnected) return;
+      const rows = Array.isArray(response.reviews) ? response.reviews : [];
+      body.replaceChildren();
+      if (!rows.length) {
+        const empty = document.createElement('p');
+        empty.textContent = role === 'admin' ? 'No reviews to moderate yet.' : 'No approved reviews yet.';
+        body.append(empty);
+        return;
+      }
+      for (const item of rows) {
+        const card = document.createElement('article');
+        card.style.cssText = 'border:1px solid #e7d8cc;border-radius:12px;padding:14px;margin:10px 0;';
+        const summary = document.createElement('p');
+        const rating = Number(item.rating);
+        const stars = Number.isInteger(rating) && rating >= 1 && rating <= 5 ? '★'.repeat(rating)+'☆'.repeat(5-rating) : 'Rating unavailable';
+        summary.textContent = stars + (role === 'admin' ? `  · Order #${Number(item.orderId)} · Stall #${Number(item.stallId)}` : ' · Anonymous Customer');
+        card.append(summary);
+        const comment = document.createElement('p');
+        comment.style.whiteSpace = 'pre-wrap';
+        comment.textContent = String(item.comment || ''); // Untrusted user text is never HTML.
+        card.append(comment);
+        const status = document.createElement('p');
+        status.className = 'muted';
+        status.textContent = 'Status: ' + String(item.status || 'UNKNOWN');
+        card.append(status);
+        if (role === 'admin' && item.status === 'PENDING') {
+          for (const [action, label] of [['APPROVED', 'Approve'], ['REJECTED', 'Reject']]) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = action === 'APPROVED' ? 'btn btn-primary' : 'btn btn-secondary';
+            button.textContent = label;
+            button.style.marginRight = '10px';
+            button.addEventListener('click', async () => {
+              button.disabled = true;
+              try {
+                await request('/api/reviews/moderation/' + Number(item.id), { method:'PATCH', body:{status:action} });
+                await load();
+              } catch (e) {
+                button.disabled = false;
+                alert('Unable to moderate review: ' + e.message);
+              }
+            });
+            card.append(button);
+          }
+        }
+        body.append(card);
+      }
+    } catch (error) {
+      if (panel.isConnected) body.textContent = 'Review list unavailable: ' + error.message;
+    }
+  }
+  await load();
+}
+
 function customerFeedback(o) {
   if (state.user.role !== 'customer' || o.status !== 'COLLECTED') return '';
   if (o.feedback) return `<section class="panel no-print"><h2>Your feedback</h2><p>Review status · ${esc(o.feedback.status)}</p></section>`;
@@ -420,14 +506,14 @@ function vendorPage(d){
   const orders=d.orders, open=orders.filter(o=>!['COLLECTED','CANCELLED'].includes(o.status));
   const counts={new:orders.filter(o=>o.status==='PLACED').length,active:open.length,ready:orders.filter(o=>o.status==='READY').length,completed:orders.filter(o=>o.status==='COLLECTED').length};
   const integrationBanner=d._integrationPending && state.vendorTab!=='scanner'?'<div class="note-box" role="status">Vendor order information is currently unavailable. Displayed counts are not live.</div>':'';
-  const section=state.vendorTab==='feedback'?feedbackPanel(d.reviews||[],false):state.vendorTab==='orders'?`<section class="panel"><div class="panel-header"><div><h2>Incoming orders</h2><p>Process each order as it moves through preparation.</p></div><button class="btn btn-sm btn-secondary" data-action="refreshVendor">Refresh ${ico('arrow')}</button></div>${orders.length?`<div class="table-wrap"><table class="data-table"><thead><tr><th>Order / Customer</th><th>Pickup</th><th>Amount</th><th>Status</th><th>Next action</th></tr></thead><tbody>${orders.map(o=>{
+  const section=state.vendorTab==='feedback'?'<div data-role-review-slot="vendor"></div>':state.vendorTab==='orders'?`<section class="panel"><div class="panel-header"><div><h2>Incoming orders</h2><p>Process each order as it moves through preparation.</p></div><button class="btn btn-sm btn-secondary" data-action="refreshVendor">Refresh ${ico('arrow')}</button></div>${orders.length?`<div class="table-wrap"><table class="data-table"><thead><tr><th>Order / Customer</th><th>Pickup</th><th>Amount</th><th>Status</th><th>Next action</th></tr></thead><tbody>${orders.map(o=>{
   const next={PLACED:['ACCEPTED','Accept order'],ACCEPTED:['PREPARING','Start preparing'],PREPARING:['READY','Mark ready']}[o.status];
   return `<tr><td><strong>${esc(o.order_number)}</strong><div class="muted tiny">${esc(o.customer_name)}</div></td><td>${esc(prettyTime(o.pickup_at))}</td><td><strong>${money(o.total_cents)}</strong></td><td>${tagStatus(o.status)}</td><td><div class="row-actions">${next?`<button class="btn btn-sm ${next[0]==='READY'?'btn-green':''}" data-vendorstatus="${o.id}" data-status="${next[0]}">${esc(next[1])}</button>`:''}<button class="btn btn-sm btn-secondary" data-order="${o.id}">Details</button>${['PLACED','ACCEPTED','PREPARING'].includes(o.status)?`<button class="btn btn-sm btn-quiet" data-vendorstatus="${o.id}" data-status="CANCELLED">Cancel</button>`:''}</div></td></tr>`;}).join('')}</tbody></table></div>`:empty('No orders yet','New orders from customers will appear here.','vendor','Refresh dashboard')}</section>`:
   state.vendorTab==='menu'?`<section class="panel"><div class="panel-header"><div><h2>Menu management</h2><p>Edit prices, availability and descriptions.</p></div><button class="btn btn-sm" data-action="addMenu">${ico('plus')} Add item</button></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Item</th><th>Category</th><th>Price</th><th>Available</th><th>Manage</th></tr></thead><tbody>${d.menu.map(i=>`<tr><td><strong>${esc(i.name)}</strong><div class="tiny muted" style="max-width:250px">${esc(i.description)}</div></td><td>${esc(i.category)}</td><td>${money(i.price_cents)}</td><td>${i.is_available?'<span class="tag tag-green">Available</span>':'<span class="tag tag-grey">Paused</span>'}</td><td><div class="row-actions"><button class="btn btn-sm btn-secondary" data-editmenu="${i.id}">${ico('edit')} Edit</button><button class="btn btn-sm btn-quiet" data-togglemenu="${i.id}" data-available="${i.is_available?'false':'true'}">${i.is_available?'Pause':'Enable'}</button></div></td></tr>`).join('')}</tbody></table></div></section>`:
   `<section class="panel"><div class="panel-header"><div><h2>Stall operations</h2><p>Control availability and per-slot pickup capacity.</p></div></div><form id="vendorSettingsForm"><div class="form-field"><label for="vendor-open">Accepting orders</label><select id="vendor-open" name="isOpen"><option value="true" ${d.stall.is_open?'selected':''}>Open for orders</option><option value="false" ${!d.stall.is_open?'selected':''}>Temporarily closed</option></select></div><div class="form-field"><label for="vendor-capacity">Maximum orders per pickup slot</label><input id="vendor-capacity" name="capacityPerSlot" type="number" min="1" max="60" value="${d.stall.capacity_per_slot}" required/><span class="form-help">This controls how many orders customers can reserve in each 30-minute pickup slot.</span></div><button class="btn" type="submit">Save stall settings ${ico('check')}</button></form></section>`;
   return `<div class="container desk desk-vendor"><div class="dashboard-head"><div><div class="overline">Vendor desk · ${esc(d.stall.court_name)}</div><h1>${esc(d.stall.name)}</h1><p>${counts.new===1?'1 order awaits acceptance.':counts.new+' orders await acceptance.'}</p></div><div class="flex-wrap">${d.stall.is_open?'<span class="tag tag-green">Accepting orders</span>':'<span class="tag tag-grey">Orders paused</span>'}<button class="btn btn-secondary btn-sm" data-stall="${d.stall.id}">View storefront ${ico('external')}</button></div></div><div class="stat-grid"><div class="stat"><span class="desk-metric-label">${ico('receipt')} New orders</span><strong>${counts.new}</strong></div><div class="stat"><span class="desk-metric-label">${ico('clock')} Active orders</span><strong>${counts.active}</strong></div><div class="stat"><span class="desk-metric-label">${ico('cloche')} Ready for pickup</span><strong>${counts.ready}</strong></div><div class="stat"><span class="desk-metric-label">${ico('check')} Collected</span><strong>${counts.completed}</strong></div></div><div class="tab-row">${[['orders','Orders'],['scanner','Collection Scanner'],['menu','Menu & availability'],['settings','Stall settings'],['feedback','Reviews']].map(([id,label])=>`<button class="tab-btn ${state.vendorTab===id?'active':''}" aria-pressed="${state.vendorTab===id}" data-vendortab="${id}">${ico(({orders:'receipt',scanner:'phone',menu:'bowl',settings:'sliders',overview:'shop',accounts:'user',stalls:'shop',feedback:'receipt'})[id])} ${label}</button>`).join('')}</div>${integrationBanner}${state.vendorTab==='scanner'?scannerPage():section}${vendorWeeklyPanel(d.weeklyStats,d.weeklyStatsError)}</div>`;
 }
-function adminPage(d){const integrationBanner=d._integrationPending?'<div class="note-box" role="status">Administrator account and order totals are unavailable. Displayed metrics are not live.</div>':'';const section=state.adminTab==='feedback'?feedbackPanel(d.reviews||[],true):state.adminTab==='overview'?`<section class="panel"><div class="panel-header"><div><h2>Platform overview</h2><p>Metrics loaded from the connected backend where available.</p></div></div><div class="stat-grid" style="margin-bottom:0"><div class="stat"><span class="desk-metric-label">${ico('user')} Accounts</span><strong>${d.counts.users}</strong></div><div class="stat"><span class="desk-metric-label">${ico('shop')} Stalls</span><strong>${d.counts.stalls}</strong></div><div class="stat"><span class="desk-metric-label">${ico('receipt')} All orders</span><strong>${d.counts.orders}</strong></div><div class="stat"><span class="desk-metric-label">${ico('clock')} Active orders</span><strong>${d.counts.active_orders}</strong></div></div><div class="note-box" style="margin-top:20px">Only connected endpoints provide live figures. Unavailable features remain pending until their backend is merged.</div></section>`:
+function adminPage(d){const integrationBanner=d._integrationPending?'<div class="note-box" role="status">Administrator account and order totals are unavailable. Displayed metrics are not live.</div>':'';const section=state.adminTab==='feedback'?'<div data-role-review-slot="admin"></div>':state.adminTab==='overview'?`<section class="panel"><div class="panel-header"><div><h2>Platform overview</h2><p>Metrics loaded from the connected backend where available.</p></div></div><div class="stat-grid" style="margin-bottom:0"><div class="stat"><span class="desk-metric-label">${ico('user')} Accounts</span><strong>${d.counts.users}</strong></div><div class="stat"><span class="desk-metric-label">${ico('shop')} Stalls</span><strong>${d.counts.stalls}</strong></div><div class="stat"><span class="desk-metric-label">${ico('receipt')} All orders</span><strong>${d.counts.orders}</strong></div><div class="stat"><span class="desk-metric-label">${ico('clock')} Active orders</span><strong>${d.counts.active_orders}</strong></div></div><div class="note-box" style="margin-top:20px">Only connected endpoints provide live figures. Unavailable features remain pending until their backend is merged.</div></section>`:
   state.adminTab==='accounts'?`<section class="panel"><div class="panel-header"><div><h2>Account permissions</h2><p>Manage roles and vendor stall assignments.</p></div></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Account</th><th>Role</th><th>Assigned stall</th><th>Enabled</th><th>Action</th></tr></thead><tbody>${d.users.map(u=>`<tr data-userrow="${u.id}"><td><strong>${esc(u.displayName)}</strong><div class="muted tiny">${esc(u.email)}</div></td><td><select class="role-select" aria-label="Role for ${esc(u.displayName)}">${['customer','vendor','admin'].map(role=>`<option value="${role}" ${u.role===role?'selected':''}>${titleCase(role)}</option>`).join('')}</select></td><td><select class="stall-select" aria-label="Assigned stall for ${esc(u.displayName)}"><option value="">None</option>${d.stalls.map(s=>`<option value="${s.id}" ${u.stallId===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select></td><td><select class="active-select" aria-label="Account status for ${esc(u.displayName)}"><option value="true" ${u.active?'selected':''}>Enabled</option><option value="false" ${!u.active?'selected':''}>Disabled</option></select></td><td><button class="btn btn-sm btn-secondary" data-saveuser="${u.id}" ${u.id===state.user.id?'disabled':''}>Save</button></td></tr>`).join('')}</tbody></table></div><p class="help-note">Your own admin account cannot be modified through this form. Inactive accounts cannot sign in.</p></section>`:
   `<section class="panel"><div class="panel-header"><div><h2>Participating stalls</h2><p>Manage stall names, status and operating capacity.</p></div><button class="btn btn-sm" data-action="adminAddStall">${ico('plus')} Add stall</button></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Stall</th><th>Food court</th><th>Capacity</th><th>Status</th><th>Action</th></tr></thead><tbody>${d.stalls.map(s=>`<tr><td><strong>${esc(s.name)}</strong><div class="muted tiny">${esc(s.cuisine)}</div></td><td>${esc(s.court_name)}</td><td>${s.capacity_per_slot} / slot</td><td>${s.is_open?'<span class="tag tag-green">Open</span>':'<span class="tag tag-grey">Closed</span>'}</td><td><button class="btn btn-sm btn-secondary" data-adminstall="${s.id}">${ico('edit')} Edit</button></td></tr>`).join('')}</tbody></table></div></section>`;
   return `<div class="container desk desk-admin"><div class="dashboard-head"><div><div class="overline">Platform management</div><h1>Admin dashboard</h1><p>${d.stalls.filter(s=>s.is_open).length} of ${d.stalls.length} stalls open for orders.</p></div><span class="tag tag-blue">Administrator</span></div><div class="tab-row">${[['overview','Overview'],['accounts','Accounts & roles'],['stalls','Stall management'],['feedback','Review moderation']].map(([id,label])=>`<button class="tab-btn ${state.adminTab===id?'active':''}" aria-pressed="${state.adminTab===id}" data-admintab="${id}">${ico(({orders:'receipt',scanner:'phone',menu:'bowl',settings:'sliders',overview:'shop',accounts:'user',stalls:'shop',feedback:'receipt'})[id])} ${label}</button>`).join('')}</div>${integrationBanner}${section}</div>`;
@@ -560,6 +646,7 @@ async function render() {
     if(turn===renderId) {
       root.innerHTML=shell(html);
       window.MakanLiveBridge.decorate?.(root);
+      void refreshReviewModerationPanels(root);
           void refreshCustomerReviewDisplay();
       if(state.focusStalls&&state.page==='explore'){state.focusStalls=false;$('#stall-list')?.scrollIntoView({behavior:'smooth'});}
     }
