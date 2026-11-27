@@ -1,6 +1,6 @@
-const TOKEN_KEY = 'token';
-const CART_KEY = 'cart';
-const LOGIN_PAGE = '/index.html';
+// const TOKEN_KEY = 'token';
+// const CART_KEY = 'cart';
+// const LOGIN_PAGE = '/index.html';
 const MAX_QUANTITY = 20;
 
 const money = new Intl.NumberFormat('en-SG', { style: 'currency', currency: 'SGD' });
@@ -26,7 +26,6 @@ const menuEmpty = document.getElementById('menu-empty');
 const windowList = document.getElementById('window-list');
 const windowsMessage = document.getElementById('windows-message');
 const cartSummaryText = document.getElementById('cart-summary-text');
-const cartBadge = document.getElementById('cart-count');
 const itemTemplate = document.getElementById('menu-item-template');
 const replaceDialog = document.getElementById('replace-dialog');
 const replaceText = document.getElementById('replace-text');
@@ -153,7 +152,7 @@ function renderCartSummary() {
     totalCents += line.quantity * line.priceCents;
   });
 
-  cartBadge.textContent = String(count);
+  document.getElementById('cart-count').textContent = String(count);
   if (count === 0) {
     cartSummaryText.textContent = 'Your cart is empty.';
     return;
@@ -385,10 +384,5 @@ if (STALL_IMAGES[stall.name]) {
   renderCartSummary();
   loadWindows(stall.id);
 }
-
-document.getElementById('sign-out').addEventListener('click', () => {
-  localStorage.removeItem(TOKEN_KEY);
-  window.location.href = LOGIN_PAGE;
-});
 
 loadPage();

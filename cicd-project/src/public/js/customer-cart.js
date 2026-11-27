@@ -1,11 +1,8 @@
-const TOKEN_KEY = 'token';
-const CART_KEY = 'cart';
-const LOGIN_PAGE = '/index.html';
+// const TOKEN_KEY = 'token';
+// const CART_KEY = 'cart';
+// const LOGIN_PAGE = '/index.html';
 const ORDERS_PAGE = 'orders.html';
 const MAX_QUANTITY = 20;
-
-//temporaryyy till i get the person table :3
-const CHECKOUT_NOT_READY = [404, 501, 503];
 
 const money = new Intl.NumberFormat('en-SG', { style: 'currency', currency: 'SGD' });
 const timeFormat = new Intl.DateTimeFormat('en-SG', {
@@ -25,7 +22,6 @@ const dayFormat = new Intl.DateTimeFormat('en-SG', {
 const cartEmpty = document.getElementById('cart-empty');
 const cartContent = document.getElementById('cart-content');
 const cartNotice = document.getElementById('cart-notice');
-const cartBadge = document.getElementById('cart-count');
 const stallNameHeading = document.getElementById('cart-stall-name');
 const countText = document.getElementById('cart-count-text');
 const cartLines = document.getElementById('cart-lines');
@@ -52,7 +48,7 @@ const ITEM_IMAGES = {
 };
 
 // ── Page state ───────────────────────────────────────────
-let cart = readCart();
+let cart = { stallId: null, stallName: '', items: [] };
 let windows = [];
 let windowsFailed = false;
 let selectedWindowId = null;
@@ -163,10 +159,31 @@ function totalCents() {
 }
 
 // ── Rendering: basket ────────────────────────────────────
+function renderCartBadge() {
+  const badge = document.getElementById('cart-count');
+  if (!badge) return; // nav not ready yet, skip
+  let count = 0;
+  try {
+    const cart = JSON.parse(localStorage.getItem(CART_KEY));
+    if (cart && Array.isArray(cart.items)) {
+      count = cart.items.reduce((sum, line) => sum + (Number.isInteger(line.quantity) ? line.quantity : 0), 0);
+    }
+  } catch {
+    
+  }
+  badge.textContent = String(count);
+}
+
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted && !localStorage.getItem(TOKEN_KEY)) {
+    window.location.href = LOGIN_PAGE;
+  }
+});
+
 function showEmpty() {
   cartContent.hidden = true;
   cartEmpty.hidden = false;
-  cartBadge.textContent = '0';
+  renderCartBadge();
 }
 
 function renderLines() {
@@ -214,7 +231,7 @@ function renderSummary() {
   summaryItems.textContent = money.format(totalCents() / 100);
   summaryTotal.textContent = money.format(totalCents() / 100);
   countText.textContent = `${pluralise(count, 'item', 'items')} in your basket`;
-  cartBadge.textContent = String(count);
+  renderCartBadge();
 }
 
 function renderAll() {
@@ -375,6 +392,7 @@ function renderWindows() {
 }
 
 async function loadWindows() {
+  if (!cart.stallId) return;
   windowsMessage.textContent = 'Loading pickup times...';
   windowsMessage.hidden = false;
   slotsField.hidden = true;
@@ -430,16 +448,6 @@ function updateCheckoutState() {
 
 function showCheckoutError(error) {
   let message = 'We could not place your order. Check your connection and try again.';
-
-  if (CHECKOUT_NOT_READY.includes(error.status)) {
-    message = 'Checkout is not available yet. Your basket is saved, so you can try again later.';
-  } else if (error.status === 409) {
-    message =
-      error.serverMessage || 'That pickup time or one of your items is no longer available. Choose again and retry.';
-  } else if (error.status === 400) {
-    message = error.serverMessage || 'Something in your order is not valid. Check your basket and try again.';
-  }
-
   checkoutMessage.textContent = message;
   checkoutMessage.hidden = false;
 }
@@ -477,6 +485,7 @@ async function placeOrder() {
 
     // A full slot or sold-out item means the page data is stale, so refresh it.
     if (error.status === 409) {
+      if (!cart.stallId) return;
       await syncWithMenu();
       renderAll();
       loadWindows();
@@ -501,15 +510,17 @@ document.getElementById('clear-confirm').addEventListener('click', () => {
   renderAll();
 });
 
-document.getElementById('sign-out').addEventListener('click', () => {
-  localStorage.removeItem(TOKEN_KEY);
-  window.location.href = LOGIN_PAGE;
-});
-
 // ── Page load ────────────────────────────────────────────
 async function loadPage() {
   if (!localStorage.getItem(TOKEN_KEY)) {
     window.location.href = LOGIN_PAGE;
+    return;
+  }
+
+  cart = readCart();
+  
+  if (cart.items.length === 0) {
+    showEmpty();
     return;
   }
 

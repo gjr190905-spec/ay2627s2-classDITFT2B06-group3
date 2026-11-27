@@ -1,6 +1,6 @@
-const TOKEN_KEY = 'token';
-const CART_KEY = 'cart';
-const LOGIN_PAGE = '/index.html';
+// const TOKEN_KEY = 'token';
+// const CART_KEY = 'cart';
+// const LOGIN_PAGE = '/index.html';
 const ORDERS_PAGE = 'orders.html';
 const POLL_MS = 30000;
 
@@ -332,10 +332,15 @@ async function loadPage() {
   await loadList(false);
   startPolling(() => loadList(true), () => false);
 }
-
-document.getElementById('sign-out').addEventListener('click', () => {
-  localStorage.removeItem(TOKEN_KEY);
-  window.location.href = LOGIN_PAGE;
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted && !localStorage.getItem(TOKEN_KEY)) {
+    window.location.href = LOGIN_PAGE;
+  }
 });
+
+// document.getElementById('sign-out').addEventListener('click', () => {
+//   localStorage.removeItem(TOKEN_KEY);
+//   window.location.href = LOGIN_PAGE;
+// });
 
 loadPage();

@@ -8,34 +8,7 @@
     <link rel="stylesheet" href="../customer-styles/menu.css" />
   </head>
   <body>
-    <a class="skip-link" href="#main">Skip to main content</a>
-
-    <p class="promo-bar">MADE FOR SP STUDENTS & STAFF    |     ORDER TOGETHER, SAVE MORE     |     COLLECT AT YOUR CAMPUS CANTEEN</p>
-
-    <header class="site-header">
-      <a class="brand" href="menu.html">
-        <img class="brand__logo" src="../images/brand/makan-liao-logo.png" alt="Makan Liao" width="120" height="48" />
-      </a>
-
-      <nav class="site-nav" aria-label="Main">
-        <ul class="site-nav__list">
-          <li><a href="menu.html" aria-current="page">Food stalls</a></li>
-          <li><a href="orders.html">My orders</a></li>
-          <li>
-            <a href="cart.html">
-              Cart
-              <span class="cart-badge" id="cart-count" aria-live="polite">0</span>
-            </a>
-          </li>
-        </ul>
-      </nav>
-
-      <div class="site-user">
-        <span class="site-user__name" id="user-name"></span>
-        <button type="button" class="button button--outline" id="sign-out">Sign out</button>
-      </div>
-    </header>
-
+    <div id="site-nav-mount"></div>
     <main id="main">
       <section class="page-intro" aria-labelledby="page-title">
       <div class="overline">FIND YOUR NEXT FAVOURITE</div>
@@ -209,7 +182,7 @@
         </article>
       </li>
     </template>
-
+    <script src="../js/nav.js" defer></script>
     <script src="../js/customer-menu.js" defer></script>
   </body>
 </html>
