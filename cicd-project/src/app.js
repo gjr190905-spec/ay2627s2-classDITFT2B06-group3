@@ -28,6 +28,13 @@ const roleNotificationsRouter = require('./routers/RoleNotifications.router');
 const reviewModerationRouter = require('./routers/ReviewModeration.router');
 
 const app = express();
+// MAKAN_LIAO_CANONICAL_HOMEPAGE_ROUTE
+// Keep the existing /prototype-exact asset URLs intact.
+// Serve the actual application at / and /index.html instead of the starter landing page.
+app.get(['/', '/index.html'], (req, res) => {
+  res.sendFile(require('node:path').join(__dirname, 'public', 'prototype-exact', 'index.html'));
+});
+
 
 // 1 MB so the vendor pages can send a (shrunken) logo, banner or menu photo as a base64 data URL.
 app.use(express.json({ limit: '1mb' }));
