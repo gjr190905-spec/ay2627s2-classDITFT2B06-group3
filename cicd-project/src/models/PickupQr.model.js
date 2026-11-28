@@ -29,7 +29,6 @@ async function columns(db) {
   const result = Object.fromEntries(Object.entries(ALLOWED).map(([key, choices]) => [key, choose(names, choices, key !== 'number')]));
   return result;
 }
-function orderRef(col) { return `o.${col}`; }
 function orderNumberExpr(schema) { return schema.number ? `o.${schema.number}::text` : `o.${schema.id}::text`; }
 async function readyOrdersForCustomer(customerId) {
   const uid = positiveId(customerId);
@@ -49,10 +48,17 @@ async function issueForCustomer(customerId, orderId) {
       FROM orders o WHERE o.${s.id}=$1 AND o.${s.customer}=$2 FOR UPDATE`, [oid, uid]);
     if (!rows.length) throw problem(404, 'Order not found in your account.');
     if (rows[0].status !== 'READY') throw problem(409, 'Pickup QR is available only when your order is READY.');
+
+    const existing = await db.query(`SELECT collected_at FROM pickup_collection_passes WHERE order_id=$1 FOR UPDATE`, [oid]);
+    if (existing.rows.length) {
+      if (existing.rows[0].collected_at) throw problem(409, 'Order has already been collected.');
+      await db.query('COMMIT');
+      return { alreadyIssued: true, orderNumber: rows[0].order_number };
+    }
+
     const code = `MLP-${crypto.randomBytes(32).toString('hex')}`;
     await db.query(`INSERT INTO pickup_collection_passes (order_id, token_hash, issued_at, collected_at, collected_by)
-      VALUES ($1,$2,NOW(),NULL,NULL)
-      ON CONFLICT (order_id) DO UPDATE SET token_hash=EXCLUDED.token_hash, issued_at=NOW(), collected_at=NULL, collected_by=NULL`,
+      VALUES ($1,$2,NOW(),NULL,NULL)`,
     [oid, digest(code)]);
     await db.query('COMMIT');
     return { code, orderNumber: rows[0].order_number };

@@ -1,7 +1,5 @@
 const TOKEN_KEY = 'token';
 const LOGIN_PAGE = 'index.html';
-const ORDERS_PAGE = 'orders.html';
-
 const money = new Intl.NumberFormat('en-SG', { style: 'currency', currency: 'SGD' });
 
 const params = new URLSearchParams(window.location.search);
@@ -115,7 +113,7 @@ payButton.addEventListener('click', async () => {
 
     resultMessage.textContent = 'Payment successful.';
     resultDetail.textContent = `Transaction: ${result.payment.transaction_reference}`;
-    receiptLink.href = `${ORDERS_PAGE}?id=${encodeURIComponent(orderId)}`;
+    receiptLink.href = `receipt.html?id=${encodeURIComponent(orderId)}`;
     receiptLink.hidden = false;
     resultSection.hidden = false;
     payButton.hidden = true;

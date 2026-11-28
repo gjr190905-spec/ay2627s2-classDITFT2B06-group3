@@ -1,4 +1,7 @@
 'use strict';
+process.env.JWT_SECRET = 'a'.repeat(32);
+class mockJsonWebTokenError extends Error {}
+jest.mock('jsonwebtoken', () => ({ verify: jest.fn(), sign: jest.fn(), JsonWebTokenError: mockJsonWebTokenError }));
 jest.mock('../../src/models/Session.model',()=>({createSession:jest.fn(),findActiveSession:jest.fn(),revokeSession:jest.fn()}));
 jest.mock('../../src/models/PickupQr.model',()=>({
   readyOrdersForCustomer:jest.fn(),issueForCustomer:jest.fn(),inspectForVendor:jest.fn(),
@@ -58,4 +61,44 @@ test('customer QR issuance returns real encoded SVG',async()=>{
   const r=await request(app).post('/api/pickup/issue').set('Cookie',cookie).set('X-CSRF-Token',csrf).send({orderId:2});
   expect(r.status).toBe(200);expect(r.body.pickup.qrCode).toMatch(/^data:image\/svg\+xml;base64,/);
   expect(model.issueForCustomer).toHaveBeenCalledWith(19,2);
+});
+test('JWT customer can issue a QR without CSRF',async()=>{
+  const jwt=require('jsonwebtoken');
+  const {findActiveSession}=require('../../src/models/Session.model');
+  findActiveSession.mockResolvedValue({id:19,name:'User',email:'test@example.com',role:'customer',stallId:null,csrfToken:csrf});
+  jwt.verify.mockReturnValue({sub:'19',role:'customer',sid:'c'.repeat(64),typ:'access',iss:'makan-liao',aud:'makan-liao-api'});
+  model.issueForCustomer.mockResolvedValue({code:'MLP-'+'a'.repeat(64),orderNumber:'ML-2'});
+  const r=await request(app).post('/api/pickup/issue').set('Authorization','Bearer fake.jwt.token').send({orderId:2});
+  expect(r.status).toBe(200);expect(r.body.pickup.qrCode).toMatch(/^data:image\/svg\+xml;base64,/);
+  expect(model.issueForCustomer).toHaveBeenCalledWith(19,2);
+});
+test('invalid JWT is rejected',async()=>{
+  const jwt=require('jsonwebtoken');
+  jwt.verify.mockImplementation(()=>{const e=new Error('bad token');e.name='JsonWebTokenError';throw e;});
+  const r=await request(app).post('/api/pickup/issue').set('Authorization','Bearer bad.token').send({orderId:2});
+  expect(r.status).toBe(401);
+  expect(model.issueForCustomer).not.toHaveBeenCalled();
+});
+test('JWT customer cannot issue QR for another customer order',async()=>{
+  const jwt=require('jsonwebtoken');
+  const {findActiveSession}=require('../../src/models/Session.model');
+  findActiveSession.mockResolvedValue({id:19,name:'User',email:'test@example.com',role:'customer',stallId:null,csrfToken:csrf});
+  jwt.verify.mockReturnValue({sub:'19',role:'customer',sid:'c'.repeat(64),typ:'access',iss:'makan-liao',aud:'makan-liao-api'});
+  model.issueForCustomer.mockRejectedValue(Object.assign(new Error('Order not found in your account.'),{status:404}));
+  const r=await request(app).post('/api/pickup/issue').set('Authorization','Bearer fake.jwt.token').send({orderId:999});
+  expect(r.status).toBe(404);
+});
+test('non-READY order cannot receive a QR',async()=>{
+  signIn('customer',null);
+  model.issueForCustomer.mockRejectedValue(Object.assign(new Error('Pickup QR is available only when your order is READY.'),{status:409}));
+  const r=await request(app).post('/api/pickup/issue').set('Cookie',cookie).set('X-CSRF-Token',csrf).send({orderId:2});
+  expect(r.status).toBe(409);
+});
+test('repeated issuance returns alreadyIssued without a new QR',async()=>{
+  signIn('customer',null);
+  model.issueForCustomer.mockResolvedValue({alreadyIssued:true,orderNumber:'ML-2'});
+  const r=await request(app).post('/api/pickup/issue').set('Cookie',cookie).set('X-CSRF-Token',csrf).send({orderId:2});
+  expect(r.status).toBe(200);
+  expect(r.body.pickup.alreadyIssued).toBe(true);
+  expect(r.body.pickup.qrCode).toBeUndefined();
 });

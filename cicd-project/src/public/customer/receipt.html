@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Receipt | Makan Liao</title>
+    <link rel="stylesheet" href="../customer-styles/orders.css" />
+    <link rel="stylesheet" href="../customer-styles/menu.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+
+    <p class="promo-bar">Order before your break. Pay at the stall when you collect.</p>
+
+    <header class="site-header">
+      <a class="brand" href="menu.html">
+        <img class="brand__logo" src="../images/brand/makan-liao-logo.png" alt="Makan Liao" width="120" height="48" />
+      </a>
+
+      <nav class="site-nav" aria-label="Main">
+        <ul class="site-nav__list">
+          <li><a href="menu.html">Food stalls</a></li>
+          <li><a href="orders.html">My orders</a></li>
+          <li>
+            <a href="cart.html">
+              Cart
+              <span class="cart-badge" id="cart-count" aria-live="polite">0</span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+
+      <div class="site-user">
+        <button type="button" class="button button--outline" id="sign-out">Sign out</button>
+      </div>
+    </header>
+
+    <main id="main">
+      <p class="message" id="receipt-loading" role="status">Loading your receipt...</p>
+      <p class="message message--error" id="receipt-error" role="alert" hidden></p>
+
+      <div id="receipt-content" hidden>
+        <section class="card order-detail" aria-labelledby="detail-title">
+          <div class="detail-head">
+            <div>
+              <p class="orders-eyebrow">Receipt</p>
+              <h1 id="detail-title"></h1>
+              <p class="detail-stall" id="detail-stall"></p>
+            </div>
+            <p class="order-status" id="detail-status"></p>
+          </div>
+
+          <dl class="detail-facts">
+            <div>
+              <dt>Pickup time</dt>
+              <dd id="detail-pickup"></dd>
+            </div>
+            <div>
+              <dt>Placed</dt>
+              <dd id="detail-placed"></dd>
+            </div>
+            <div>
+              <dt>Payment status</dt>
+              <dd id="payment-status"></dd>
+            </div>
+            <div>
+              <dt>Payment method</dt>
+              <dd id="payment-method"></dd>
+            </div>
+            <div>
+              <dt>Transaction</dt>
+              <dd id="transaction-ref"></dd>
+            </div>
+            <div>
+              <dt>Paid at</dt>
+              <dd id="paid-at"></dd>
+            </div>
+            <div>
+              <dt>Collection reference</dt>
+              <dd id="collection-ref"></dd>
+            </div>
+          </dl>
+
+          <h2>Items</h2>
+          <ul class="detail-items" id="detail-items"></ul>
+
+          <p class="detail-total">
+            <span>Total paid</span>
+            <strong id="detail-total"></strong>
+          </p>
+
+          <div id="qr-section" hidden>
+            <h2>Pickup QR</h2>
+            <img id="qr-image" alt="Pickup QR code" width="220" height="220" />
+            <p class="card__hint" id="qr-note"></p>
+          </div>
+          <p class="card__hint" id="qr-unavailable" hidden>
+            Your pickup QR will be available here once your order is ready.
+          </p>
+        </section>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <p>A campus food ordering platform for students and staff.</p>
+    </footer>
+
+    <script src="../js/customer-receipt.js" defer></script>
+  </body>
+</html>

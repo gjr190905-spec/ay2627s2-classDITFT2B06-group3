@@ -45,3 +45,28 @@ test('wrong-stall scan is rejected and leaves order unchanged',async()=>{
   await expect(inspectForVendor(9,qr,true,35)).rejects.toMatchObject({status:403});
   expect(queryLog.some(x=>x.sql.includes('UPDATE orders'))).toBe(false);
 });
+test('repeated issuance does not replace an existing uncollected token',async()=>{
+  const db2 = { query: jest.fn(async (sql, p=[]) => {
+    queryLog.push({sql,p});
+    if(sql.includes('information_schema.columns')) return { rows: cols };
+    if(sql.includes('SELECT UPPER') && sql.includes('FOR UPDATE')) return { rows: [{status:'READY',order_number:'ML-2'}] };
+    if(sql.includes('SELECT collected_at FROM pickup_collection_passes')) return { rows: [{ collected_at: null }] };
+    return { rows:[],rowCount:1 };
+  }), release: jest.fn() };
+  pool.connect.mockResolvedValue(db2); pool.query.mockImplementation(db2.query);
+  const result = await issueForCustomer(8,2);
+  expect(result.alreadyIssued).toBe(true);
+  expect(result.code).toBeUndefined();
+  expect(queryLog.some(x=>x.sql.includes('INSERT INTO pickup_collection_passes'))).toBe(false);
+});
+test('collected order cannot receive a replacement QR',async()=>{
+  const db2 = { query: jest.fn(async (sql, p=[]) => {
+    queryLog.push({sql,p});
+    if(sql.includes('information_schema.columns')) return { rows: cols };
+    if(sql.includes('SELECT UPPER') && sql.includes('FOR UPDATE')) return { rows: [{status:'READY',order_number:'ML-2'}] };
+    if(sql.includes('SELECT collected_at FROM pickup_collection_passes')) return { rows: [{ collected_at: new Date() }] };
+    return { rows:[],rowCount:1 };
+  }), release: jest.fn() };
+  pool.connect.mockResolvedValue(db2); pool.query.mockImplementation(db2.query);
+  await expect(issueForCustomer(8,2)).rejects.toMatchObject({status:409});
+});
