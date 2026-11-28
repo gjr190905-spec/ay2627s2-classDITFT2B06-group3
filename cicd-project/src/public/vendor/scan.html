@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pickup QR Verification | Makan Liao</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/vendor-dashboard.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="vh-header__inner">
+        <span class="vh-brand__text">
+          <span class="vh-brand__stall">Vendor Desk</span>
+        </span>
+        <a class="ml-btn vh-logout" href="./home.html">Back to home</a>
+      </div>
+    </header>
+
+    <main class="vh-main" id="main">
+      <div class="db-heading">
+        <div>
+          <h1 class="vp-title">Pickup QR Verification</h1>
+          <p class="db-date">Scan a customer's pickup QR to verify and confirm collection.</p>
+        </div>
+      </div>
+
+      <section class="db-card" aria-labelledby="scan-title">
+        <h2 class="db-card__title" id="scan-title">Scan QR code</h2>
+        <p class="db-card__sub">Use the camera, upload an image, or paste a scanned code.</p>
+
+        <div class="scan-actions">
+          <button type="button" class="button button--primary" id="start-camera">Start camera</button>
+          <button type="button" class="button button--outline" id="stop-camera" hidden>Stop camera</button>
+          <button type="button" class="button button--outline" id="retry-scan" hidden>Scan another</button>
+        </div>
+
+        <video id="camera" autoplay playsinline hidden width="320" height="240"></video>
+        <canvas id="canvas" hidden></canvas>
+
+        <div class="form-field">
+          <label for="image-upload">Upload QR image</label>
+          <input type="file" id="image-upload" accept="image/*" />
+        </div>
+
+        <form id="usb-form" class="form-field">
+          <label for="usb-code">USB / Bluetooth scanner</label>
+          <input type="text" id="usb-code" autocomplete="off" />
+          <button type="submit" class="button button--outline">Verify</button>
+        </form>
+
+        <p class="message" id="scan-status" role="status"></p>
+        <p class="message message--error" id="scan-error" role="alert" hidden></p>
+      </section>
+
+      <section class="db-card" id="order-panel" hidden aria-labelledby="order-title">
+        <h2 class="db-card__title" id="order-title">Order details</h2>
+        <p id="order-number"></p>
+        <p id="order-status"></p>
+        <p id="order-message"></p>
+
+        <div class="confirm-box">
+          <label><input type="checkbox" id="handover" /> I have handed over the order to the customer.</label>
+          <label><input type="checkbox" id="payment" /> Payment has been confirmed.</label>
+        </div>
+
+        <button type="button" class="button button--primary" id="confirm-collection" disabled>Confirm collection</button>
+        <p class="message message--success" id="success-message" role="status" hidden></p>
+      </section>
+    </main>
+
+    <script src="../js/jsQR.js"></script>
+    <script src="../js/vendor-scan.js" defer></script>
+  </body>
+</html>
