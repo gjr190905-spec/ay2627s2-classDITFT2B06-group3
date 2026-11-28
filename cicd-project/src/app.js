@@ -22,8 +22,10 @@ const vendorOrderStatusRouter = require('./routers/VendorOrdersStatusRouter.js')
 const { loadSession } = require('./middleware/auth-session');
 const pickupQrRouter = require('./routers/PickupQr.router');
 const liveCheckoutRouter = require('./routers/LiveCheckout.router');
+const customerReviewRouter = require('./routers/CustomerReview.router');
 const customerNotificationsRouter = require('./routers/CustomerNotifications.router');
 const roleNotificationsRouter = require('./routers/RoleNotifications.router');
+const reviewModerationRouter = require('./routers/ReviewModeration.router');
 
 const app = express();
 
@@ -45,8 +47,11 @@ app.get('/favicon.ico', (req, res) => res.status(204).end());
 app.use('/api/auth', authRouter);
 app.use('/api/pickup', pickupQrRouter);
 app.use('/api/live', liveCheckoutRouter);
+// Day 12: the existing customer receipt form calls /api/orders/:id/feedback.
+app.use('/api/orders', customerReviewRouter);
 app.use('/api/notifications', customerNotificationsRouter);
 app.use('/api/activity-notifications', roleNotificationsRouter);
+app.use('/api/reviews', reviewModerationRouter);
 app.use('/api/profile', profileRouter);
 app.use('/api/vendor/weekly-stats', weeklyStatsRouter);
 app.use('/somethings', somethingRouter);
